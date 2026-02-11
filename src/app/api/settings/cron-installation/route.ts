@@ -1,12 +1,20 @@
 import { NextResponse } from "next/server";
-import { runOpenClaw } from "@/lib/openclaw";
+import { gatewayConfigGet, gatewayConfigPatch } from "@/lib/gateway";
 
 const CFG_PATH = "plugins.entries.recipes.config.cronInstallation";
 
+function getPath(obj: unknown, p: string): unknown {
+  return p.split(".").reduce<unknown>((acc, k) => {
+    if (!acc || typeof acc !== "object") return undefined;
+    return (acc as Record<string, unknown>)[k];
+  }, obj);
+}
+
 export async function GET() {
-  const { stdout, stderr } = await runOpenClaw(["config", "get", CFG_PATH]);
-  const value = stdout.trim();
-  return NextResponse.json({ ok: true, path: CFG_PATH, value, stderr });
+  const { raw } = await gatewayConfigGet();
+  const cfg = JSON.parse(raw);
+  const value = String(getPath(cfg, CFG_PATH) ?? "").trim();
+  return NextResponse.json({ ok: true, path: CFG_PATH, value });
 }
 
 export async function PUT(req: Request) {
@@ -16,6 +24,20 @@ export async function PUT(req: Request) {
     return NextResponse.json({ ok: false, error: "value must be one of: off|prompt|on" }, { status: 400 });
   }
 
-  const { stdout, stderr } = await runOpenClaw(["config", "set", CFG_PATH, value]);
-  return NextResponse.json({ ok: true, path: CFG_PATH, value, stdout, stderr });
+  await gatewayConfigPatch(
+    {
+      plugins: {
+        entries: {
+          recipes: {
+            config: {
+              cronInstallation: value,
+            },
+          },
+        },
+      },
+    },
+    `ClawKitchen: set ${CFG_PATH}=${value}`
+  );
+
+  return NextResponse.json({ ok: true, path: CFG_PATH, value, note: "Gateway will restart to apply config." });
 }

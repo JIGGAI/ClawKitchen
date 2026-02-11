@@ -3,6 +3,7 @@ import path from "node:path";
 
 type OpenClawConfig = {
   agents?: { defaults?: { workspace?: string } };
+  gateway?: { port?: number; auth?: { token?: string } };
   plugins?: {
     installs?: { recipes?: { installPath?: string; sourcePath?: string } };
     load?: { paths?: string[] };

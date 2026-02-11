@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { runOpenClaw } from "@/lib/openclaw";
+import { toolsInvoke } from "@/lib/gateway";
 
 export async function POST(req: Request) {
   const body = (await req.json()) as { id?: string; action?: string };
@@ -12,11 +12,11 @@ export async function POST(req: Request) {
   }
 
   if (action === "run") {
-    const { stdout, stderr } = await runOpenClaw(["cron", "run", id, "--json"]);
-    return NextResponse.json({ ok: true, action, id, stdout, stderr });
+    const result = await toolsInvoke({ tool: "cron", args: { action: "run", jobId: id } });
+    return NextResponse.json({ ok: true, action, id, result });
   }
 
-  const flag = action === "enable" ? "--enable" : "--disable";
-  const { stdout, stderr } = await runOpenClaw(["cron", "edit", id, flag, "--json"].filter(Boolean));
-  return NextResponse.json({ ok: true, action, id, stdout, stderr });
+  const patch = { enabled: action === "enable" };
+  const result = await toolsInvoke({ tool: "cron", args: { action: "update", jobId: id, patch } });
+  return NextResponse.json({ ok: true, action, id, result });
 }
