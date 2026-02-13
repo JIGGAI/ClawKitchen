@@ -50,6 +50,9 @@ export default async function RecipesPage() {
   const builtin = recipes.filter((r) => r.source === "builtin");
   const workspace = recipes.filter((r) => r.source === "workspace");
 
+  const customTeams = workspace.filter((r) => r.kind === "team" && r.id.startsWith("custom-"));
+  const workspaceOther = workspace.filter((r) => !(r.kind === "team" && r.id.startsWith("custom-")));
+
   return (
     <div className="ck-glass mx-auto max-w-4xl p-6 sm:p-8">
       <div className="flex items-baseline justify-between gap-4">
@@ -63,7 +66,8 @@ export default async function RecipesPage() {
       </div>
 
       <RecipesSection title={`Builtin (${builtin.length})`} items={builtin} />
-      <RecipesSection title={`Workspace (${workspace.length})`} items={workspace} />
+      <RecipesSection title={`Custom team recipes (${customTeams.length})`} items={customTeams} />
+      <RecipesSection title={`Workspace (${workspaceOther.length})`} items={workspaceOther} />
 
       <p className="mt-10 text-xs text-[color:var(--ck-text-tertiary)]">
         Note: editing builtin recipes will modify the recipes plugin install path on this machine.

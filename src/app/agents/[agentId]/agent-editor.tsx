@@ -10,16 +10,26 @@ type AgentListItem = {
   isDefault?: boolean;
 };
 
+type FileListResponse = { ok?: boolean; files?: unknown[] };
+
+type FileEntry = { name: string; missing: boolean };
+
 export default function AgentEditor({ agentId }: { agentId: string }) {
   const [agent, setAgent] = useState<AgentListItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string>("");
 
+  const [activeTab, setActiveTab] = useState<"identity" | "files">("identity");
+
   const [name, setName] = useState<string>("");
   const [emoji, setEmoji] = useState<string>("");
   const [theme, setTheme] = useState<string>("");
   const [avatar, setAvatar] = useState<string>("");
+
+  const [agentFiles, setAgentFiles] = useState<FileEntry[]>([]);
+  const [fileName, setFileName] = useState<string>("IDENTITY.md");
+  const [fileContent, setFileContent] = useState<string>("");
 
   const [saveAsNewId, setSaveAsNewId] = useState<string>("");
 
@@ -28,12 +38,27 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
       setLoading(true);
       setMessage("");
       try {
-        const res = await fetch("/api/agents", { cache: "no-store" });
-        const json = await res.json();
-        const list = (json.agents ?? []) as AgentListItem[];
+        const [agentsRes, filesRes] = await Promise.all([
+          fetch("/api/agents", { cache: "no-store" }),
+          fetch(`/api/agents/files?agentId=${encodeURIComponent(agentId)}`, { cache: "no-store" }),
+        ]);
+
+        const agentsJson = (await agentsRes.json()) as { agents?: unknown[] };
+        const list = Array.isArray(agentsJson.agents) ? (agentsJson.agents as AgentListItem[]) : [];
         const found = list.find((a) => a.id === agentId) ?? null;
         setAgent(found);
         setName(found?.identityName ?? "");
+
+        const filesJson = (await filesRes.json()) as FileListResponse;
+        if (filesRes.ok && filesJson.ok) {
+          const files = Array.isArray(filesJson.files) ? filesJson.files : [];
+          setAgentFiles(
+            files.map((f) => {
+              const entry = f as { name?: unknown; missing?: unknown };
+              return { name: String(entry.name ?? ""), missing: Boolean(entry.missing) };
+            }),
+          );
+        }
       } catch (e: unknown) {
         setMessage(e instanceof Error ? e.message : String(e));
       } finally {
@@ -42,7 +67,7 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
     })();
   }, [agentId]);
 
-  async function onSave() {
+  async function onSaveIdentity() {
     setSaving(true);
     setMessage("");
     try {
@@ -51,7 +76,7 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ agentId, name, emoji, theme, avatar }),
       });
-      const json = await res.json();
+      const json = (await res.json()) as { message?: string; error?: string };
       if (!res.ok) throw new Error(json.message || json.error || "Save failed");
       setMessage("Saved identity via openclaw agents set-identity");
     } catch (e: unknown) {
@@ -73,9 +98,47 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ newAgentId, name, emoji, theme, avatar, model: agent?.model }),
       });
-      const json = await res.json();
+      const json = (await res.json()) as { message?: string; error?: string };
       if (!res.ok) throw new Error(json.message || json.error || "Save As New failed");
       setMessage(`Created new agent: ${newAgentId}`);
+    } catch (e: unknown) {
+      setMessage(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function onLoadAgentFile(nextName: string) {
+    setSaving(true);
+    setMessage("");
+    try {
+      const res = await fetch(
+        `/api/agents/file?agentId=${encodeURIComponent(agentId)}&name=${encodeURIComponent(nextName)}`,
+        { cache: "no-store" }
+      );
+      const json = (await res.json()) as { ok?: boolean; error?: string; content?: string };
+      if (!res.ok || !json.ok) throw new Error(json.error || "Failed to load file");
+      setFileName(nextName);
+      setFileContent(String(json.content ?? ""));
+    } catch (e: unknown) {
+      setMessage(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function onSaveAgentFile() {
+    setSaving(true);
+    setMessage("");
+    try {
+      const res = await fetch("/api/agents/file", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ agentId, name: fileName, content: fileContent }),
+      });
+      const json = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !json.ok) throw new Error(json.error || "Failed to save file");
+      setMessage(`Saved ${fileName}`);
     } catch (e: unknown) {
       setMessage(e instanceof Error ? e.message : String(e));
     } finally {
@@ -98,90 +161,152 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
         <div className="mt-1 text-xs text-[color:var(--ck-text-tertiary)]">Workspace: {agent.workspace}</div>
       ) : null}
 
+      <div className="mt-6 flex flex-wrap gap-2">
+        {(
+          [
+            { id: "identity", label: "Identity" },
+            { id: "files", label: "Files" },
+          ] as const
+        ).map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setActiveTab(t.id)}
+            className={
+              activeTab === t.id
+                ? "rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)]"
+                : "rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] hover:bg-white/10"
+            }
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
       <div className="mt-6 grid grid-cols-1 gap-4">
-        <div className="ck-glass-strong p-4">
-          <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Identity</div>
+        {activeTab === "identity" ? (
+          <div className="ck-glass-strong p-4">
+            <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Identity</div>
 
-          <label className="mt-3 block text-xs font-medium text-[color:var(--ck-text-secondary)]">Name</label>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
-          />
+            <label className="mt-3 block text-xs font-medium text-[color:var(--ck-text-secondary)]">Name</label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+            />
 
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div>
-              <label className="block text-xs font-medium text-[color:var(--ck-text-secondary)]">Emoji</label>
-              <input
-                value={emoji}
-                onChange={(e) => setEmoji(e.target.value)}
-                placeholder="🦞"
-                className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
-              />
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div>
+                <label className="block text-xs font-medium text-[color:var(--ck-text-secondary)]">Emoji</label>
+                <input
+                  value={emoji}
+                  onChange={(e) => setEmoji(e.target.value)}
+                  placeholder="🦞"
+                  className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[color:var(--ck-text-secondary)]">Theme</label>
+                <input
+                  value={theme}
+                  onChange={(e) => setTheme(e.target.value)}
+                  placeholder="warm, sharp, calm"
+                  className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[color:var(--ck-text-secondary)]">Avatar</label>
+                <input
+                  value={avatar}
+                  onChange={(e) => setAvatar(e.target.value)}
+                  placeholder="avatars/openclaw.png"
+                  className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                />
+              </div>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-[color:var(--ck-text-secondary)]">Theme</label>
-              <input
-                value={theme}
-                onChange={(e) => setTheme(e.target.value)}
-                placeholder="warm, sharp, calm"
-                className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
-              />
+
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <button
+                disabled={saving}
+                onClick={onSaveIdentity}
+                className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] transition-colors hover:bg-[var(--ck-accent-red-hover)] active:bg-[var(--ck-accent-red-active)] disabled:opacity-50"
+              >
+                {saving ? "Saving…" : "Save"}
+              </button>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-[color:var(--ck-text-secondary)]">Avatar</label>
-              <input
-                value={avatar}
-                onChange={(e) => setAvatar(e.target.value)}
-                placeholder="avatars/openclaw.png"
-                className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+
+            <div className="mt-4 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3">
+              <div className="text-xs font-medium text-[color:var(--ck-text-secondary)]">Save As New (new agent id)</div>
+              <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                <input
+                  value={saveAsNewId}
+                  onChange={(e) => setSaveAsNewId(e.target.value)}
+                  placeholder={`${agentId}-copy`}
+                  className="w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                />
+                <button
+                  disabled={saving}
+                  onClick={onSaveAsNew}
+                  className="shrink-0 rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15 disabled:opacity-50"
+                >
+                  {saving ? "Saving…" : "Save As New"}
+                </button>
+              </div>
+              <p className="mt-2 text-xs text-[color:var(--ck-text-tertiary)]">
+                This adds a new agent entry to OpenClaw config and restarts the gateway.
+              </p>
+            </div>
+          </div>
+        ) : null}
+
+        {activeTab === "files" ? (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <div className="ck-glass-strong p-4">
+              <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Agent files</div>
+              <ul className="mt-3 space-y-1">
+                {agentFiles.map((f) => (
+                  <li key={f.name}>
+                    <button
+                      onClick={() => onLoadAgentFile(f.name)}
+                      className={
+                        fileName === f.name
+                          ? "w-full rounded-[var(--ck-radius-sm)] bg-white/10 px-3 py-2 text-left text-sm text-[color:var(--ck-text-primary)]"
+                          : "w-full rounded-[var(--ck-radius-sm)] px-3 py-2 text-left text-sm text-[color:var(--ck-text-secondary)] hover:bg-white/5"
+                      }
+                    >
+                      {f.name}
+                      {f.missing ? " (missing)" : ""}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="ck-glass-strong p-4 lg:col-span-2">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Edit: {fileName}</div>
+                <button
+                  disabled={saving}
+                  onClick={onSaveAgentFile}
+                  className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] disabled:opacity-50"
+                >
+                  {saving ? "Saving…" : "Save file"}
+                </button>
+              </div>
+              <textarea
+                value={fileContent}
+                onChange={(e) => setFileContent(e.target.value)}
+                className="mt-3 h-[55vh] w-full resize-none rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-3 font-mono text-xs text-[color:var(--ck-text-primary)]"
+                spellCheck={false}
               />
             </div>
           </div>
-
-          <label className="mt-4 block text-xs font-medium text-[color:var(--ck-text-secondary)]">
-            Save As New (new agent id)
-          </label>
-          <input
-            value={saveAsNewId}
-            onChange={(e) => setSaveAsNewId(e.target.value)}
-            placeholder={`${agentId}-copy`}
-            className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
-          />
-
-          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-            <button
-              disabled={saving}
-              onClick={onSave}
-              className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] transition-colors hover:bg-[var(--ck-accent-red-hover)] active:bg-[var(--ck-accent-red-active)] disabled:opacity-50"
-            >
-              {saving ? "Saving…" : "Save"}
-            </button>
-
-            <button
-              disabled={saving}
-              onClick={onSaveAsNew}
-              className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15 disabled:opacity-50"
-            >
-              {saving ? "Saving…" : "Save As New"}
-            </button>
-          </div>
-        </div>
+        ) : null}
 
         {message ? (
           <div className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3 text-sm text-[color:var(--ck-text-primary)]">
             {message}
           </div>
         ) : null}
-
-        <div className="ck-glass-strong p-4">
-          <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Next sub-areas (not yet)</div>
-          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-[color:var(--ck-text-secondary)]">
-            <li>Skills management</li>
-            <li>Agent config fields beyond identity</li>
-            <li>Edit agent-created files</li>
-          </ul>
-        </div>
       </div>
     </div>
   );
