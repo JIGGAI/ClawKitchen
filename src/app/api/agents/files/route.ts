@@ -24,7 +24,9 @@ export async function GET(req: Request) {
 
   const ws = await resolveAgentWorkspace(agentId);
 
-  const candidates = ["IDENTITY.md", "SOUL.md", "USER.md", "AGENTS.md", "TOOLS.md", "HEARTBEAT.md", "MEMORY.md"];
+  // Keep the default agent files list focused. MEMORY.md is a main-agent convention
+  // and may not exist in team workspaces, so only show it when present.
+  const candidates = ["IDENTITY.md", "SOUL.md", "USER.md", "AGENTS.md", "TOOLS.md", "HEARTBEAT.md"];
 
   const files = await Promise.all(
     candidates.map(async (name) => {
@@ -37,6 +39,15 @@ export async function GET(req: Request) {
       }
     })
   );
+
+  // Optional: MEMORY.md
+  try {
+    const p = path.join(ws, "MEMORY.md");
+    const st = await fs.stat(p);
+    files.push({ name: "MEMORY.md", path: p, missing: false, size: st.size, updatedAtMs: st.mtimeMs });
+  } catch {
+    // ignore
+  }
 
   return NextResponse.json({ ok: true, agentId, workspace: ws, files });
 }

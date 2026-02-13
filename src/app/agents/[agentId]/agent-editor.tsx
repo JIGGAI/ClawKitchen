@@ -158,6 +158,27 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
     }
   }
 
+  // When entering the Files tab, load the current file immediately (default: IDENTITY.md).
+  useEffect(() => {
+    if (activeTab !== "files") return;
+    if (!agentFiles.length) return;
+
+    const exists = agentFiles.some((f) => f.name === fileName);
+    const fallback = agentFiles[0]?.name;
+    const target = exists ? fileName : fallback;
+    if (!target) return;
+
+    if (target !== fileName) {
+      setFileName(target);
+      setFileContent("");
+    }
+
+    if (!fileContent) {
+      onLoadAgentFile(target);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, agentId, agentFiles.length]);
+
   async function onSaveAgentFile() {
     setSaving(true);
     setMessage("");
