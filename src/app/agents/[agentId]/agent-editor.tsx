@@ -18,6 +18,7 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
   const [agent, setAgent] = useState<AgentListItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loadingFile, setLoadingFile] = useState(false);
   const [message, setMessage] = useState<string>("");
 
   const [activeTab, setActiveTab] = useState<"identity" | "config" | "skills" | "files">("identity");
@@ -139,7 +140,7 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
   }
 
   async function onLoadAgentFile(nextName: string) {
-    setSaving(true);
+    setLoadingFile(true);
     setMessage("");
     try {
       const res = await fetch(
@@ -153,7 +154,7 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
     } catch (e: unknown) {
       setMessage(e instanceof Error ? e.message : String(e));
     } finally {
-      setSaving(false);
+      setLoadingFile(false);
     }
   }
 
@@ -356,13 +357,18 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
             <div className="ck-glass-strong p-4 lg:col-span-2">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Edit: {fileName}</div>
-                <button
-                  disabled={saving}
-                  onClick={onSaveAgentFile}
-                  className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] disabled:opacity-50"
-                >
-                  {saving ? "Saving…" : "Save file"}
-                </button>
+                <div className="flex items-center gap-3">
+                  {loadingFile ? (
+                    <span className="text-xs text-[color:var(--ck-text-tertiary)]">Loading…</span>
+                  ) : null}
+                  <button
+                    disabled={saving}
+                    onClick={onSaveAgentFile}
+                    className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] disabled:opacity-50"
+                  >
+                    {saving ? "Saving…" : "Save file"}
+                  </button>
+                </div>
               </div>
               <textarea
                 value={fileContent}
