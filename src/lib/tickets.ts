@@ -27,8 +27,38 @@ function stageDir(stage: TicketStage) {
 }
 
 function parseTitle(md: string) {
-  const m = md.match(/^#\s+\S+\s+(.+)$/m);
-  return m?.[1]?.trim() ?? "(untitled)";
+  // Ticket markdown files typically start with:
+  //   # 0033-some-slug
+  // (no human title after the id). Prefer extracting a readable title from the slug.
+  const header = md.match(/^#\s+(.+)$/m)?.[1]?.trim() ?? "";
+
+  // If header is like: "<id> <title...>" keep the explicit title portion.
+  const withExplicit = header.match(/^\S+\s+(.+)$/);
+  if (withExplicit?.[1]?.trim()) return withExplicit[1].trim();
+
+  // Otherwise derive from the slug: strip leading number + hyphen, then de-kebab.
+  const derivedRaw = header
+    .replace(/^\d{4}-/, "")
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const titleCase = (s: string) =>
+    s
+      .split(" ")
+      .filter(Boolean)
+      .map((w) => {
+        // Keep common acronyms and versions readable.
+        if (/^(v\d+(?:\.\d+)*|api|cli|ui|ux|gpu|cpu|npm|pr|ci|cd|json|yaml|md)$/i.test(w)) return w.toUpperCase();
+        if (/^\d+(?:\.\d+)*$/.test(w)) return w;
+        return w.slice(0, 1).toUpperCase() + w.slice(1);
+      })
+      .join(" ");
+
+  const derived = derivedRaw ? titleCase(derivedRaw) : "";
+
+  if (derived) return derived;
+  return header || "(untitled)";
 }
 
 function parseField(md: string, field: string): string | null {
