@@ -13,23 +13,25 @@ function normalizeAgentId(id: string) {
 }
 
 export async function POST(req: Request) {
-  const body = (await req.json()) as {
-    newAgentId?: string;
-    name?: string;
-    emoji?: string;
-    theme?: string;
-    avatar?: string;
-    model?: string;
-    overwrite?: boolean;
-  };
+  try {
+    const body = (await req.json()) as {
+      newAgentId?: string;
+      agentId?: string; // legacy/compat: some callers send agentId
+      name?: string;
+      emoji?: string;
+      theme?: string;
+      avatar?: string;
+      model?: string;
+      overwrite?: boolean;
+    };
 
-  const newAgentId = normalizeAgentId(String(body.newAgentId ?? ""));
-  const overwrite = Boolean(body.overwrite);
+    const newAgentId = normalizeAgentId(String(body.newAgentId ?? body.agentId ?? ""));
+    const overwrite = Boolean(body.overwrite);
 
-  const { raw } = await gatewayConfigGet();
-  const cfg = JSON.parse(raw) as {
-    agents?: { defaults?: { workspace?: string }; list?: Array<Record<string, unknown>> };
-  };
+    const { raw } = await gatewayConfigGet();
+    const cfg = JSON.parse(raw) as {
+      agents?: { defaults?: { workspace?: string }; list?: Array<Record<string, unknown>> };
+    };
 
   const baseWorkspace = String(cfg?.agents?.defaults?.workspace ?? "").trim();
   if (!baseWorkspace) {
@@ -70,4 +72,10 @@ export async function POST(req: Request) {
   await gatewayConfigPatch({ agents: { list: nextList } }, `ClawKitchen: add agent ${newAgentId}`);
 
   return NextResponse.json({ ok: true, agentId: newAgentId, workspace: newWorkspace });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    // Prefer 400 for validation/input errors; otherwise 500.
+    const status = /required|match \//i.test(msg) ? 400 : 500;
+    return NextResponse.json({ ok: false, error: msg }, { status });
+  }
 }
