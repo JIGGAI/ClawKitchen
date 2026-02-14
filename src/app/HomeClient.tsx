@@ -19,6 +19,11 @@ function inferTeamIdFromWorkspace(workspace: string | undefined) {
   return team || null;
 }
 
+function normalizeTeamId(teamId: string) {
+  // Support legacy workspaces that used a "-team" suffix.
+  return teamId.endsWith("-team") ? teamId.slice(0, -"-team".length) : teamId;
+}
+
 export default function HomeClient({
   agents,
   teamNames,
@@ -42,6 +47,11 @@ export default function HomeClient({
   const grouped = useMemo(() => {
     const groups = new Map<string, AgentListItem[]>();
 
+    function displayNameFor(teamId: string) {
+      const normalized = normalizeTeamId(teamId);
+      return teamNames[teamId] || teamNames[normalized] || teamId;
+    }
+
     for (const a of agents) {
       const teamId = inferTeamIdFromWorkspace(a.workspace) ?? "personal";
       if (teamFilter !== "all" && teamId !== teamFilter) continue;
@@ -59,11 +69,12 @@ export default function HomeClient({
     });
 
     return keys.map((k) => {
-      const display = k === "personal" ? "Personal / Unassigned" : teamNames[k] || k;
+      const display = k === "personal" ? "Personal / Unassigned" : displayNameFor(k);
       return {
         key: k,
         title: display,
-        subtitle: k === "personal" ? null : k,
+        // Keep the raw id visible, but deemphasize it.
+        subtitle: k === "personal" ? null : normalizeTeamId(k),
         agents: (groups.get(k) ?? []).slice().sort((a, b) => a.id.localeCompare(b.id)),
         isTeam: k !== "personal",
       };
@@ -114,11 +125,14 @@ export default function HomeClient({
             onChange={(e) => setTeamFilter(e.target.value)}
           >
             <option value="all">All teams</option>
-            {teamIds.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
+            {teamIds.map((t) => {
+              const label = teamNames[t] || teamNames[normalizeTeamId(t)] || t;
+              return (
+                <option key={t} value={t}>
+                  {label}
+                </option>
+              );
+            })}
             <option value="personal">Personal / Unassigned</option>
           </select>
         </div>
