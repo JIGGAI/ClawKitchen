@@ -31,6 +31,12 @@ export async function POST(req: Request) {
 
   if (!fromId) return NextResponse.json({ ok: false, error: "Missing fromId" }, { status: 400 });
   if (!toId) return NextResponse.json({ ok: false, error: "Missing toId" }, { status: 400 });
+  if (!toId.startsWith("custom-")) {
+    return NextResponse.json(
+      { ok: false, error: "Clone target id must start with 'custom-'" },
+      { status: 400 },
+    );
+  }
 
   // Load source markdown from OpenClaw CLI (no HTTP self-call; avoids dev-server deadlocks/timeouts).
   const shown = await runOpenClaw(["recipes", "show", fromId]);

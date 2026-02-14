@@ -50,6 +50,10 @@ export async function PUT(
   const item = recipes.find((r) => r.id === id);
   if (!item) return NextResponse.json({ error: `Recipe not found: ${id}` }, { status: 404 });
 
+  if (item.source === "builtin") {
+    return NextResponse.json({ error: `Recipe ${id} is builtin and cannot be modified` }, { status: 403 });
+  }
+
   const filePath = await resolveRecipePath(item);
   await writeRecipeFile(filePath, body.content);
 
