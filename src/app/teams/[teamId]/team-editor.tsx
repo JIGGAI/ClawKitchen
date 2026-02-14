@@ -50,6 +50,9 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
   const router = useRouter();
   const [recipes, setRecipes] = useState<RecipeListItem[]>([]);
   const [fromId, setFromId] = useState<string>("");
+  const [lockedFromId, setLockedFromId] = useState<string | null>(null);
+  const [lockedFromName, setLockedFromName] = useState<string | null>(null);
+  const [provenanceMissing, setProvenanceMissing] = useState(false);
   const [toId, setToId] = useState<string>(`custom-${teamId}`);
   const [toName, setToName] = useState<string>(`Custom ${teamId}`);
   const [content, setContent] = useState<string>("");
@@ -93,16 +96,47 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
       setLoading(true);
       setMessage("");
       try {
-        const res = await fetch("/api/recipes", { cache: "no-store" });
-        const json = await res.json();
+        const [recipesRes, metaRes] = await Promise.all([
+          fetch("/api/recipes", { cache: "no-store" }),
+          fetch(`/api/teams/meta?teamId=${encodeURIComponent(teamId)}`, { cache: "no-store" }),
+        ]);
+
+        const json = await recipesRes.json();
         const list = (json.recipes ?? []) as RecipeListItem[];
         setRecipes(list);
 
-        // Prefer a recipe with id matching the teamId; fallback to first team recipe.
-        const preferred = list.find((r) => r.kind === "team" && r.id === teamId);
-        const fallback = list.find((r) => r.kind === "team");
-        const pick = preferred ?? fallback;
-        if (pick) setFromId(pick.id);
+        // Prefer a recipe that corresponds to this teamId.
+        // Primary source of truth: provenance stored in the team workspace.
+        // Fallback: heuristic matching (legacy teams without provenance).
+        let locked: { recipeId: string; recipeName?: string } | null = null;
+        try {
+          const metaJson = await metaRes.json();
+          if (metaRes.ok && metaJson.ok && metaJson.meta && (metaJson.meta as { recipeId?: unknown }).recipeId) {
+            const m = metaJson.meta as { recipeId?: unknown; recipeName?: unknown };
+            locked = {
+              recipeId: String(m.recipeId),
+              recipeName: typeof m.recipeName === "string" ? m.recipeName : undefined,
+            };
+          }
+        } catch {
+          // ignore
+        }
+
+        if (locked) {
+          setLockedFromId(locked.recipeId);
+          setLockedFromName(locked.recipeName ?? null);
+          setProvenanceMissing(false);
+          setFromId(locked.recipeId);
+        } else {
+          setLockedFromId(null);
+          setLockedFromName(null);
+          setProvenanceMissing(true);
+
+          const preferred = list.find((r) => r.kind === "team" && r.id === teamId);
+          const fallback = list.find((r) => r.kind === "team");
+          const pick = preferred ?? fallback;
+          if (pick) setFromId(pick.id);
+        }
 
         // Load ancillary data for sub-areas.
         const [filesRes, cronRes, agentsRes, skillsRes] = await Promise.all([
@@ -334,7 +368,8 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
             <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Source team recipe</div>
             <label className="mt-3 block text-xs font-medium text-[color:var(--ck-text-secondary)]">From</label>
             <select
-              className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+              disabled={Boolean(lockedFromId)}
+              className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] disabled:opacity-70"
               value={fromId}
               onChange={(e) => setFromId(e.target.value)}
             >
@@ -344,12 +379,58 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
                 </option>
               ))}
             </select>
+            {lockedFromId ? (
+              <div className="mt-2 text-xs text-[color:var(--ck-text-tertiary)]">
+                Locked to parent recipe: <code>{lockedFromId}</code>
+                {lockedFromName ? ` (${lockedFromName})` : ""}
+              </div>
+            ) : provenanceMissing ? (
+              <div className="mt-2 text-xs text-[color:var(--ck-text-tertiary)]">
+                Provenance not found for this team. The source recipe above is a best-guess.
+              </div>
+            ) : null}
             <button
               onClick={onLoadSource}
               className="mt-3 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15"
             >
               Load source markdown
             </button>
+
+            {provenanceMissing ? (
+              <div className="mt-3 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3 text-sm text-[color:var(--ck-text-secondary)]">
+                <div className="font-medium text-[color:var(--ck-text-primary)]">Provenance missing</div>
+                <div className="mt-1">
+                  This team workspace is missing <code>team.json</code>, so ClawKitchen is guessing the source recipe.
+                </div>
+                <button
+                  disabled={saving || !fromId}
+                  onClick={async () => {
+                    setSaving(true);
+                    flashMessage("");
+                    try {
+                      const match = teamRecipes.find((r) => r.id === fromId);
+                      const res = await fetch("/api/teams/meta", {
+                        method: "POST",
+                        headers: { "content-type": "application/json" },
+                        body: JSON.stringify({ teamId, recipeId: fromId, recipeName: match?.name ?? "" }),
+                      });
+                      const json = await res.json();
+                      if (!res.ok || !json.ok) throw new Error(json.error || "Attach provenance failed");
+                      setLockedFromId(fromId);
+                      setProvenanceMissing(false);
+                      flashMessage("Attached provenance (team.json)");
+                    } catch (e: unknown) {
+                      flashMessage(e instanceof Error ? e.message : String(e));
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                  className="mt-3 rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] hover:bg-white/10 disabled:opacity-50"
+                >
+                  Attach provenance
+                </button>
+              </div>
+            ) : null}
           </div>
 
           <div className="ck-glass-strong p-4">
