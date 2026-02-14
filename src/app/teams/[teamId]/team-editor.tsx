@@ -86,7 +86,6 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
   const teamRecipes = useMemo(() => recipes.filter((r) => r.kind === "team"), [recipes]);
 
   const toRecipe = useMemo(() => recipes.find((r) => r.id === toId) ?? null, [recipes, toId]);
-  const targetExists = Boolean(toRecipe);
 
   function titleCaseId(id: string) {
     const s = id
@@ -106,7 +105,9 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
   const teamIdValid = Boolean(teamId.trim());
   const targetIdValid = toId.trim().startsWith("custom-");
   const targetIsBuiltin = toRecipe?.source === "builtin";
-  const canEditTargetId = !targetExists;
+  // Editing an installed team should never allow changing its team id.
+  // The underlying custom recipe id is derived (custom-<teamId>) and shown separately.
+  const canEditTargetId = false;
 
   useEffect(() => {
     (async () => {
