@@ -47,9 +47,24 @@ export default function HomeClient({
   const grouped = useMemo(() => {
     const groups = new Map<string, AgentListItem[]>();
 
+    function titleCaseId(id: string) {
+      const s = id
+        .replace(/[-_]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (!s) return id;
+      return s
+        .split(" ")
+        .map((w) => {
+          if (/^(ai|api|cli|ui|ux|sre|qa|devops)$/i.test(w)) return w.toUpperCase();
+          return w.slice(0, 1).toUpperCase() + w.slice(1);
+        })
+        .join(" ");
+    }
+
     function displayNameFor(teamId: string) {
       const normalized = normalizeTeamId(teamId);
-      return teamNames[teamId] || teamNames[normalized] || teamId;
+      return teamNames[teamId] || teamNames[normalized] || titleCaseId(normalized);
     }
 
     for (const a of agents) {
