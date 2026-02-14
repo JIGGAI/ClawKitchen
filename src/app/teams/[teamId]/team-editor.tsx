@@ -123,9 +123,12 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
         setRecipes(list);
 
         // If the target recipe already exists, treat it as "saved" (lock id) and load its name.
+        // Only set a default name when we haven't diverged from the initial default.
         const existingCustom = list.find((r) => r.id === toId);
         if (existingCustom?.name) setToName(existingCustom.name);
-        else if (toName === `Custom ${teamId}`) setToName(titleCaseId(teamId));
+        else {
+          setToName((prev) => (prev === `Custom ${teamId}` ? titleCaseId(teamId) : prev));
+        }
 
         // Prefer a recipe that corresponds to this teamId.
         // Primary source of truth: provenance stored in the team workspace.
@@ -214,7 +217,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
         setLoading(false);
       }
     })();
-  }, [teamId, toId, toName]);
+  }, [teamId, toId]);
 
   async function onLoadSource() {
     if (!fromId) return;
@@ -474,11 +477,14 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
             <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Custom recipe target</div>
             <label className="mt-3 block text-xs font-medium text-[color:var(--ck-text-secondary)]">Team id</label>
             <input
-              value={toId}
+              value={canEditTargetId ? toId : teamId}
               onChange={(e) => setToId(e.target.value)}
               disabled={!canEditTargetId}
               className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] disabled:opacity-70"
             />
+            {!canEditTargetId ? (
+              <div className="mt-1 text-xs text-[color:var(--ck-text-tertiary)]">Recipe id: <code>{toId}</code></div>
+            ) : null}
 
             <label className="mt-3 block text-xs font-medium text-[color:var(--ck-text-secondary)]">Team name</label>
             <input
