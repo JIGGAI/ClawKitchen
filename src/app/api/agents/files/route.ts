@@ -24,18 +24,33 @@ export async function GET(req: Request) {
 
   const ws = await resolveAgentWorkspace(agentId);
 
-  // Keep the default agent files list focused. MEMORY.md is a main-agent convention
-  // and may not exist in team workspaces, so only show it when present.
-  const candidates = ["IDENTITY.md", "SOUL.md", "USER.md", "AGENTS.md", "TOOLS.md", "HEARTBEAT.md"];
+  // Required vs optional classification to avoid "missing" noise.
+  const candidates: Array<{ name: string; required: boolean; rationale: string }> = [
+    { name: "IDENTITY.md", required: true, rationale: "Identity (name/emoji/avatar)" },
+    { name: "SOUL.md", required: true, rationale: "Agent persona/instructions" },
+    { name: "AGENTS.md", required: true, rationale: "Agent operating rules" },
+    { name: "TOOLS.md", required: true, rationale: "Agent local notes" },
+
+    { name: "USER.md", required: false, rationale: "Optional user profile" },
+    { name: "HEARTBEAT.md", required: false, rationale: "Optional periodic checklist" },
+  ];
 
   const files = await Promise.all(
-    candidates.map(async (name) => {
-      const p = path.join(ws, name);
+    candidates.map(async (c) => {
+      const p = path.join(ws, c.name);
       try {
         const st = await fs.stat(p);
-        return { name, path: p, missing: false, size: st.size, updatedAtMs: st.mtimeMs };
+        return {
+          name: c.name,
+          required: c.required,
+          rationale: c.rationale,
+          path: p,
+          missing: false,
+          size: st.size,
+          updatedAtMs: st.mtimeMs,
+        };
       } catch {
-        return { name, path: p, missing: true };
+        return { name: c.name, required: c.required, rationale: c.rationale, path: p, missing: true };
       }
     })
   );
@@ -44,7 +59,15 @@ export async function GET(req: Request) {
   try {
     const p = path.join(ws, "MEMORY.md");
     const st = await fs.stat(p);
-    files.push({ name: "MEMORY.md", path: p, missing: false, size: st.size, updatedAtMs: st.mtimeMs });
+    files.push({
+      name: "MEMORY.md",
+      required: false,
+      rationale: "Optional curated memory",
+      path: p,
+      missing: false,
+      size: st.size,
+      updatedAtMs: st.mtimeMs,
+    });
   } catch {
     // ignore
   }

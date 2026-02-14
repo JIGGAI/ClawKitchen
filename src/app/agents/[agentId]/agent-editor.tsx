@@ -32,7 +32,8 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
 
   const [skillsList, setSkillsList] = useState<string[]>([]);
 
-  const [agentFiles, setAgentFiles] = useState<FileEntry[]>([]);
+  const [agentFiles, setAgentFiles] = useState<Array<FileEntry & { required?: boolean; rationale?: string }>>([]);
+  const [showOptionalFiles, setShowOptionalFiles] = useState(false);
   const [fileName, setFileName] = useState<string>("IDENTITY.md");
   const [fileContent, setFileContent] = useState<string>("");
 
@@ -62,7 +63,15 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
           setAgentFiles(
             files.map((f) => {
               const entry = f as { name?: unknown; missing?: unknown };
-              return { name: String(entry.name ?? ""), missing: Boolean(entry.missing) };
+              return {
+                name: String(entry.name ?? ""),
+                missing: Boolean(entry.missing),
+                required: Boolean((entry as { required?: unknown }).required),
+                rationale:
+                  typeof (entry as { rationale?: unknown }).rationale === "string"
+                    ? ((entry as { rationale?: string }).rationale as string)
+                    : undefined,
+              };
             }),
           );
         }
@@ -355,9 +364,24 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
         {activeTab === "files" ? (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <div className="ck-glass-strong p-4">
-              <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Agent files</div>
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Agent files</div>
+                <label className="flex items-center gap-2 text-xs text-[color:var(--ck-text-secondary)]">
+                  <input
+                    type="checkbox"
+                    checked={showOptionalFiles}
+                    onChange={(e) => setShowOptionalFiles(e.target.checked)}
+                  />
+                  Show optional
+                </label>
+              </div>
+              <div className="mt-2 text-xs text-[color:var(--ck-text-tertiary)]">
+                Default view hides optional missing files to reduce noise.
+              </div>
               <ul className="mt-3 space-y-1">
-                {agentFiles.map((f) => (
+                {agentFiles
+                  .filter((f) => (showOptionalFiles ? true : Boolean(f.required) || !f.missing))
+                  .map((f) => (
                   <li key={f.name}>
                     <button
                       onClick={() => onLoadAgentFile(f.name)}
@@ -367,8 +391,13 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
                           : "w-full rounded-[var(--ck-radius-sm)] px-3 py-2 text-left text-sm text-[color:var(--ck-text-secondary)] hover:bg-white/5"
                       }
                     >
-                      {f.name}
-                      {f.missing ? " (missing)" : ""}
+                      <span className={f.required ? "text-[color:var(--ck-text-primary)]" : "text-[color:var(--ck-text-secondary)]"}>
+                        {f.name}
+                      </span>
+                      <span className="ml-2 text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">
+                        {f.required ? "required" : "optional"}
+                      </span>
+                      {f.missing ? <span className="ml-2 text-xs text-[color:var(--ck-text-tertiary)]">missing</span> : null}
                     </button>
                   </li>
                 ))}

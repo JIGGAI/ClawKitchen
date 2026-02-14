@@ -20,25 +20,34 @@ export async function GET(req: Request) {
 
   const teamDir = teamDirFromTeamId(baseWorkspace, teamId);
 
-  const candidates = [
-    "SOUL.md",
-    "USER.md",
-    "TEAM.md",
-    "TICKETS.md",
-    "AGENTS.md",
-    "MEMORY.md",
-    "TOOLS.md",
-    "notes/QA_CHECKLIST.md",
+  const candidates: Array<{ name: string; required: boolean; rationale: string }> = [
+    { name: "TEAM.md", required: true, rationale: "Team workspace overview" },
+    { name: "TICKETS.md", required: true, rationale: "Ticket workflow + format" },
+    { name: "notes/QA_CHECKLIST.md", required: true, rationale: "QA verification checklist" },
+
+    { name: "SOUL.md", required: false, rationale: "Optional team persona (some teams use role SOUL.md only)" },
+    { name: "USER.md", required: false, rationale: "Optional user profile" },
+    { name: "AGENTS.md", required: false, rationale: "Optional team notes (often role-scoped)" },
+    { name: "TOOLS.md", required: false, rationale: "Optional team-local tooling notes" },
+    { name: "MEMORY.md", required: false, rationale: "Optional curated memory" },
   ];
 
   const files = await Promise.all(
-    candidates.map(async (name) => {
-      const p = path.join(teamDir, name);
+    candidates.map(async (c) => {
+      const p = path.join(teamDir, c.name);
       try {
         const st = await fs.stat(p);
-        return { name, path: p, missing: false, size: st.size, updatedAtMs: st.mtimeMs };
+        return {
+          name: c.name,
+          required: c.required,
+          rationale: c.rationale,
+          path: p,
+          missing: false,
+          size: st.size,
+          updatedAtMs: st.mtimeMs,
+        };
       } catch {
-        return { name, path: p, missing: true };
+        return { name: c.name, required: c.required, rationale: c.rationale, path: p, missing: true };
       }
     })
   );
