@@ -98,8 +98,24 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
         const list = (json.recipes ?? []) as RecipeListItem[];
         setRecipes(list);
 
-        // Prefer a recipe with id matching the teamId; fallback to first team recipe.
-        const preferred = list.find((r) => r.kind === "team" && r.id === teamId);
+        // Prefer a recipe that corresponds to this teamId.
+        // Heuristics:
+        // - exact match (teamId)
+        // - normalized legacy "-team" suffix
+        // - smoke prefix mapping: smoke-<id> -> <id> (e.g., smoke-product-team -> product-team)
+        const normalizedTeamId = teamId.endsWith("-team") ? teamId.slice(0, -"-team".length) : teamId;
+        const candidates = Array.from(
+          new Set([
+            teamId,
+            normalizedTeamId,
+            teamId.replace(/^smoke-/, ""),
+            normalizedTeamId.replace(/^smoke-/, ""),
+          ]),
+        ).filter(Boolean);
+
+        const preferred = candidates
+          .map((id) => list.find((r) => r.kind === "team" && r.id === id))
+          .find(Boolean);
         const fallback = list.find((r) => r.kind === "team");
         const pick = preferred ?? fallback;
         if (pick) setFromId(pick.id);
