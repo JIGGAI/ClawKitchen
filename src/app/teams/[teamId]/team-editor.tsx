@@ -198,17 +198,21 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
     })();
   }, [teamId]);
 
-  async function onLoadSource() {
-    if (!fromId) return;
+  async function onLoadTeamRecipeMarkdown() {
+    const id = toId.trim();
+    if (!id) return;
     flashMessage("");
     setLoadingSource(true);
     try {
-      const res = await fetch(`/api/recipes/${encodeURIComponent(fromId)}`, { cache: "no-store" });
+      const res = await fetch(`/api/recipes/${encodeURIComponent(id)}`, { cache: "no-store" });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Failed to load recipe");
+      if (!res.ok) {
+        // Usually means the workspace recipe doesn't exist yet.
+        throw new Error(json.error || `Recipe not found: ${id}. Save or Clone first to create it.`);
+      }
       const r = json.recipe as RecipeDetail;
       setContent(r.content);
-      flashMessage(`Loaded source recipe: ${r.id}`);
+      flashMessage(`Loaded team recipe: ${r.id}`);
     } catch (e: unknown) {
       flashMessage(e instanceof Error ? e.message : String(e));
     } finally {
@@ -373,6 +377,19 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
 
             <div className="mt-4 grid grid-cols-1 gap-2">
               <button
+                type="button"
+                disabled={loadingSource || !targetIdValid || targetIsBuiltin}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  void onLoadTeamRecipeMarkdown();
+                }}
+                className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15 disabled:opacity-60"
+              >
+                {loadingSource ? "Loading…" : "Load team markdown"}
+              </button>
+
+              <button
                 disabled={saving || !teamIdValid || !targetIdValid || targetIsBuiltin}
                 onClick={() => onSaveCustom(true)}
                 className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] transition-colors hover:bg-[var(--ck-accent-red-hover)] active:bg-[var(--ck-accent-red-active)] disabled:opacity-50"
@@ -448,18 +465,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
                 </div>
               ) : null}
 
-              <button
-                type="button"
-                disabled={loadingSource || !fromId}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  void onLoadSource();
-                }}
-                className="mt-3 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15 disabled:opacity-60"
-              >
-                {loadingSource ? "Loading…" : "Load source markdown"}
-              </button>
+
             </div>
 
             <ul className="mt-4 list-disc space-y-1 pl-5 text-sm text-[color:var(--ck-text-secondary)]">
