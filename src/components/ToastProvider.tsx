@@ -125,7 +125,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                       {t.title ? (
                         <p className="text-sm font-medium text-[color:var(--ck-text-primary)]">{t.title}</p>
                       ) : null}
-                      <p className="whitespace-pre-wrap text-sm text-[color:var(--ck-text-secondary)]">{t.message}</p>
+                      <p className="whitespace-pre-wrap text-sm text-[color:var(--ck-text-primary)]">{t.message}</p>
                     </div>
                     <div className="ml-4 flex shrink-0">
                       <button

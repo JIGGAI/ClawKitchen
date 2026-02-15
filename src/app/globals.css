@@ -14,9 +14,9 @@
   --ck-bg-glass: rgba(255, 255, 255, 0.70);
   --ck-bg-glass-strong: rgba(255, 255, 255, 0.86);
 
-  /* Toasts (want darker in light mode) */
-  --ck-toast-bg: rgba(10, 12, 16, 0.08);
-  --ck-toast-border: rgba(10, 12, 16, 0.14);
+  /* Toasts (barely transparent in light mode) */
+  --ck-toast-bg: rgba(255, 255, 255, 0.94);
+  --ck-toast-border: rgba(10, 12, 16, 0.16);
 
   --ck-border-subtle: rgba(10, 12, 16, 0.10);
   --ck-border-strong: rgba(10, 12, 16, 0.16);
@@ -56,9 +56,9 @@
   --ck-bg-glass: rgba(24, 25, 31, 0.72);
   --ck-bg-glass-strong: rgba(24, 25, 31, 0.88);
 
-  /* Toasts (want lighter in dark mode) */
-  --ck-toast-bg: rgba(255, 255, 255, 0.10);
-  --ck-toast-border: rgba(255, 255, 255, 0.16);
+  /* Toasts (barely transparent in dark mode) */
+  --ck-toast-bg: rgba(24, 25, 31, 0.92);
+  --ck-toast-border: rgba(255, 255, 255, 0.18);
 
   --ck-border-subtle: rgba(255, 255, 255, 0.10);
   --ck-border-strong: rgba(255, 255, 255, 0.16);
