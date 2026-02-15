@@ -15,15 +15,6 @@ type RecipeDetail = RecipeListItem & {
   filePath: string | null;
 };
 
-function downloadTextFile(filename: string, text: string) {
-  const blob = new Blob([text], { type: "text/markdown;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
 function forceFrontmatterId(md: string, id: string) {
   if (!md.startsWith("---\n")) return md;
@@ -280,38 +271,6 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
     }
   }
 
-  async function onSaveMarkdown() {
-    const id = toId.trim();
-    if (!id) return flashMessage("Custom recipe id is required");
-
-    setSaving(true);
-    flashMessage("");
-    try {
-      // Ensure the workspace file exists first.
-      // Save markdown should behave like "overwrite" by default.
-      await ensureCustomRecipeExists(true).catch(() => null);
-
-      // The editor content may be loaded from a different source recipe. Force the
-      // frontmatter id to match the target route id to avoid 400s.
-      const nextContent = forceFrontmatterId(content, id);
-
-      const res = await fetch(`/api/recipes/${encodeURIComponent(id)}`, {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ content: nextContent }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Save markdown failed");
-      setContent(nextContent);
-      flashMessage(`Saved markdown: ${json.filePath}`);
-      setTimeout(() => router.push("/"), 250);
-    } catch (e: unknown) {
-      flashMessage(e instanceof Error ? e.message : String(e));
-    } finally {
-      setSaving(false);
-    }
-  }
-
   async function onLoadTeamFile(name: string) {
     setSaving(true);
     flashMessage("");
@@ -391,82 +350,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
       </div>
 
       {activeTab === "recipe" ? (
-        <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <div className="ck-glass-strong p-4">
-            <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Source team recipe</div>
-            <label className="mt-3 block text-xs font-medium text-[color:var(--ck-text-secondary)]">From</label>
-            <select
-              disabled={Boolean(lockedFromId)}
-              className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] disabled:opacity-70"
-              value={fromId}
-              onChange={(e) => setFromId(e.target.value)}
-            >
-              {teamRecipes.map((r) => (
-                <option key={`${r.source}:${r.id}`} value={r.id}>
-                  {r.id} ({r.source})
-                </option>
-              ))}
-            </select>
-            {lockedFromId ? (
-              <div className="mt-2 text-xs text-[color:var(--ck-text-tertiary)]">
-                Locked to parent recipe: <code>{lockedFromId}</code>
-                {lockedFromName ? ` (${lockedFromName})` : ""}
-              </div>
-            ) : provenanceMissing ? (
-              <div className="mt-2 text-xs text-[color:var(--ck-text-tertiary)]">
-                Provenance not found for this team. The source recipe above is a best-guess.
-              </div>
-            ) : null}
-            <button
-              type="button"
-              disabled={loadingSource || !fromId}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                void onLoadSource();
-              }}
-              className="mt-3 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15 disabled:opacity-60"
-            >
-              {loadingSource ? "Loading…" : "Load source markdown"}
-            </button>
-
-            {provenanceMissing ? (
-              <div className="mt-3 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3 text-sm text-[color:var(--ck-text-secondary)]">
-                <div className="font-medium text-[color:var(--ck-text-primary)]">Provenance missing</div>
-                <div className="mt-1">
-                  This team workspace is missing <code>team.json</code>, so ClawKitchen is guessing the source recipe.
-                </div>
-                <button
-                  disabled={saving || !fromId}
-                  onClick={async () => {
-                    setSaving(true);
-                    flashMessage("");
-                    try {
-                      const match = teamRecipes.find((r) => r.id === fromId);
-                      const res = await fetch("/api/teams/meta", {
-                        method: "POST",
-                        headers: { "content-type": "application/json" },
-                        body: JSON.stringify({ teamId, recipeId: fromId, recipeName: match?.name ?? "" }),
-                      });
-                      const json = await res.json();
-                      if (!res.ok || !json.ok) throw new Error(json.error || "Attach provenance failed");
-                      setLockedFromId(fromId);
-                      setProvenanceMissing(false);
-                      flashMessage("Attached provenance (team.json)");
-                    } catch (e: unknown) {
-                      flashMessage(e instanceof Error ? e.message : String(e));
-                    } finally {
-                      setSaving(false);
-                    }
-                  }}
-                  className="mt-3 rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] hover:bg-white/10 disabled:opacity-50"
-                >
-                  Attach provenance
-                </button>
-              </div>
-            ) : null}
-          </div>
-
+        <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
           <div className="ck-glass-strong p-4">
             <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Custom recipe target</div>
             <label className="mt-3 block text-xs font-medium text-[color:var(--ck-text-secondary)]">Team id</label>
@@ -493,7 +377,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
                 onClick={() => onSaveCustom(true)}
                 className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] transition-colors hover:bg-[var(--ck-accent-red-hover)] active:bg-[var(--ck-accent-red-active)] disabled:opacity-50"
               >
-                {saving ? "Saving…" : "Save (overwrite)"}
+                {saving ? "Saving…" : "Save"}
               </button>
 
               <button
@@ -501,40 +385,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
                 onClick={() => onSaveCustom(false)}
                 className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15 disabled:opacity-50"
               >
-                Clone Team (create custom copy)
-              </button>
-
-              <button
-                disabled={!content || saving || !targetIdValid || targetIsBuiltin}
-                onClick={onSaveMarkdown}
-                className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15 disabled:opacity-50"
-              >
-                Save markdown
-              </button>
-
-              <button
-                disabled={saving || !teamIdValid}
-                onClick={async () => {
-                  setSaving(true);
-                  flashMessage("");
-                  try {
-                    const res = await fetch("/api/scaffold", {
-                      method: "POST",
-                      headers: { "content-type": "application/json" },
-                      body: JSON.stringify({ kind: "team", recipeId: fromId.trim(), teamId, applyConfig: true, overwrite: false }),
-                    });
-                    const json = await res.json();
-                    if (!res.ok || !json.ok) throw new Error(json.error || "Publish failed");
-                    flashMessage("Published (scaffold-team) successfully");
-                  } catch (e: unknown) {
-                    flashMessage(e instanceof Error ? e.message : String(e));
-                  } finally {
-                    setSaving(false);
-                  }
-                }}
-                className="rounded-[var(--ck-radius-sm)] border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-sm font-medium text-emerald-200 shadow-[var(--ck-shadow-1)] transition-colors hover:bg-emerald-500/20 active:bg-emerald-500/25 disabled:opacity-50"
-              >
-                Publish
+                Clone Team
               </button>
 
               <button
@@ -566,32 +417,57 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
               >
                 Delete Team
               </button>
-
-              <button
-                disabled={!content}
-                onClick={() => downloadTextFile(`${toId || "custom-team"}.md`, content)}
-                className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15 disabled:opacity-50"
-              >
-                Export recipe (download)
-              </button>
             </div>
           </div>
 
           <div className="ck-glass-strong p-4">
             <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Notes</div>
-            <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-[color:var(--ck-text-secondary)]">
-              <li>Builtin recipes are treated as read-only; edits should be saved to a custom clone.</li>
+
+            <div className="mt-3 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3">
+              <div className="text-xs font-medium text-[color:var(--ck-text-secondary)]">Parent recipe (locked)</div>
+              <select
+                disabled
+                className="mt-2 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] disabled:opacity-70"
+                value={fromId}
+                onChange={(e) => setFromId(e.target.value)}
+              >
+                {teamRecipes.map((r) => (
+                  <option key={`${r.source}:${r.id}`} value={r.id}>
+                    {r.id} ({r.source})
+                  </option>
+                ))}
+              </select>
+              {lockedFromId ? (
+                <div className="mt-2 text-xs text-[color:var(--ck-text-tertiary)]">
+                  <code>{lockedFromId}</code>
+                  {lockedFromName ? ` (${lockedFromName})` : ""}
+                </div>
+              ) : provenanceMissing ? (
+                <div className="mt-2 text-xs text-[color:var(--ck-text-tertiary)]">
+                  Provenance not found for this team. The parent recipe above is a best-guess.
+                </div>
+              ) : null}
+
+              <button
+                type="button"
+                disabled={loadingSource || !fromId}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  void onLoadSource();
+                }}
+                className="mt-3 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15 disabled:opacity-60"
+              >
+                {loadingSource ? "Loading…" : "Load source markdown"}
+              </button>
+            </div>
+
+            <ul className="mt-4 list-disc space-y-1 pl-5 text-sm text-[color:var(--ck-text-secondary)]">
               <li>
-                <strong>Save (overwrite)</strong> overwrites the existing custom recipe file (workspace/custom only).
+                <strong>Save</strong> writes/overwrites the custom recipe file identified by “Team id”.
               </li>
               <li>
-                <strong>Clone Team</strong> creates a custom recipe copy (fails if it already exists).
-              </li>
-              <li>
-                <strong>Save markdown</strong> writes the current editor content to the custom recipe file.
-              </li>
-              <li>
-                <strong>Publish</strong> runs scaffold-team for this team id.
+                <strong>Clone Team</strong> creates a new custom recipe copy (fails if it already exists).
               </li>
               <li>
                 <strong>Delete Team</strong> runs the safe uninstall command (<code>openclaw recipes remove-team</code>).
