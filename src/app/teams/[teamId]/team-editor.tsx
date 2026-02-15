@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CloneTeamModal } from "./CloneTeamModal";
+import { DeleteTeamModal } from "./DeleteTeamModal";
 import { useToast } from "@/components/ToastProvider";
 
 type RecipeListItem = {
@@ -57,6 +58,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
 
   const [cloneOpen, setCloneOpen] = useState(false);
   const [cloneNonce, setCloneNonce] = useState(0);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   function flashMessage(next: string, kind: "success" | "error" | "info" = "info") {
     const msg = String(next ?? "").trim();
@@ -394,29 +396,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
 
               <button
                 disabled={saving}
-                onClick={async () => {
-                  const ok = window.confirm(
-                    `Delete team ${teamId}? This will remove the team workspace, agents, and stamped cron jobs.`,
-                  );
-                  if (!ok) return;
-                  setSaving(true);
-                  flashMessage("");
-                  try {
-                    const res = await fetch("/api/teams/remove-team", {
-                      method: "POST",
-                      headers: { "content-type": "application/json" },
-                      body: JSON.stringify({ teamId }),
-                    });
-                    const json = await res.json();
-                    if (!res.ok || !json.ok) throw new Error(json.error || "Delete failed");
-                    flashMessage("Deleted team successfully", "success");
-                    setTimeout(() => router.push("/"), 250);
-                  } catch (e: unknown) {
-                    flashMessage(e instanceof Error ? e.message : String(e), "error");
-                  } finally {
-                    setSaving(false);
-                  }
-                }}
+                onClick={() => setDeleteOpen(true)}
                 className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15 disabled:opacity-50"
               >
                 Delete Team
@@ -753,6 +733,32 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
           setToName(name);
           // Ensure we run after state updates apply.
           setTimeout(() => onSaveCustom(false), 0);
+        }}
+      />
+
+      <DeleteTeamModal
+        open={deleteOpen}
+        teamId={teamId}
+        busy={saving}
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={async () => {
+          setSaving(true);
+          try {
+            const res = await fetch("/api/teams/remove-team", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ teamId }),
+            });
+            const json = await res.json();
+            if (!res.ok || !json.ok) throw new Error(json.error || "Delete failed");
+            flashMessage("Deleted team successfully", "success");
+            setDeleteOpen(false);
+            setTimeout(() => router.push("/"), 250);
+          } catch (e: unknown) {
+            flashMessage(e instanceof Error ? e.message : String(e), "error");
+          } finally {
+            setSaving(false);
+          }
         }}
       />
 
