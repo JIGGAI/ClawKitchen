@@ -89,7 +89,7 @@ export default function HomeClient({
         key: k,
         title: display,
         // Keep the raw id visible, but deemphasize it.
-        subtitle: k === "personal" ? null : normalizeTeamId(k),
+        subtitle: k === "personal" ? null : `Workspace: ${normalizeTeamId(k)}`,
         agents: (groups.get(k) ?? []).slice().sort((a, b) => a.id.localeCompare(b.id)),
         isTeam: k !== "personal",
       };
