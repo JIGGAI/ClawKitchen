@@ -59,8 +59,10 @@ export default async function RecipesPage() {
   const builtin = recipes.filter((r) => r.source === "builtin");
   const workspace = recipes.filter((r) => r.source === "workspace");
 
-  const customTeams = workspace.filter((r) => r.kind === "team" && r.id.startsWith("custom-"));
-  const workspaceOther = workspace.filter((r) => !(r.kind === "team" && r.id.startsWith("custom-")));
+  // Workspace recipes are user-editable markdown files under ~/.openclaw/workspace/recipes.
+  // Treat them as "Custom recipes" in the UI.
+  const customTeamRecipes = workspace.filter((r) => r.kind === "team");
+  const customAgentRecipes = workspace.filter((r) => r.kind === "agent");
 
   return (
     <div className="ck-glass mx-auto max-w-4xl p-6 sm:p-8">
@@ -86,8 +88,9 @@ export default async function RecipesPage() {
       ) : null}
 
       <RecipesSection title={`Builtin (${builtin.length})`} items={builtin} />
-      <RecipesSection title={`Custom team recipes (${customTeams.length})`} items={customTeams} />
-      <RecipesSection title={`Workspace (${workspaceOther.length})`} items={workspaceOther} />
+
+      <RecipesSection title={`Custom recipes — Teams (${customTeamRecipes.length})`} items={customTeamRecipes} />
+      <RecipesSection title={`Custom recipes — Agents (${customAgentRecipes.length})`} items={customAgentRecipes} />
 
       <p className="mt-10 text-xs text-[color:var(--ck-text-tertiary)]">
         Note: editing builtin recipes will modify the recipes plugin install path on this machine.
