@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { runOpenClaw } from "@/lib/openclaw";
+import RecipesClient from "./recipes-client";
 
 type Recipe = {
   id: string;
@@ -20,37 +21,6 @@ async function getRecipes(): Promise<{ recipes: Recipe[]; error: string | null }
   } catch {
     return { recipes: [], error: "Failed to parse openclaw recipes list output" };
   }
-}
-
-function RecipesSection({ title, items }: { title: string; items: Recipe[] }) {
-  return (
-    <section className="mt-8">
-      <h2 className="text-lg font-semibold tracking-tight text-[color:var(--ck-text-primary)]">
-        {title}
-      </h2>
-      <ul className="mt-3 space-y-3">
-        {items.map((r) => (
-          <li
-            key={`${r.source}:${r.id}`}
-            className="ck-glass flex items-center justify-between gap-4 px-4 py-3"
-          >
-            <div className="min-w-0">
-              <div className="truncate font-medium">{r.name}</div>
-              <div className="mt-0.5 text-xs text-[color:var(--ck-text-secondary)]">
-                {r.id} • {r.kind} • {r.source}
-              </div>
-            </div>
-            <Link
-              className="shrink-0 rounded-[var(--ck-radius-sm)] px-3 py-1.5 text-sm font-medium text-[color:var(--ck-accent-red)] transition-colors hover:text-[color:var(--ck-accent-red-hover)]"
-              href={`/recipes/${r.id}`}
-            >
-              Edit
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
 }
 
 export default async function RecipesPage() {
@@ -87,10 +57,7 @@ export default async function RecipesPage() {
         </div>
       ) : null}
 
-      <RecipesSection title={`Builtin (${builtin.length})`} items={builtin} />
-
-      <RecipesSection title={`Custom recipes — Teams (${customTeamRecipes.length})`} items={customTeamRecipes} />
-      <RecipesSection title={`Custom recipes — Agents (${customAgentRecipes.length})`} items={customAgentRecipes} />
+      <RecipesClient builtin={builtin} customTeamRecipes={customTeamRecipes} customAgentRecipes={customAgentRecipes} />
 
       <p className="mt-10 text-xs text-[color:var(--ck-text-tertiary)]">
         Note: editing builtin recipes will modify the recipes plugin install path on this machine.
