@@ -67,14 +67,27 @@ export async function POST(req: Request) {
   const nextYaml = YAML.stringify(patched).trimEnd();
   const next = `---\n${nextYaml}\n---\n${original.slice(end + 5)}`;
 
+  function suggestIds(baseId: string) {
+    const b = String(baseId || "recipe").trim();
+    // Keep it simple/predictable: no timestamps, just common prefixes + auto-increment style.
+    return [`custom-${b}`, `my-${b}`, `${b}-2`, `${b}-alt`];
+  }
+
   const dir = await getWorkspaceRecipesDir();
   const filePath = path.join(dir, `${toId}.md`);
 
   try {
+    await fs.stat(filePath);
     if (!overwrite) {
-      await fs.stat(filePath);
       return NextResponse.json(
-        { ok: false, error: `Refusing to overwrite existing recipe: ${filePath}. Pass overwrite=true to replace.` },
+        {
+          ok: false,
+          error: `Recipe id already exists: ${toId}. Choose a different id (e.g. ${suggestIds(toId).join(", ")}).`,
+          code: "RECIPE_ID_TAKEN",
+          recipeId: toId,
+          suggestions: suggestIds(toId),
+          filePath,
+        },
         { status: 409 },
       );
     }

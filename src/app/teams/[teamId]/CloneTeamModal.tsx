@@ -86,6 +86,29 @@ export function CloneTeamModal({
               {availability.state === "taken" ? "That id is already taken." : availability.state === "available" ? "Id is available." : ""}
             </div>
 
+            {availability.state === "taken" ? (
+              <div className="mt-3 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3">
+                <div className="text-xs font-medium text-[color:var(--ck-text-secondary)]">Try one of these ids</div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {[`custom-${effectiveId.trim()}`, `my-${effectiveId.trim()}`, `${effectiveId.trim()}-2`, `${effectiveId.trim()}-alt`]
+                    .filter((x) => x && x !== effectiveId.trim())
+                    .map((x) => (
+                      <button
+                        key={x}
+                        type="button"
+                        onClick={() => {
+                          setIdTouched(true);
+                          setId(x);
+                        }}
+                        className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
+                      >
+                        {x}
+                      </button>
+                    ))}
+                </div>
+              </div>
+            ) : null}
+
             <label className="mt-5 flex items-start gap-2 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3 text-sm text-[color:var(--ck-text-secondary)]">
               <input
                 type="checkbox"
