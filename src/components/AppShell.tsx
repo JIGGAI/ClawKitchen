@@ -45,6 +45,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-2">
+            <a
+              href="https://github.com/JIGGAI/ClawRecipes/tree/main/docs"
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-[var(--ck-radius-sm)] px-3 py-1.5 text-sm font-medium text-[color:var(--ck-text-secondary)] transition-colors hover:bg-[color:var(--ck-bg-glass)] hover:text-[color:var(--ck-text-primary)]"
+            >
+              Docs
+            </a>
             <ThemeToggle />
           </div>
         </div>
