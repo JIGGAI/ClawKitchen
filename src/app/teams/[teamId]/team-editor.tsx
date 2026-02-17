@@ -78,11 +78,16 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
 
   const teamRecipes = useMemo(() => recipes.filter((r) => r.kind === "team"), [recipes]);
 
-  const toRecipe = useMemo(() => recipes.find((r) => r.id === toId) ?? null, [recipes, toId]);
+  const toRecipe = useMemo(() => {
+    // Prefer the workspace recipe when both builtin + workspace exist for the same id.
+    const ws = recipes.find((r) => r.id === toId && r.source === "workspace");
+    return ws ?? recipes.find((r) => r.id === toId) ?? null;
+  }, [recipes, toId]);
 
   const teamIdValid = Boolean(teamId.trim());
   const targetIdValid = Boolean(toId.trim());
-  const targetIsBuiltin = toRecipe?.source === "builtin";
+  const hasWorkspaceOverride = recipes.some((r) => r.id === toId && r.source === "workspace");
+  const targetIsBuiltin = Boolean(toRecipe?.source === "builtin" && !hasWorkspaceOverride);
   // The "Recipe id" field is the workspace recipe id target.
   // It should be editable, and we must not auto-prefix/modify what the user types.
   const canEditTargetId = true;
@@ -145,7 +150,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
         // Load ancillary data for sub-areas.
         const [filesRes, cronRes, agentsRes, skillsRes] = await Promise.all([
           fetch(`/api/teams/files?teamId=${encodeURIComponent(teamId)}`, { cache: "no-store" }),
-          fetch("/api/cron/jobs", { cache: "no-store" }),
+          fetch(`/api/cron/jobs?teamId=${encodeURIComponent(teamId)}`, { cache: "no-store" }),
           fetch("/api/agents", { cache: "no-store" }),
           fetch(`/api/teams/skills?teamId=${encodeURIComponent(teamId)}`, { cache: "no-store" }),
         ]);
@@ -169,8 +174,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
         const cronJson = (await cronRes.json()) as { ok?: boolean; jobs?: unknown[] };
         if (cronRes.ok && cronJson.ok) {
           const all = Array.isArray(cronJson.jobs) ? cronJson.jobs : [];
-          const filtered = all.filter((j) => String((j as { name?: unknown }).name ?? "").includes(teamId));
-          setCronJobs(filtered);
+          setCronJobs(all);
         }
 
         const agentsJson = (await agentsRes.json()) as { agents?: unknown[] };
