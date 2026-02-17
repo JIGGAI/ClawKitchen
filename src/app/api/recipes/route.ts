@@ -14,32 +14,8 @@ export async function GET() {
     return NextResponse.json({ error: "Failed to parse openclaw recipes list output", stderr, stdout }, { status: 500 });
   }
 
-  const list = Array.isArray(data) ? (data as Array<Record<string, unknown>>) : [];
-
-  // openclaw can return multiple entries for the same id/kind (e.g. builtin + workspace override).
-  // For UI operations, we want a single canonical entry per (kind,id), preferring `workspace`.
-  const deduped = Array.from(
-    list.reduce((acc, r) => {
-      const id = String(r.id ?? "");
-      const kind = String(r.kind ?? "");
-      const source = String(r.source ?? "");
-      const key = `${kind}:${id}`;
-
-      const prev = acc.get(key);
-      if (!prev) {
-        acc.set(key, r);
-        return acc;
-      }
-
-      const prevSource = String(prev.source ?? "");
-      // prefer workspace over builtin
-      if (prevSource !== "workspace" && source === "workspace") {
-        acc.set(key, r);
-      }
-
-      return acc;
-    }, new Map<string, Record<string, unknown>>()),
-  ).map(([, v]) => v);
-
-  return NextResponse.json({ recipes: deduped, stderr });
+  // NOTE: We intentionally return the full list here. openclaw can return both builtin + workspace
+  // entries for the same (kind,id). The UI can decide which to prefer depending on context.
+  const list = Array.isArray(data) ? data : [];
+  return NextResponse.json({ recipes: list, stderr });
 }

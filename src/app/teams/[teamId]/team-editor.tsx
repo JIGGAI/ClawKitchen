@@ -574,7 +574,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
         <div className="mt-6 ck-glass-strong p-4">
           <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Installed skills (team workspace)</div>
           <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-[color:var(--ck-text-secondary)]">
-            {skillsList.length ? skillsList.map((s) => <li key={s}>{s}</li>) : <li>None detected (or skills dir missing).</li>}
+            {skillsList.length ? skillsList.map((s) => <li key={s}>{s}</li>) : <li>No skills installed.</li>}
           </ul>
         </div>
       ) : null}
