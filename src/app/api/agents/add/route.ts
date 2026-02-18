@@ -1,11 +1,10 @@
-import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { promisify } from "node:util";
 
 import { NextResponse } from "next/server";
 
-const execFileAsync = promisify(execFile);
+import { execFileAsync } from "@/lib/exec";
+import { teamDirFromBaseWorkspace } from "@/lib/paths";
 
 function normalizeAgentId(id: string) {
   const s = id.trim();
@@ -16,11 +15,30 @@ function normalizeAgentId(id: string) {
   return s;
 }
 
+function buildAgentEntry(
+  body: { newAgentId?: string; agentId?: string; name?: string; emoji?: string; theme?: string; avatar?: string; model?: string },
+  newAgentId: string,
+  newWorkspace: string
+): Record<string, unknown> {
+  const identity: Record<string, unknown> = {};
+  if (typeof body.name === "string" && body.name.trim()) identity.name = body.name.trim();
+  if (typeof body.theme === "string" && body.theme.trim()) identity.theme = body.theme.trim();
+  if (typeof body.emoji === "string" && body.emoji.trim()) identity.emoji = body.emoji.trim();
+  if (typeof body.avatar === "string" && body.avatar.trim()) identity.avatar = body.avatar.trim();
+
+  return {
+    id: newAgentId,
+    workspace: newWorkspace,
+    ...(body.model ? { model: body.model } : {}),
+    identity,
+  };
+}
+
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as {
       newAgentId?: string;
-      agentId?: string; // legacy/compat: some callers send agentId
+      agentId?: string;
       name?: string;
       emoji?: string;
       theme?: string;
@@ -32,46 +50,32 @@ export async function POST(req: Request) {
     const newAgentId = normalizeAgentId(String(body.newAgentId ?? body.agentId ?? ""));
     const overwrite = Boolean(body.overwrite);
 
-    const configPath = path.join(process.env.HOME || "", ".openclaw", "openclaw.json");
     if (!process.env.HOME) {
       return NextResponse.json({ ok: false, error: "HOME is not set" }, { status: 500 });
     }
 
+    const configPath = path.join(process.env.HOME, ".openclaw", "openclaw.json");
     const raw = await fs.readFile(configPath, "utf8");
     const cfg = JSON.parse(raw) as {
       agents?: { defaults?: { workspace?: string }; list?: Array<Record<string, unknown>> };
     };
 
-  const baseWorkspace = String(cfg?.agents?.defaults?.workspace ?? "").trim();
-  if (!baseWorkspace) {
-    return NextResponse.json({ ok: false, error: "agents.defaults.workspace not set" }, { status: 500 });
-  }
+    const baseWorkspace = String(cfg?.agents?.defaults?.workspace ?? "").trim();
+    if (!baseWorkspace) {
+      return NextResponse.json({ ok: false, error: "agents.defaults.workspace not set" }, { status: 500 });
+    }
 
-  const newWorkspace = path.resolve(baseWorkspace, "..", `workspace-${newAgentId}`);
+    const newWorkspace = teamDirFromBaseWorkspace(baseWorkspace, newAgentId);
+    const agentsList: Array<Record<string, unknown>> = Array.isArray(cfg?.agents?.list) ? cfg.agents.list : [];
+    const exists = agentsList.some((a) => String(a?.id ?? "").toLowerCase() === newAgentId.toLowerCase());
+    if (exists && !overwrite) {
+      return NextResponse.json({ ok: false, error: `Agent already exists: ${newAgentId}` }, { status: 409 });
+    }
 
-  const agentsList: Array<Record<string, unknown>> = Array.isArray(cfg?.agents?.list)
-    ? (cfg.agents?.list as Array<Record<string, unknown>>)
-    : [];
-  const exists = agentsList.some((a) => String(a?.id ?? "").toLowerCase() === newAgentId.toLowerCase());
-  if (exists && !overwrite) {
-    return NextResponse.json({ ok: false, error: `Agent already exists: ${newAgentId}` }, { status: 409 });
-  }
-
-  const nextEntry: Record<string, unknown> = {
-    id: newAgentId,
-    workspace: newWorkspace,
-    ...(body.model ? { model: body.model } : {}),
-    identity: {
-      ...(typeof body.name === "string" && body.name.trim() ? { name: body.name.trim() } : {}),
-      ...(typeof body.theme === "string" && body.theme.trim() ? { theme: body.theme.trim() } : {}),
-      ...(typeof body.emoji === "string" && body.emoji.trim() ? { emoji: body.emoji.trim() } : {}),
-      ...(typeof body.avatar === "string" && body.avatar.trim() ? { avatar: body.avatar.trim() } : {}),
-    },
-  };
-
-  const nextList = exists
-    ? agentsList.map((a) => (String(a?.id ?? "").toLowerCase() === newAgentId.toLowerCase() ? nextEntry : a))
-    : [...agentsList, nextEntry];
+    const nextEntry = buildAgentEntry(body, newAgentId, newWorkspace);
+    const nextList = exists
+      ? agentsList.map((a) => (String(a?.id ?? "").toLowerCase() === newAgentId.toLowerCase() ? nextEntry : a))
+      : [...agentsList, nextEntry];
 
   // Ensure workspace directory exists and seed IDENTITY.md for clarity.
   await fs.mkdir(newWorkspace, { recursive: true });

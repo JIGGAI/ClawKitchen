@@ -5,6 +5,11 @@ import { getWorkspaceGoalsDir } from "@/lib/paths";
 
 export type GoalStatus = "planned" | "active" | "done";
 
+/** Parses comma-separated string into trimmed non-empty array. */
+export function parseCommaList(raw: string): string[] {
+  return raw.split(",").map((s) => s.trim()).filter(Boolean);
+}
+
 export type GoalFrontmatter = {
   id: string;
   title: string;
@@ -20,7 +25,7 @@ export type GoalSummary = GoalFrontmatter & {
 
 const ID_RE = /^[a-z0-9][a-z0-9-]{1,63}$/;
 
-function assertSafeGoalId(id: string) {
+export function assertSafeGoalId(id: string) {
   if (!ID_RE.test(id)) {
     throw new Error(
       `Invalid goal id "${id}". Use 2-64 chars: lowercase letters, numbers, hyphens. Example: "increase-trial-activation".`
@@ -28,7 +33,12 @@ function assertSafeGoalId(id: string) {
   }
 }
 
-function splitFrontmatter(md: string): { fm: unknown; body: string } {
+/** Maps goal-related errors to HTTP status: 400 for validation, 500 for other. */
+export function goalErrorStatus(msg: string): 400 | 500 {
+  return /Invalid goal id|Path traversal/.test(msg) ? 400 : 500;
+}
+
+export function splitFrontmatter(md: string): { fm: unknown; body: string } {
   if (md.startsWith("---\n")) {
     const end = md.indexOf("\n---\n", 4);
     if (end !== -1) {
@@ -41,7 +51,7 @@ function splitFrontmatter(md: string): { fm: unknown; body: string } {
   return { fm: {}, body: md };
 }
 
-function normalizeFrontmatter(input: unknown, fallbackId: string, fallbackTitle: string): GoalFrontmatter {
+export function normalizeFrontmatter(input: unknown, fallbackId: string, fallbackTitle: string): GoalFrontmatter {
   const now = new Date().toISOString();
   const obj = (input && typeof input === "object") ? (input as Record<string, unknown>) : {};
   const id = String(obj.id ?? fallbackId).trim();

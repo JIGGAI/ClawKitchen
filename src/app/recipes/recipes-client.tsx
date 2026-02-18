@@ -3,14 +3,9 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useToast } from "@/components/ToastProvider";
+import { errorMessage } from "@/lib/errors";
+import type { RecipeListItem } from "@/lib/recipes";
 import { DeleteRecipeModal } from "./DeleteRecipeModal";
-
-type Recipe = {
-  id: string;
-  name: string;
-  kind: "agent" | "team";
-  source: "builtin" | "workspace";
-};
 
 function RecipesSection({
   title,
@@ -19,7 +14,7 @@ function RecipesSection({
   installedAgentIds,
 }: {
   title: string;
-  items: Recipe[];
+  items: RecipeListItem[];
   onDelete?: (id: string) => void;
   installedAgentIds: string[];
 }) {
@@ -82,9 +77,9 @@ export default function RecipesClient({
   customAgentRecipes,
   installedAgentIds,
 }: {
-  builtin: Recipe[];
-  customTeamRecipes: Recipe[];
-  customAgentRecipes: Recipe[];
+  builtin: RecipeListItem[];
+  customTeamRecipes: RecipeListItem[];
+  customAgentRecipes: RecipeListItem[];
   installedAgentIds: string[];
 }) {
   const toast = useToast();
@@ -121,7 +116,7 @@ export default function RecipesClient({
       setDeleteOpen(false);
       window.location.reload();
     } catch (e: unknown) {
-      toast.push({ kind: "error", message: e instanceof Error ? e.message : String(e) });
+      toast.push({ kind: "error", message: errorMessage(e) });
     } finally {
       setBusy(false);
     }

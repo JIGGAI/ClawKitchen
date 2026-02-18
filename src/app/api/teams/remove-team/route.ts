@@ -1,26 +1,18 @@
 import { NextResponse } from "next/server";
 import { runOpenClaw } from "@/lib/openclaw";
+import { findRecipeById } from "@/lib/recipes";
 
 export async function POST(req: Request) {
   const body = (await req.json()) as { teamId?: string; includeAmbiguous?: boolean };
   const teamId = String(body.teamId ?? "").trim();
   if (!teamId) return NextResponse.json({ ok: false, error: "teamId is required" }, { status: 400 });
 
-  // Server-side guardrail: refuse deletion of builtin teams.
-  const list = await runOpenClaw(["recipes", "list"]);
-  if (list.ok) {
-    try {
-      const recipes = JSON.parse(list.stdout) as Array<{ id?: string; kind?: string; source?: string }>;
-      const match = recipes.find((r) => r.kind === "team" && r.id === teamId);
-      if (match?.source === "builtin") {
-        return NextResponse.json(
-          { ok: false, error: `Refusing to delete builtin team: ${teamId}. Clone to a custom team first.` },
-          { status: 403 },
-        );
-      }
-    } catch {
-      // ignore parse issues; best-effort guard
-    }
+  const match = await findRecipeById(teamId);
+  if (match?.kind === "team" && match.source === "builtin") {
+    return NextResponse.json(
+      { ok: false, error: `Refusing to delete builtin team: ${teamId}. Clone to a custom team first.` },
+      { status: 403 },
+    );
   }
 
   const args = ["recipes", "remove-team", "--team-id", teamId, "--yes", "--json"];

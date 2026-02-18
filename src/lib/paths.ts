@@ -45,6 +45,18 @@ export async function getTeamWorkspaceDir(teamId: string) {
   return path.join(home, ".openclaw", `workspace-${teamId}`);
 }
 
+/** Team workspace dir derived from agents.defaults.workspace (sibling: .. / workspace-{teamId}) */
+export function teamDirFromBaseWorkspace(baseWorkspace: string, teamId: string) {
+  return path.resolve(baseWorkspace, "..", `workspace-${teamId}`);
+}
+
+/** Rejects path traversal and empty names; returns normalized name. */
+export function assertSafeRelativeFileName(name: string): string {
+  const n = name.replace(/\\/g, "/");
+  if (!n || n.startsWith("/") || n.includes("..")) throw new Error("Invalid file name");
+  return n;
+}
+
 export async function getBuiltinRecipesDir() {
   const cfg = await readOpenClawConfig();
   const p =

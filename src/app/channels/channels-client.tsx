@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { errorMessage } from "@/lib/errors";
+import { isRecord } from "@/lib/type-guards";
 
 type ChannelConfig = Record<string, unknown>;
 
@@ -9,10 +11,6 @@ type ChannelsResponse = {
   channels?: Record<string, unknown>;
   error?: string;
 };
-
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return Boolean(v) && typeof v === "object" && !Array.isArray(v);
-}
 
 function Button({
   children,
@@ -25,13 +23,10 @@ function Button({
   kind?: "primary" | "danger";
   disabled?: boolean;
 }) {
-  const base =
-    "rounded-[var(--ck-radius-sm)] px-3 py-2 text-sm font-medium transition disabled:opacity-50 " +
-    (kind === "primary"
-      ? "bg-[var(--ck-accent-red)] text-white"
-      : kind === "danger"
-        ? "border border-red-400/40 text-red-200 hover:bg-red-500/10"
-        : "border border-[color:var(--ck-border-subtle)] hover:bg-[color:var(--ck-bg-glass)]");
+  let base = "rounded-[var(--ck-radius-sm)] px-3 py-2 text-sm font-medium transition disabled:opacity-50 ";
+  if (kind === "primary") base += "bg-[var(--ck-accent-red)] text-white";
+  else if (kind === "danger") base += "border border-red-400/40 text-red-200 hover:bg-red-500/10";
+  else base += "border border-[color:var(--ck-border-subtle)] hover:bg-[color:var(--ck-bg-glass)]";
   return (
     <button className={base} onClick={onClick} disabled={disabled}>
       {children}
@@ -58,7 +53,7 @@ export default function ChannelsClient() {
     return { ok: true, channels: ch };
   }
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -72,12 +67,12 @@ export default function ChannelsClient() {
       setChannels(result.channels);
       setLoading(false);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = errorMessage(e);
       setError(msg);
       setChannels({});
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -88,8 +83,7 @@ export default function ChannelsClient() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [refresh]);
 
   const providers = useMemo(() => {
     const keys = Object.keys(channels);
@@ -198,11 +192,11 @@ export default function ChannelsClient() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="ck-glass p-4">
           <div className="text-sm font-medium">Bindings</div>
-          {loading ? (
-            <div className="mt-3 text-sm text-[color:var(--ck-text-secondary)]">Loading…</div>
-          ) : providers.length === 0 ? (
+          {loading && <div className="mt-3 text-sm text-[color:var(--ck-text-secondary)]">Loading…</div>}
+          {!loading && providers.length === 0 && (
             <div className="mt-3 text-sm text-[color:var(--ck-text-secondary)]">No bindings configured.</div>
-          ) : (
+          )}
+          {!loading && providers.length > 0 && (
             <div className="mt-3 space-y-2">
               {providers.map((p) => (
                 <button

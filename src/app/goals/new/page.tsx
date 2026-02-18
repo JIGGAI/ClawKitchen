@@ -1,21 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { GoalFormFields } from "@/components/GoalFormFields";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-
-type GoalStatus = "planned" | "active" | "done";
-
-function slugify(input: string) {
-  return input
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/[\s_-]+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 64);
-}
+import { type GoalStatus, parseCommaList } from "@/lib/goals";
+import { slugifyId } from "@/lib/slugify";
 
 export default function NewGoalPage() {
   const router = useRouter();
@@ -32,11 +22,11 @@ export default function NewGoalPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const tags = useMemo(() => tagsRaw.split(",").map((s) => s.trim()).filter(Boolean), [tagsRaw]);
-  const teams = useMemo(() => teamsRaw.split(",").map((s) => s.trim()).filter(Boolean), [teamsRaw]);
+  const tags = useMemo(() => parseCommaList(tagsRaw), [tagsRaw]);
+  const teams = useMemo(() => parseCommaList(teamsRaw), [teamsRaw]);
 
   const suggestedId = useMemo(() => {
-    const s = slugify(title);
+    const s = slugifyId(title, 64);
     return s.length >= 2 ? s : "";
   }, [title]);
 
@@ -71,79 +61,20 @@ export default function NewGoalPage() {
       <div className="ck-glass p-6 space-y-4">
         <h1 className="text-xl font-semibold tracking-tight">Create goal</h1>
 
-        <div>
-          <div className="text-xs text-[color:var(--ck-text-tertiary)]">ID</div>
-          <input
-            className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] bg-transparent px-3 py-2 text-sm font-mono"
-            value={id}
-            onChange={(e) => setId(e.target.value)}
-            placeholder="increase-trial-activation"
-          />
-          <div className="mt-1 text-xs text-[color:var(--ck-text-tertiary)]">
-            Lowercase letters, numbers, hyphens. Stored as <code className="font-mono">{id || "<id>"}.md</code>.
-            {suggestedId && !id.trim() ? (
-              <>
-                {" "}Suggested:{" "}
-                <button className="underline" onClick={() => setId(suggestedId)}>
-                  {suggestedId}
-                </button>
-              </>
-            ) : null}
-          </div>
-        </div>
-
-        <div>
-          <div className="text-xs text-[color:var(--ck-text-tertiary)]">Title</div>
-          <input
-            className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] bg-transparent px-3 py-2 text-sm"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Increase trial activation"
-          />
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div>
-            <div className="text-xs text-[color:var(--ck-text-tertiary)]">Status</div>
-            <select
-              className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] bg-transparent px-3 py-2 text-sm"
-              value={status}
-              onChange={(e) => setStatus(e.target.value as GoalStatus)}
-            >
-              <option value="planned">Planned</option>
-              <option value="active">Active</option>
-              <option value="done">Done</option>
-            </select>
-          </div>
-          <div>
-            <div className="text-xs text-[color:var(--ck-text-tertiary)]">Teams (comma-separated)</div>
-            <input
-              className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] bg-transparent px-3 py-2 text-sm"
-              value={teamsRaw}
-              onChange={(e) => setTeamsRaw(e.target.value)}
-              placeholder="development-team, marketing-team"
-            />
-          </div>
-          <div>
-            <div className="text-xs text-[color:var(--ck-text-tertiary)]">Tags (comma-separated)</div>
-            <input
-              className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] bg-transparent px-3 py-2 text-sm"
-              value={tagsRaw}
-              onChange={(e) => setTagsRaw(e.target.value)}
-              placeholder="onboarding, growth"
-            />
-          </div>
-        </div>
-
-        <div>
-          <div className="text-xs text-[color:var(--ck-text-tertiary)]">Body (markdown)</div>
-          <textarea
-            className="mt-1 h-[260px] w-full rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] bg-transparent px-3 py-2 font-mono text-sm"
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder="Write the goal here…"
-          />
-        </div>
+        <GoalFormFields
+          title={title}
+          setTitle={setTitle}
+          status={status}
+          setStatus={setStatus}
+          tagsRaw={tagsRaw}
+          setTagsRaw={setTagsRaw}
+          teamsRaw={teamsRaw}
+          setTeamsRaw={setTeamsRaw}
+          body={body}
+          setBody={setBody}
+          idField={{ id, setId, suggestedId: suggestedId || undefined }}
+          bodyHeight="h-[260px]"
+        />
 
         {error ? <div className="text-sm text-red-300">{error}</div> : null}
 

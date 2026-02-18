@@ -1,24 +1,12 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
-import { readOpenClawConfig } from "@/lib/paths";
-
-function teamDirFromTeamId(baseWorkspace: string, teamId: string) {
-  return path.resolve(baseWorkspace, "..", `workspace-${teamId}`);
-}
+import { getTeamContextFromBody, getTeamContextFromQuery } from "@/lib/api-route-helpers";
 
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const teamId = String(searchParams.get("teamId") ?? "").trim();
-  if (!teamId) return NextResponse.json({ ok: false, error: "teamId is required" }, { status: 400 });
-
-  const cfg = await readOpenClawConfig();
-  const baseWorkspace = String(cfg.agents?.defaults?.workspace ?? "").trim();
-  if (!baseWorkspace) {
-    return NextResponse.json({ ok: false, error: "agents.defaults.workspace not set" }, { status: 500 });
-  }
-
-  const teamDir = teamDirFromTeamId(baseWorkspace, teamId);
+  const ctx = await getTeamContextFromQuery(req);
+  if (ctx instanceof NextResponse) return ctx;
+  const { teamId, teamDir } = ctx;
   const metaPath = path.join(teamDir, "team.json");
 
   try {
@@ -32,20 +20,14 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   const body = (await req.json()) as { teamId?: string; recipeId?: string; recipeName?: string };
-  const teamId = String(body.teamId ?? "").trim();
+  const ctx = await getTeamContextFromBody(body);
+  if (ctx instanceof NextResponse) return ctx;
+  const { teamId, teamDir } = ctx;
+
   const recipeId = String(body.recipeId ?? "").trim();
   const recipeName = typeof body.recipeName === "string" ? body.recipeName : "";
-
-  if (!teamId) return NextResponse.json({ ok: false, error: "teamId is required" }, { status: 400 });
   if (!recipeId) return NextResponse.json({ ok: false, error: "recipeId is required" }, { status: 400 });
 
-  const cfg = await readOpenClawConfig();
-  const baseWorkspace = String(cfg.agents?.defaults?.workspace ?? "").trim();
-  if (!baseWorkspace) {
-    return NextResponse.json({ ok: false, error: "agents.defaults.workspace not set" }, { status: 500 });
-  }
-
-  const teamDir = teamDirFromTeamId(baseWorkspace, teamId);
   const metaPath = path.join(teamDir, "team.json");
 
   const meta = {

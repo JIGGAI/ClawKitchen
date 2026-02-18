@@ -1,8 +1,5 @@
 import { NextResponse } from "next/server";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-
-const execFileAsync = promisify(execFile);
+import { execFileAsync } from "@/lib/exec";
 
 export async function POST(req: Request) {
   try {

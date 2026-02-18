@@ -1,7 +1,4 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-
-const execFileAsync = promisify(execFile);
+import { execFileAsync } from "./exec";
 
 export type OpenClawExecResult = {
   ok: boolean;
@@ -10,8 +7,24 @@ export type OpenClawExecResult = {
   stderr: string;
 };
 
+function extractStdout(err: { stdout?: unknown }): string {
+  if (typeof err.stdout === "string") return err.stdout;
+  if (err.stdout && typeof err.stdout === "object" && "toString" in err.stdout) {
+    return String((err.stdout as { toString: () => string }).toString());
+  }
+  return "";
+}
+
+function extractStderr(err: { stderr?: unknown; message?: unknown }, fallback: unknown): string {
+  if (typeof err.stderr === "string") return err.stderr;
+  if (err.stderr && typeof err.stderr === "object" && "toString" in err.stderr) {
+    return String((err.stderr as { toString: () => string }).toString());
+  }
+  if (typeof err.message === "string") return err.message;
+  return String(fallback);
+}
+
 export async function runOpenClaw(args: string[]): Promise<OpenClawExecResult> {
-  // Use execFile (no shell) for safety.
   try {
     const { stdout, stderr } = await execFileAsync("openclaw", args, {
       maxBuffer: 10 * 1024 * 1024,
@@ -19,24 +32,10 @@ export async function runOpenClaw(args: string[]): Promise<OpenClawExecResult> {
     });
     return { ok: true, exitCode: 0, stdout: stdout?.toString() ?? "", stderr: stderr?.toString() ?? "" };
   } catch (e: unknown) {
-    // execFile throws on non-zero exit; it often includes stdout/stderr.
     const err = e as { code?: unknown; stdout?: unknown; stderr?: unknown; message?: unknown };
     const exitCode = typeof err.code === "number" ? err.code : 1;
-
-    const stdout =
-      typeof err.stdout === "string" ? err.stdout : err.stdout && typeof err.stdout === "object" && "toString" in err.stdout
-        ? String((err.stdout as { toString: () => string }).toString())
-        : "";
-
-    const stderr =
-      typeof err.stderr === "string"
-        ? err.stderr
-        : err.stderr && typeof err.stderr === "object" && "toString" in err.stderr
-          ? String((err.stderr as { toString: () => string }).toString())
-          : typeof err.message === "string"
-            ? err.message
-            : String(e);
-
+    const stdout = extractStdout(err);
+    const stderr = extractStderr(err, e);
     return { ok: false, exitCode, stdout, stderr };
   }
 }

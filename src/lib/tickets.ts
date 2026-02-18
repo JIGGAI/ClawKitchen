@@ -16,7 +16,7 @@ export interface TicketSummary {
 
 const TEAM_WORKSPACE = "/home/control/.openclaw/workspace-development-team";
 
-function stageDir(stage: TicketStage) {
+export function stageDir(stage: TicketStage) {
   const map: Record<TicketStage, string> = {
     backlog: "work/backlog",
     "in-progress": "work/in-progress",
@@ -26,15 +26,17 @@ function stageDir(stage: TicketStage) {
   return path.join(TEAM_WORKSPACE, map[stage]);
 }
 
-function parseTitle(md: string) {
-  // Ticket markdown files typically start with:
-  //   # 0033-some-slug
-  // (no human title after the id). Prefer extracting a readable title from the slug.
-  const header = md.match(/^#\s+(.+)$/m)?.[1]?.trim() ?? "";
+export function parseTitle(md: string) {
+  // Ticket markdown files typically start with: # 0033-some-slug
+  const firstLine = md.split("\n")[0] ?? "";
+  const header = firstLine.startsWith("# ") ? firstLine.slice(2).trim() : "";
 
   // If header is like: "<id> <title...>" keep the explicit title portion.
-  const withExplicit = header.match(/^\S+\s+(.+)$/);
-  if (withExplicit?.[1]?.trim()) return withExplicit[1].trim();
+  const firstSpace = header.indexOf(" ");
+  if (firstSpace > 0) {
+    const afterSpace = header.slice(firstSpace + 1).trim();
+    if (afterSpace) return afterSpace;
+  }
 
   // Otherwise derive from the slug: strip leading number + hyphen, then de-kebab.
   const derivedRaw = header
@@ -43,14 +45,16 @@ function parseTitle(md: string) {
     .replace(/\s+/g, " ")
     .trim();
 
+  const ACRONYMS = new Set(["api", "cli", "ui", "ux", "gpu", "cpu", "npm", "pr", "ci", "cd", "json", "yaml", "md"]);
   const titleCase = (s: string) =>
     s
       .split(" ")
       .filter(Boolean)
       .map((w) => {
-        // Keep common acronyms and versions readable.
-        if (/^(v\d+(?:\.\d+)*|api|cli|ui|ux|gpu|cpu|npm|pr|ci|cd|json|yaml|md)$/i.test(w)) return w.toUpperCase();
-        if (/^\d+(?:\.\d+)*$/.test(w)) return w;
+        const lower = w.toLowerCase();
+        if (ACRONYMS.has(lower)) return w.toUpperCase();
+        if (lower.startsWith("v") && /^\d/.test(lower.slice(1))) return w; // version-like
+        if (/^[\d.]+$/.test(w)) return w; // numbers/semver
         return w.slice(0, 1).toUpperCase() + w.slice(1);
       })
       .join(" ");
@@ -67,7 +71,7 @@ function parseField(md: string, field: string): string | null {
   return m?.[1]?.trim() || null;
 }
 
-function parseNumberFromFilename(filename: string): number | null {
+export function parseNumberFromFilename(filename: string): number | null {
   const m = filename.match(/^(\d{4})-/);
   if (!m) return null;
   return Number(m[1]);

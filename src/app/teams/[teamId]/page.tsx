@@ -1,24 +1,10 @@
 import Link from "next/link";
-import { runOpenClaw } from "@/lib/openclaw";
+import { findRecipeById } from "@/lib/recipes";
 import TeamEditor from "./team-editor";
 
-type RecipeListItem = {
-  id: string;
-  name: string;
-  kind: "agent" | "team";
-  source: "builtin" | "workspace";
-};
-
 async function getTeamDisplayName(teamId: string) {
-  const res = await runOpenClaw(["recipes", "list"]);
-  if (!res.ok) return null;
-  try {
-    const items = JSON.parse(res.stdout) as RecipeListItem[];
-    const match = items.find((r) => r.kind === "team" && r.id === teamId);
-    return match?.name ?? null;
-  } catch {
-    return null;
-  }
+  const item = await findRecipeById(teamId);
+  return item?.kind === "team" ? (item.name ?? null) : null;
 }
 
 export default async function TeamPage({ params }: { params: Promise<{ teamId: string }> }) {

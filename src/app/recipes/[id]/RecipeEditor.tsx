@@ -1,20 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-
-type Recipe = {
-  id: string;
-  name: string;
-  kind: "agent" | "team";
-  source: "builtin" | "workspace";
-  content: string;
-  filePath: string | null;
-};
+import { errorMessage } from "@/lib/errors";
+import { type RecipeDetail } from "@/lib/recipes";
 
 export default function RecipeEditor({ recipeId }: { recipeId: string }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [recipe, setRecipe] = useState<Recipe | null>(null);
+  const [recipe, setRecipe] = useState<RecipeDetail | null>(null);
   const [content, setContent] = useState<string>("");
   const [message, setMessage] = useState<string>("");
   const [scaffoldOut, setScaffoldOut] = useState<string>("");
@@ -30,7 +23,7 @@ export default function RecipeEditor({ recipeId }: { recipeId: string }) {
         setLoading(false);
         return;
       }
-      const r = json.recipe as Recipe;
+      const r = json.recipe as RecipeDetail;
       setRecipe(r);
       setContent(r.content);
       setLoading(false);
@@ -55,7 +48,7 @@ export default function RecipeEditor({ recipeId }: { recipeId: string }) {
       if (!res.ok) throw new Error(json.error || "Save failed");
       setMessage(`Saved to ${json.filePath}`);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = errorMessage(e);
       setMessage(msg);
     } finally {
       setSaving(false);
@@ -81,7 +74,7 @@ export default function RecipeEditor({ recipeId }: { recipeId: string }) {
       if (!res.ok) throw new Error(json.error || "Scaffold failed");
       setScaffoldOut([json.stdout, json.stderr].filter(Boolean).join("\n"));
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = errorMessage(e);
       setScaffoldOut(msg);
     }
   }

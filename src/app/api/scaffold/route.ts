@@ -2,24 +2,9 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
 import { runOpenClaw } from "@/lib/openclaw";
-import { readOpenClawConfig } from "@/lib/paths";
-
-type ReqBody =
-  | {
-      kind: "agent";
-      recipeId: string;
-      agentId?: string;
-      name?: string;
-      applyConfig?: boolean;
-      overwrite?: boolean;
-    }
-  | {
-      kind: "team";
-      recipeId: string;
-      teamId?: string;
-      applyConfig?: boolean;
-      overwrite?: boolean;
-    };
+import { findRecipeById } from "@/lib/recipes";
+import { readOpenClawConfig, teamDirFromBaseWorkspace } from "@/lib/paths";
+import { buildScaffoldArgs, type ScaffoldReqBody } from "@/lib/scaffold";
 
 const asString = (v: unknown) => {
   if (typeof v === "string") return v;
@@ -28,83 +13,65 @@ const asString = (v: unknown) => {
   return "";
 };
 
-function teamDirFromTeamId(baseWorkspace: string, teamId: string) {
-  return path.resolve(baseWorkspace, "..", `workspace-${teamId}`);
-}
-
 const TEAM_META_FILE = "team.json";
 
-export async function POST(req: Request) {
-  const body = (await req.json()) as ReqBody & { cronInstallChoice?: "yes" | "no" };
+async function applyCronOverride(override: "yes" | "no"): Promise<string | null> {
+  const cfgPath = "plugins.entries.recipes.config.cronInstallation";
+  const prev = await runOpenClaw(["config", "get", cfgPath]);
+  const prevValue = prev.stdout.trim() || null;
+  const next = override === "yes" ? "on" : "off";
+  await runOpenClaw(["config", "set", cfgPath, next]);
+  return prevValue;
+}
 
-  const args: string[] = ["recipes", body.kind === "team" ? "scaffold-team" : "scaffold", body.recipeId];
+async function getRecipeName(recipeId: string): Promise<string | undefined> {
+  const item = await findRecipeById(recipeId);
+  const n = String(item?.name ?? "").trim();
+  return n || undefined;
+}
 
-  if (body.overwrite) args.push("--overwrite");
-  if (body.applyConfig) args.push("--apply-config");
+async function persistTeamProvenance(body: Extract<ScaffoldReqBody, { kind: "team" }>): Promise<void> {
+  const teamId = String(body.teamId ?? "").trim();
+  if (!teamId) return;
+  try {
+    const cfg = await readOpenClawConfig();
+    const baseWorkspace = String(cfg.agents?.defaults?.workspace ?? "").trim();
+    if (!baseWorkspace) return;
 
-  if (body.kind === "agent") {
-    if (body.agentId) args.push("--agent-id", body.agentId);
-    if (body.name) args.push("--name", body.name);
-  } else {
-    if (body.teamId) args.push("--team-id", body.teamId);
+    const teamDir = teamDirFromBaseWorkspace(baseWorkspace, teamId);
+    const recipeName = await getRecipeName(body.recipeId);
+
+    const now = new Date().toISOString();
+    const meta = {
+      teamId,
+      recipeId: body.recipeId,
+      ...(recipeName ? { recipeName } : {}),
+      scaffoldedAt: now,
+      attachedAt: now,
+    };
+
+    await fs.mkdir(teamDir, { recursive: true });
+    await fs.writeFile(path.join(teamDir, TEAM_META_FILE), JSON.stringify(meta, null, 2) + "\n", "utf8");
+  } catch {
+    // best-effort only; scaffold should still succeed
   }
+}
 
-  // Kitchen runs scaffold non-interactively, so the recipes plugin cannot prompt.
-  // To emulate prompt semantics, we optionally override cronInstallation for this one scaffold run.
+export async function POST(req: Request) {
+  const body = (await req.json()) as ScaffoldReqBody & { cronInstallChoice?: "yes" | "no" };
+
+  const args = buildScaffoldArgs(body);
   let prevCronInstallation: string | null = null;
-  const override = body.cronInstallChoice;
 
   try {
-    if (override === "yes" || override === "no") {
-      const cfgPath = "plugins.entries.recipes.config.cronInstallation";
-      const prev = await runOpenClaw(["config", "get", cfgPath]);
-      prevCronInstallation = prev.stdout.trim() || null;
-      const next = override === "yes" ? "on" : "off";
-      await runOpenClaw(["config", "set", cfgPath, next]);
+    if (body.cronInstallChoice === "yes" || body.cronInstallChoice === "no") {
+      prevCronInstallation = await applyCronOverride(body.cronInstallChoice);
     }
 
     const { stdout, stderr } = await runOpenClaw(args);
 
-    // Persist team provenance so the Team editor can lock the correct parent recipe.
     if (body.kind === "team") {
-      const teamId = String(body.teamId ?? "").trim();
-      if (teamId) {
-        try {
-          const cfg = await readOpenClawConfig();
-          const baseWorkspace = String(cfg.agents?.defaults?.workspace ?? "").trim();
-          if (baseWorkspace) {
-            const teamDir = teamDirFromTeamId(baseWorkspace, teamId);
-
-            // Best-effort recipe name snapshot.
-            let recipeName: string | undefined;
-            try {
-              const list = await runOpenClaw(["recipes", "list"]);
-              if (list.ok) {
-                const items = JSON.parse(list.stdout) as Array<{ id?: string; name?: string }>;
-                const hit = items.find((r) => String(r.id ?? "").trim() === body.recipeId);
-                const n = String(hit?.name ?? "").trim();
-                if (n) recipeName = n;
-              }
-            } catch {
-              // ignore
-            }
-
-            const now = new Date().toISOString();
-            const meta = {
-              teamId,
-              recipeId: body.recipeId,
-              ...(recipeName ? { recipeName } : {}),
-              scaffoldedAt: now,
-              attachedAt: now,
-            };
-
-            await fs.mkdir(teamDir, { recursive: true });
-            await fs.writeFile(path.join(teamDir, TEAM_META_FILE), JSON.stringify(meta, null, 2) + "\n", "utf8");
-          }
-        } catch {
-          // best-effort only; scaffold should still succeed
-        }
-      }
+      await persistTeamProvenance(body);
     }
 
     return NextResponse.json({ ok: true, args, stdout, stderr });

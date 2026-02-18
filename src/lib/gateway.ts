@@ -65,13 +65,17 @@ export async function toolsInvoke<T = unknown>(req: ToolsInvokeRequest): Promise
   return json.result as T;
 }
 
+export function getContentText(content: Array<{ type: string; text?: string }> | undefined): string | undefined {
+  return content?.find((c) => c.type === "text")?.text;
+}
+
 export async function gatewayConfigGet(): Promise<{ raw: string; hash: string }> {
   const toolResult = await toolsInvoke<{ content: Array<{ type: string; text?: string }> }>({
     tool: "gateway",
     args: { action: "config.get", raw: "{}" },
   });
 
-  const text = toolResult?.content?.find((c) => c.type === "text")?.text;
+  const text = getContentText(toolResult?.content);
   if (!text) throw new Error("gateway config.get: missing text payload");
 
   const parsed = JSON.parse(text) as ToolTextEnvelope;

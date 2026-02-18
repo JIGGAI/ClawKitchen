@@ -1,24 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { runOpenClaw } from "@/lib/openclaw";
+import { findRecipeById } from "@/lib/recipes";
 import RecipeEditor from "./RecipeEditor";
 
-type RecipeListItem = {
-  id: string;
-  name: string;
-  kind: "agent" | "team";
-  source: "builtin" | "workspace";
-};
-
 async function getKind(id: string): Promise<"agent" | "team" | null> {
-  const res = await runOpenClaw(["recipes", "list"]);
-  if (!res.ok) return null;
-  try {
-    const items = JSON.parse(res.stdout) as RecipeListItem[];
-    return items.find((r) => r.id === id)?.kind ?? null;
-  } catch {
-    return null;
-  }
+  const item = await findRecipeById(id);
+  return item?.kind ?? null;
 }
 
 export default async function RecipePage({ params }: { params: Promise<{ id: string }> }) {

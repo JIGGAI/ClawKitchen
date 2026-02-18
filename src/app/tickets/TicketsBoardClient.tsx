@@ -42,6 +42,21 @@ function formatAge(hours: number) {
   return `${Math.round(hours / 24)}d`;
 }
 
+function handleMoveTicket(
+  ticket: TicketSummary,
+  to: TicketStage,
+  moveFn: (t: TicketSummary, s: TicketStage) => Promise<void>,
+  startTransition: (fn: () => void) => void,
+  router: { refresh: () => void },
+  setError: (msg: string | null) => void
+) {
+  startTransition(() => {
+    moveFn(ticket, to)
+      .then(() => router.refresh())
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
+  });
+}
+
 export function TicketsBoardClient({ tickets }: { tickets: TicketSummary[] }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -216,11 +231,7 @@ export function TicketsBoardClient({ tickets }: { tickets: TicketSummary[] }) {
                         defaultValue={t.stage}
                         onChange={(e) => {
                           const to = e.target.value as TicketStage;
-                          startTransition(() => {
-                            move(t, to)
-                              .then(() => router.refresh())
-                              .catch((err) => setError(err.message));
-                          });
+                          handleMoveTicket(t, to, move, startTransition, router, setError);
                         }}
                       >
                         {STAGES.map((s) => (

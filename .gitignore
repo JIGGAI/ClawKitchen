@@ -13,6 +13,12 @@
 # testing
 /coverage
 
+# jscpd duplication report
+/report
+
+# refactor report (generated)
+refactor-report.md
+
 # next.js
 /.next/
 /out/

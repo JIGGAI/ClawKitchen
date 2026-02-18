@@ -1,19 +1,22 @@
 "use client";
 
 import Link from "next/link";
+import { GoalFormFields } from "@/components/GoalFormFields";
+import { errorMessage } from "@/lib/errors";
+import { type GoalFrontmatter, type GoalStatus, parseCommaList } from "@/lib/goals";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-type GoalStatus = "planned" | "active" | "done";
+function parseGoalResponse(res: Response, data: unknown): { error?: string; goal?: GoalFrontmatter; body?: string } {
+  const obj = (data && typeof data === "object") ? (data as Record<string, unknown>) : {};
+  if (!res.ok) return { error: String(obj.error ?? "Failed to load goal") };
 
-type Goal = {
-  id: string;
-  title: string;
-  status: GoalStatus;
-  tags: string[];
-  teams: string[];
-  updatedAt: string;
-};
+  const g = (obj.goal ?? {}) as GoalFrontmatter;
+  return {
+    goal: g,
+    body: String(obj.body ?? ""),
+  };
+}
 
 export default function GoalEditor({ goalId }: { goalId: string }) {
   const router = useRouter();
@@ -28,73 +31,37 @@ export default function GoalEditor({ goalId }: { goalId: string }) {
   const [body, setBody] = useState("");
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
 
-  const tags = useMemo(
-    () => tagsRaw.split(",").map((s) => s.trim()).filter(Boolean),
-    [tagsRaw]
-  );
-  const teams = useMemo(
-    () => teamsRaw.split(",").map((s) => s.trim()).filter(Boolean),
-    [teamsRaw]
-  );
+  const tags = useMemo(() => parseCommaList(tagsRaw), [tagsRaw]);
+  const teams = useMemo(() => parseCommaList(teamsRaw), [teamsRaw]);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetch(`/api/goals/${encodeURIComponent(goalId)}`, { cache: "no-store" });
-        const data = (await res.json()) as unknown;
-        const obj = (data && typeof data === "object") ? (data as Record<string, unknown>) : {};
-        if (cancelled) return;
-
-        if (!res.ok) {
-          setError(String(obj.error ?? "Failed to load goal"));
-          setLoading(false);
-          return;
-        }
-
-        const g = (obj.goal ?? {}) as Goal;
-        setTitle(g.title ?? "");
-        setStatus((g.status as GoalStatus) ?? "planned");
-        setTagsRaw((g.tags ?? []).join(", "));
-        setTeamsRaw((g.teams ?? []).join(", "));
-        setBody(String(obj.body ?? ""));
-        setUpdatedAt(g.updatedAt ?? null);
-        setLoading(false);
-      } catch (e: unknown) {
-        if (cancelled) return;
-        const msg = e instanceof Error ? e.message : String(e);
-        setError(msg);
-        setLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [goalId]);
-
-  async function reload() {
+  const loadGoal = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const res = await fetch(`/api/goals/${encodeURIComponent(goalId)}`, { cache: "no-store" });
-    const data = (await res.json()) as unknown;
-    const obj = (data && typeof data === "object") ? (data as Record<string, unknown>) : {};
-    if (!res.ok) {
-      setError(String(obj.error ?? "Failed to load goal"));
+    try {
+      const res = await fetch(`/api/goals/${encodeURIComponent(goalId)}`, { cache: "no-store" });
+      const data = (await res.json()) as unknown;
+      const parsed = parseGoalResponse(res, data);
+      if (parsed.error) {
+        setError(parsed.error);
+        return;
+      }
+      const g = parsed.goal as GoalFrontmatter;
+      setTitle(g.title ?? "");
+      setStatus((g.status as GoalStatus) ?? "planned");
+      setTagsRaw((g.tags ?? []).join(", "));
+      setTeamsRaw((g.teams ?? []).join(", "));
+      setBody(parsed.body ?? "");
+      setUpdatedAt(g.updatedAt ?? null);
+    } catch (e: unknown) {
+      setError(errorMessage(e));
+    } finally {
       setLoading(false);
-      return;
     }
-    const g = (obj.goal ?? {}) as Goal;
-    setTitle(g.title ?? "");
-    setStatus((g.status as GoalStatus) ?? "planned");
-    setTagsRaw((g.tags ?? []).join(", "));
-    setTeamsRaw((g.teams ?? []).join(", "));
-    setBody(String(obj.body ?? ""));
-    setUpdatedAt(g.updatedAt ?? null);
-    setLoading(false);
-  }
+  }, [goalId]);
+
+  useEffect(() => {
+    void loadGoal();
+  }, [loadGoal]);
 
   async function save() {
     setSaving(true);
@@ -110,7 +77,7 @@ export default function GoalEditor({ goalId }: { goalId: string }) {
       setSaving(false);
       return;
     }
-    const g = data.goal as Goal;
+    const g = data.goal as GoalFrontmatter;
     setUpdatedAt(g.updatedAt ?? null);
     setSaving(false);
 
@@ -133,7 +100,7 @@ export default function GoalEditor({ goalId }: { goalId: string }) {
       return;
     }
 
-    await reload();
+    await loadGoal();
     setSaving(false);
   }
 
@@ -164,63 +131,19 @@ export default function GoalEditor({ goalId }: { goalId: string }) {
       </div>
 
       <div className="ck-glass p-6 space-y-4">
-        <div>
-          <div className="text-xs text-[color:var(--ck-text-tertiary)]">Title</div>
-          <input
-            className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] bg-transparent px-3 py-2 text-sm"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Goal title"
-          />
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div>
-            <div className="text-xs text-[color:var(--ck-text-tertiary)]">Status</div>
-            <select
-              className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] bg-transparent px-3 py-2 text-sm"
-              value={status}
-              onChange={(e) => setStatus(e.target.value as GoalStatus)}
-            >
-              <option value="planned">Planned</option>
-              <option value="active">Active</option>
-              <option value="done">Done</option>
-            </select>
-          </div>
-          <div>
-            <div className="text-xs text-[color:var(--ck-text-tertiary)]">Teams (comma-separated)</div>
-            <input
-              className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] bg-transparent px-3 py-2 text-sm"
-              value={teamsRaw}
-              onChange={(e) => setTeamsRaw(e.target.value)}
-              placeholder="development-team, marketing-team"
-            />
-          </div>
-          <div>
-            <div className="text-xs text-[color:var(--ck-text-tertiary)]">Tags (comma-separated)</div>
-            <input
-              className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] bg-transparent px-3 py-2 text-sm"
-              value={tagsRaw}
-              onChange={(e) => setTagsRaw(e.target.value)}
-              placeholder="onboarding, growth"
-            />
-          </div>
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between">
-            <div className="text-xs text-[color:var(--ck-text-tertiary)]">Body (markdown)</div>
-            <div className="text-xs text-[color:var(--ck-text-tertiary)]">
-              {updatedAt ? `updated ${new Date(updatedAt).toLocaleString()}` : ""}
-            </div>
-          </div>
-          <textarea
-            className="mt-1 h-[320px] w-full rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] bg-transparent px-3 py-2 font-mono text-sm"
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder="Write the goal here…"
-          />
-        </div>
+        <GoalFormFields
+          title={title}
+          setTitle={setTitle}
+          status={status}
+          setStatus={setStatus}
+          tagsRaw={tagsRaw}
+          setTagsRaw={setTagsRaw}
+          teamsRaw={teamsRaw}
+          setTeamsRaw={setTeamsRaw}
+          body={body}
+          setBody={setBody}
+          updatedAt={updatedAt}
+        />
 
         {error ? <div className="text-sm text-red-300">{error}</div> : null}
 
@@ -233,7 +156,7 @@ export default function GoalEditor({ goalId }: { goalId: string }) {
             {saving ? "Saving…" : "Save"}
           </button>
           <button
-            onClick={() => void reload()}
+            onClick={() => void loadGoal()}
             disabled={saving}
             className="rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] px-3 py-2 text-sm"
           >

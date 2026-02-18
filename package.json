@@ -7,7 +7,14 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "smoke:goals": "node scripts/goals-smoke.mjs"
+    "test": "vitest",
+    "test:run": "vitest run",
+    "coverage": "vitest run --coverage",
+    "check": "npm run lint && npm run test:run",
+    "dup:check": "jscpd src --min-tokens 50 --min-lines 10 --reporters html,console",
+    "refactor:report": "node scripts/refactor-report.mjs",
+    "smoke:goals": "node scripts/goals-smoke.mjs",
+    "prepare": "husky"
   },
   "dependencies": {
     "next": "16.1.6",
@@ -17,12 +24,26 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^5.1.4",
+    "@vitest/coverage-v8": "^4.0.18",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "eslint-plugin-sonarjs": "^4.0.0",
+    "husky": "^9.1.7",
+    "jscpd": "^4.0.8",
+    "jsdom": "^28.1.0",
+    "lint-staged": "^16.2.7",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "^4.0.18"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": "eslint --fix"
   }
 }

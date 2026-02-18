@@ -1,9 +1,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import YAML from "yaml";
 import { NextResponse } from "next/server";
 import { getWorkspaceRecipesDir } from "@/lib/paths";
 import { runOpenClaw } from "@/lib/openclaw";
+import { suggestIds, scaffoldCmdForKind, patchFrontmatter } from "@/lib/recipe-clone";
 
 export async function POST(req: Request) {
   const body = (await req.json()) as {
@@ -40,38 +40,8 @@ export async function POST(req: Request) {
 
   const original = String(shown.stdout ?? "");
 
-  // Patch the frontmatter for the new recipe id/name.
-  // For team recipes, also patch team.teamId so downstream scaffold targets the new team workspace.
-  // (Agent ids for team members are derived from teamId + role by scaffold-team.)
   if (!original.startsWith("---\n")) throw new Error("Recipe markdown must start with YAML frontmatter (---)");
-  const end = original.indexOf("\n---\n", 4);
-  if (end === -1) throw new Error("Recipe frontmatter not terminated (---)");
-  const yamlText = original.slice(4, end + 1);
-  const fm = (YAML.parse(yamlText) ?? {}) as Record<string, unknown>;
-  const kind = String(fm.kind ?? "").trim().toLowerCase();
-
-  const patched: Record<string, unknown> = {
-    ...fm,
-    id: toId,
-    ...(toName ? { name: toName } : {}),
-    ...(kind === "team"
-      ? {
-          team: {
-            ...(typeof fm.team === "object" && fm.team ? (fm.team as Record<string, unknown>) : {}),
-            teamId: toId,
-          },
-        }
-      : {}),
-  };
-
-  const nextYaml = YAML.stringify(patched).trimEnd();
-  const next = `---\n${nextYaml}\n---\n${original.slice(end + 5)}`;
-
-  function suggestIds(baseId: string) {
-    const b = String(baseId || "recipe").trim();
-    // Keep it simple/predictable: no timestamps, just common prefixes + auto-increment style.
-    return [`custom-${b}`, `my-${b}`, `${b}-2`, `${b}-alt`];
-  }
+  const { next, kind } = patchFrontmatter(original, toId, toName);
 
   const dir = await getWorkspaceRecipesDir();
   const filePath = path.join(dir, `${toId}.md`);
@@ -106,12 +76,7 @@ export async function POST(req: Request) {
     | null = null;
 
   if (scaffold) {
-    const cmd =
-      kind === "team"
-        ? ["recipes", "scaffold-team", toId, "--team-id", toId, "--overwrite"]
-        : kind === "agent"
-          ? ["recipes", "scaffold", toId, "--agent-id", toId, "--overwrite"]
-          : null;
+    const cmd = scaffoldCmdForKind(kind, toId);
 
     if (!cmd) {
       scaffoldResult = {

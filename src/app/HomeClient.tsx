@@ -2,14 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-
-type AgentListItem = {
-  id: string;
-  identityName?: string;
-  workspace?: string;
-  model?: string;
-  isDefault?: boolean;
-};
+import type { AgentListItem } from "@/lib/agents";
 
 function inferTeamIdFromWorkspace(workspace: string | undefined) {
   if (!workspace) return null;
