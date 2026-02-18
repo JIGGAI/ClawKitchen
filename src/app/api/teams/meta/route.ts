@@ -1,11 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
-import { readOpenClawConfig } from "@/lib/paths";
-
-function teamDirFromTeamId(baseWorkspace: string, teamId: string) {
-  return path.resolve(baseWorkspace, "..", `workspace-${teamId}`);
-}
+import { readOpenClawConfig, teamDirFromBaseWorkspace } from "@/lib/paths";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -18,7 +14,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: "agents.defaults.workspace not set" }, { status: 500 });
   }
 
-  const teamDir = teamDirFromTeamId(baseWorkspace, teamId);
+  const teamDir = teamDirFromBaseWorkspace(baseWorkspace, teamId);
   const metaPath = path.join(teamDir, "team.json");
 
   try {
@@ -45,7 +41,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "agents.defaults.workspace not set" }, { status: 500 });
   }
 
-  const teamDir = teamDirFromTeamId(baseWorkspace, teamId);
+  const teamDir = teamDirFromBaseWorkspace(baseWorkspace, teamId);
   const metaPath = path.join(teamDir, "team.json");
 
   const meta = {

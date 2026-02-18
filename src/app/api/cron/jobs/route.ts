@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { toolsInvoke } from "@/lib/gateway";
+import { cronJobId } from "@/lib/cron";
+import { errorMessage } from "@/lib/errors";
+import { getContentText, toolsInvoke } from "@/lib/gateway";
 
 type CronToolResult = {
   content: Array<{ type: string; text?: string }>;
@@ -19,7 +21,7 @@ export async function GET(req: Request) {
       args: { action: "list", includeDisabled: true },
     });
 
-    const text = result?.content?.find((c) => c.type === "text")?.text;
+    const text = getContentText(result?.content);
     if (!text) {
       return NextResponse.json({ ok: true, jobs: [] });
     }
@@ -50,10 +52,10 @@ export async function GET(req: Request) {
       installedIds = [];
     }
 
-    const filtered = jobs.filter((j) => installedIds.includes(String((j as { id?: unknown }).id ?? "")));
+    const filtered = jobs.filter((j) => installedIds.includes(cronJobId(j)));
     return NextResponse.json({ ok: true, jobs: filtered, teamId, provenancePath, installedIds });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
+    const msg = errorMessage(e);
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
 }

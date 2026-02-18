@@ -1,17 +1,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
-import { readOpenClawConfig } from "@/lib/paths";
-
-function teamDirFromTeamId(baseWorkspace: string, teamId: string) {
-  return path.resolve(baseWorkspace, "..", `workspace-${teamId}`);
-}
-
-function assertSafeRelative(name: string) {
-  const n = name.replace(/\\/g, "/");
-  if (!n || n.startsWith("/") || n.includes("..")) throw new Error("Invalid file name");
-  return n;
-}
+import { errorMessage } from "@/lib/errors";
+import { readOpenClawConfig, teamDirFromBaseWorkspace, assertSafeRelativeFileName } from "@/lib/paths";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -26,8 +17,8 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: "agents.defaults.workspace not set" }, { status: 500 });
   }
 
-  const safe = assertSafeRelative(name);
-  const teamDir = teamDirFromTeamId(baseWorkspace, teamId);
+  const safe = assertSafeRelativeFileName(name);
+  const teamDir = teamDirFromBaseWorkspace(baseWorkspace, teamId);
   const filePath = path.join(teamDir, safe);
 
   try {
@@ -35,7 +26,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: true, teamId, name: safe, filePath, content });
   } catch (e: unknown) {
     return NextResponse.json(
-      { ok: false, error: e instanceof Error ? e.message : String(e) },
+      { ok: false, error: errorMessage(e) },
       { status: 404 }
     );
   }
@@ -57,8 +48,8 @@ export async function PUT(req: Request) {
     return NextResponse.json({ ok: false, error: "agents.defaults.workspace not set" }, { status: 500 });
   }
 
-  const safe = assertSafeRelative(name);
-  const teamDir = teamDirFromTeamId(baseWorkspace, teamId);
+  const safe = assertSafeRelativeFileName(name);
+  const teamDir = teamDirFromBaseWorkspace(baseWorkspace, teamId);
   const filePath = path.join(teamDir, safe);
 
   await fs.mkdir(path.dirname(filePath), { recursive: true });

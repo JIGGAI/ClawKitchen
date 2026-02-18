@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
-import { listGoals, writeGoal } from "@/lib/goals";
+import { errorMessage } from "@/lib/errors";
+import { goalErrorStatus, listGoals, writeGoal } from "@/lib/goals";
 
 export async function GET() {
   try {
     const goals = await listGoals();
     return NextResponse.json({ goals });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
+    const msg = errorMessage(e);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
@@ -40,8 +41,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ goal: result.frontmatter });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    const status = /Invalid goal id|Path traversal/.test(msg) ? 400 : 500;
+    const msg = errorMessage(e);
+    const status = goalErrorStatus(msg);
     return NextResponse.json({ error: msg }, { status });
   }
 }

@@ -1,17 +1,20 @@
 "use client";
 
 import Link from "next/link";
+import { errorMessage } from "@/lib/errors";
+import { type GoalFrontmatter } from "@/lib/goals";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
-type Goal = {
-  id: string;
-  title: string;
-  status: "planned" | "active" | "done";
-  tags: string[];
-  teams: string[];
-  updatedAt: string;
-};
+async function fetchGoals(): Promise<{ goals: GoalFrontmatter[]; error: string | null }> {
+  const res = await fetch("/api/goals", { cache: "no-store" });
+  const data = (await res.json()) as unknown;
+  const obj = (data && typeof data === "object") ? (data as Record<string, unknown>) : {};
+  if (!res.ok) {
+    return { goals: [], error: String(obj.error ?? "Failed to load goals") };
+  }
+  return { goals: (obj.goals ?? []) as GoalFrontmatter[], error: null };
+}
 
 function Badge({ children }: { children: React.ReactNode }) {
   return (
@@ -22,7 +25,7 @@ function Badge({ children }: { children: React.ReactNode }) {
 }
 
 export default function GoalsClient() {
-  const [goals, setGoals] = useState<Goal[] | null>(null);
+  const [goals, setGoals] = useState<GoalFrontmatter[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const searchParams = useSearchParams();
@@ -34,25 +37,13 @@ export default function GoalsClient() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/goals", { cache: "no-store" });
-        const data = (await res.json()) as unknown;
+        const { goals: g, error: err } = await fetchGoals();
         if (cancelled) return;
-
-        const obj = (data && typeof data === "object") ? (data as Record<string, unknown>) : {};
-
-        if (!res.ok) {
-          const msg = obj.error ?? "Failed to load goals";
-          setError(String(msg));
-          setGoals([]);
-          return;
-        }
-
-        setError(null);
-        setGoals((obj.goals ?? []) as Goal[]);
+        setError(err);
+        setGoals(err ? [] : g);
       } catch (e: unknown) {
         if (cancelled) return;
-        const msg = e instanceof Error ? e.message : String(e);
-        setError(msg);
+        setError(errorMessage(e));
         setGoals([]);
       }
     })();
@@ -63,19 +54,16 @@ export default function GoalsClient() {
   }, []);
 
   async function reload() {
-    // reuse the same logic by forcing a page-level refetch
-    // (simple and avoids extra hooks)
     setGoals(null);
     setError(null);
-    const res = await fetch("/api/goals", { cache: "no-store" });
-    const data = (await res.json()) as unknown;
-    const obj = (data && typeof data === "object") ? (data as Record<string, unknown>) : {};
-    if (!res.ok) {
-      setError(String(obj.error ?? "Failed to load goals"));
+    try {
+      const { goals: g, error: err } = await fetchGoals();
+      setError(err);
+      setGoals(err ? [] : g);
+    } catch (e: unknown) {
+      setError(errorMessage(e));
       setGoals([]);
-      return;
     }
-    setGoals((obj.goals ?? []) as Goal[]);
   }
 
   const filtered = useMemo(() => {
@@ -96,7 +84,7 @@ export default function GoalsClient() {
     return c;
   }, [goals]);
 
-  function renderGoal(g: Goal) {
+  function renderGoal(g: GoalFrontmatter) {
     return (
       <Link
         key={g.id}
@@ -174,9 +162,10 @@ export default function GoalsClient() {
         <div className="ck-glass p-4 text-sm text-red-300">{error}</div>
       ) : null}
 
-      {goals == null ? (
+      {goals == null && (
         <div className="ck-glass p-6 text-sm text-[color:var(--ck-text-secondary)]">Loading…</div>
-      ) : filtered.length === 0 ? (
+      )}
+      {goals != null && filtered.length === 0 && (
         <div className="ck-glass p-6">
           <div className="text-sm text-[color:var(--ck-text-secondary)]">No goals yet.</div>
           <div className="mt-3">
@@ -185,9 +174,11 @@ export default function GoalsClient() {
             </Link>
           </div>
         </div>
-      ) : filterStatus !== "all" ? (
+      )}
+      {goals != null && filtered.length > 0 && filterStatus !== "all" && (
         <div className="space-y-3">{filtered.map(renderGoal)}</div>
-      ) : (
+      )}
+      {goals != null && filtered.length > 0 && filterStatus === "all" && (
         <div className="space-y-8">
           {(["active", "planned", "done"] as const).map((status) => {
             const section = filtered.filter((g) => g.status === status);

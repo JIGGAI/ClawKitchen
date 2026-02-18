@@ -1,14 +1,7 @@
 import { NextResponse } from "next/server";
-
+import { type AgentListItem } from "@/lib/agents";
+import { errorMessage } from "@/lib/errors";
 import { runOpenClaw } from "@/lib/openclaw";
-
-type AgentListItem = {
-  id: string;
-  identityName?: string;
-  workspace?: string;
-  model?: string;
-  isDefault?: boolean;
-};
 
 export async function GET() {
   try {
@@ -21,7 +14,7 @@ export async function GET() {
     return NextResponse.json(
       {
         error: "Failed to list agents",
-        message: err instanceof Error ? err.message : String(err),
+        message: errorMessage(err),
       },
       { status: 500 },
     );

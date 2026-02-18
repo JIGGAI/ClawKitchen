@@ -1,17 +1,8 @@
 import { NextResponse } from "next/server";
+import { errorMessage } from "@/lib/errors";
 import { gatewayConfigGet, gatewayConfigPatch } from "@/lib/gateway";
-
-function safeJsonParse(raw: string): unknown {
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
-
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return Boolean(v) && typeof v === "object" && !Array.isArray(v);
-}
+import { safeJsonParse } from "@/lib/json";
+import { isRecord } from "@/lib/type-guards";
 
 export async function GET() {
   try {
@@ -21,7 +12,7 @@ export async function GET() {
     const channels = isRecord(root.channels) ? root.channels : {};
     return NextResponse.json({ ok: true, hash, channels });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
+    const msg = errorMessage(e);
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
 }
@@ -49,7 +40,7 @@ export async function PUT(req: Request) {
     await gatewayConfigPatch({ channels: { [provider]: cfg } }, `ClawKitchen Channels upsert: ${provider}`);
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
+    const msg = errorMessage(e);
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
 }
@@ -66,7 +57,7 @@ export async function DELETE(req: Request) {
     await gatewayConfigPatch({ channels: { [provider]: null } }, `ClawKitchen Channels delete: ${provider}`);
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
+    const msg = errorMessage(e);
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
 }

@@ -1,19 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { errorMessage } from "@/lib/errors";
+import { type GoalFrontmatter, type GoalStatus } from "@/lib/goals";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-
-type GoalStatus = "planned" | "active" | "done";
-
-type Goal = {
-  id: string;
-  title: string;
-  status: GoalStatus;
-  tags: string[];
-  teams: string[];
-  updatedAt: string;
-};
 
 export default function GoalEditor({ goalId }: { goalId: string }) {
   const router = useRouter();
@@ -54,7 +45,7 @@ export default function GoalEditor({ goalId }: { goalId: string }) {
           return;
         }
 
-        const g = (obj.goal ?? {}) as Goal;
+        const g = (obj.goal ?? {}) as GoalFrontmatter;
         setTitle(g.title ?? "");
         setStatus((g.status as GoalStatus) ?? "planned");
         setTagsRaw((g.tags ?? []).join(", "));
@@ -64,7 +55,7 @@ export default function GoalEditor({ goalId }: { goalId: string }) {
         setLoading(false);
       } catch (e: unknown) {
         if (cancelled) return;
-        const msg = e instanceof Error ? e.message : String(e);
+        const msg = errorMessage(e);
         setError(msg);
         setLoading(false);
       }
@@ -86,7 +77,7 @@ export default function GoalEditor({ goalId }: { goalId: string }) {
       setLoading(false);
       return;
     }
-    const g = (obj.goal ?? {}) as Goal;
+    const g = (obj.goal ?? {}) as GoalFrontmatter;
     setTitle(g.title ?? "");
     setStatus((g.status as GoalStatus) ?? "planned");
     setTagsRaw((g.tags ?? []).join(", "));
@@ -110,7 +101,7 @@ export default function GoalEditor({ goalId }: { goalId: string }) {
       setSaving(false);
       return;
     }
-    const g = data.goal as Goal;
+    const g = data.goal as GoalFrontmatter;
     setUpdatedAt(g.updatedAt ?? null);
     setSaving(false);
 

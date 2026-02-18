@@ -1,17 +1,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
-import { runOpenClaw } from "@/lib/openclaw";
-
-type AgentListItem = { id: string; workspace?: string };
-
-async function resolveAgentWorkspace(agentId: string) {
-  const { stdout } = await runOpenClaw(["agents", "list", "--json"]);
-  const list = JSON.parse(stdout) as AgentListItem[];
-  const agent = list.find((a) => a.id === agentId);
-  if (!agent?.workspace) throw new Error(`Agent workspace not found for ${agentId}`);
-  return agent.workspace;
-}
+import { resolveAgentWorkspace } from "@/lib/agents";
+import { errorMessage } from "@/lib/errors";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -30,6 +21,6 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ ok: true, agentId, workspace: ws, skillsDir, skills });
   } catch (e: unknown) {
-    return NextResponse.json({ ok: true, agentId, workspace: ws, skillsDir, skills: [], note: e instanceof Error ? e.message : String(e) });
+    return NextResponse.json({ ok: true, agentId, workspace: ws, skillsDir, skills: [], note: errorMessage(e) });
   }
 }

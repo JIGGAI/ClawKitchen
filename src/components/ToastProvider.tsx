@@ -19,6 +19,18 @@ type ToastContextValue = {
 
 const ToastContext = createContext<ToastContextValue | null>(null);
 
+function randomHex(bytes: number): string {
+  const arr = new Uint8Array(bytes);
+  crypto.getRandomValues(arr);
+  return Array.from(arr, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function getToastMotionClass(state: "enter" | "show" | "leave"): string {
+  if (state === "enter") return "translate-x-[-16px] opacity-0";
+  if (state === "leave") return "translate-x-[-16px] opacity-0";
+  return "translate-x-0 opacity-100";
+}
+
 function ToastIcon({ kind }: { kind: ToastKind }) {
   if (kind === "success") {
     return (
@@ -69,23 +81,24 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     [removeNow],
   );
 
+  const promoteToShow = useCallback((id: string) => {
+    setToasts((prev) => prev.map((x) => (x.id === id ? { ...x, state: "show" } : x)));
+  }, []);
+
   const push = useCallback(
     (t: Omit<Toast, "id">) => {
-      const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      const id = `${Date.now()}-${randomHex(8)}`;
       const toast: ToastInternal = { id, timeoutMs: 5000, state: "enter", ...t };
       setToasts((prev) => [toast, ...prev].slice(0, 4));
 
-      // Promote enter -> show on next tick so transitions apply.
-      window.setTimeout(() => {
-        setToasts((prev) => prev.map((x) => (x.id === id ? { ...x, state: "show" } : x)));
-      }, 10);
+      window.setTimeout(() => promoteToShow(id), 10);
 
       const ms = toast.timeoutMs;
       if (ms && ms > 0) {
         window.setTimeout(() => dismiss(id), ms);
       }
     },
-    [dismiss],
+    [dismiss, promoteToShow],
   );
 
   const value = useMemo(() => ({ push }), [push]);
@@ -100,20 +113,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         className="pointer-events-none fixed inset-0 z-[100] flex items-end px-4 py-6 sm:p-6"
       >
         <div className="flex w-full flex-col items-start space-y-4">
-          {toasts.map((t) => {
-            const motion =
-              t.state === "enter"
-                ? "translate-x-[-16px] opacity-0"
-                : t.state === "leave"
-                  ? "translate-x-[-16px] opacity-0"
-                  : "translate-x-0 opacity-100";
-
-            return (
+          {toasts.map((t) => (
               <div
                 key={t.id}
                 className={
                   "pointer-events-auto w-full max-w-sm overflow-hidden rounded-lg border bg-[color:var(--ck-toast-bg)] shadow-[var(--ck-shadow-2)] transition-all duration-200 ease-out border-[color:var(--ck-toast-border)] " +
-                  motion
+                  getToastMotionClass(t.state)
                 }
               >
                 <div className="p-4">
@@ -144,8 +149,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                   </div>
                 </div>
               </div>
-            );
-          })}
+          ))}
         </div>
       </div>
     </ToastContext.Provider>

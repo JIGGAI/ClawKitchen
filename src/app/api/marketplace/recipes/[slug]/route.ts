@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBySlug, loadRegistry } from "@/lib/marketplace";
 
-export async function GET(_req: NextRequest, ctx: { params: Promise<{ slug: string }> }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   try {
-    const { slug } = await ctx.params;
+    const { slug } = await params;
     const registry = await loadRegistry();
     const recipe = getBySlug(registry.recipes, slug);
     if (!recipe) return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });

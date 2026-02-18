@@ -3,22 +3,7 @@ import path from "node:path";
 import YAML from "yaml";
 import { NextResponse } from "next/server";
 import { getWorkspaceRecipesDir } from "@/lib/paths";
-
-function splitFrontmatter(md: string) {
-  if (!md.startsWith("---\n")) throw new Error("Recipe markdown must start with YAML frontmatter (---)");
-  const end = md.indexOf("\n---\n", 4);
-  if (end === -1) throw new Error("Recipe frontmatter not terminated (---)");
-  const yamlText = md.slice(4, end + 1);
-  const rest = md.slice(end + 5);
-  return { yamlText, rest };
-}
-
-function normalizeRole(role: string) {
-  const r = role.trim();
-  if (!r) throw new Error("role is required");
-  if (!/^[a-z][a-z0-9-]{0,62}$/i.test(r)) throw new Error("role must be alphanumeric/dash");
-  return r;
-}
+import { splitRecipeFrontmatter, normalizeRole } from "@/lib/recipe-team-agents";
 
 export async function POST(req: Request) {
   const body = (await req.json()) as {
@@ -42,7 +27,7 @@ export async function POST(req: Request) {
   const filePath = path.join(dir, `${recipeId}.md`);
 
   const md = await fs.readFile(filePath, "utf8");
-  const { yamlText, rest } = splitFrontmatter(md);
+  const { yamlText, rest } = splitRecipeFrontmatter(md);
   const fm = (YAML.parse(yamlText) ?? {}) as Record<string, unknown>;
 
   const kind = String(fm.kind ?? "");

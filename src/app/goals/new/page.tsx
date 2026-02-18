@@ -3,19 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-
-type GoalStatus = "planned" | "active" | "done";
-
-function slugify(input: string) {
-  return input
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/[\s_-]+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 64);
-}
+import { type GoalStatus } from "@/lib/goals";
+import { slugifyId } from "@/lib/slugify";
 
 export default function NewGoalPage() {
   const router = useRouter();
@@ -36,7 +25,7 @@ export default function NewGoalPage() {
   const teams = useMemo(() => teamsRaw.split(",").map((s) => s.trim()).filter(Boolean), [teamsRaw]);
 
   const suggestedId = useMemo(() => {
-    const s = slugify(title);
+    const s = slugifyId(title, 64);
     return s.length >= 2 ? s : "";
   }, [title]);
 

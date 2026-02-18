@@ -2,22 +2,14 @@
 
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import type { RecipeListItem } from "@/lib/recipes";
+import { slugifyId } from "@/lib/slugify";
 
-type RecipeListItem = {
-  id: string;
-  name: string;
-  kind: "agent" | "team";
-  source: "builtin" | "workspace";
-};
-
-function slugifyId(input: string) {
-  return String(input ?? "")
-    .toLowerCase()
-    .trim()
-    // Replace any run of non-alphanumeric chars with a hyphen
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .replace(/--+/g, "-");
+function getIdInputClass(state: "empty" | "available" | "taken"): string {
+  const base = "mt-1 w-full rounded-[var(--ck-radius-sm)] border bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] ";
+  if (state === "available") return base + "border-emerald-400/50";
+  if (state === "taken") return base + "border-red-400/60";
+  return base + "border-white/10";
 }
 
 export function CloneTeamModal({
@@ -36,7 +28,7 @@ export function CloneTeamModal({
   const [idTouched, setIdTouched] = useState(false);
   const [scaffold, setScaffold] = useState(true);
 
-  const derivedId = useMemo(() => slugifyId(name), [name]);
+  const derivedId = useMemo(() => slugifyId(name, 80), [name]);
   const effectiveId = idTouched ? id : derivedId;
 
   const availability = useMemo(() => {
@@ -73,17 +65,11 @@ export function CloneTeamModal({
                 setIdTouched(true);
                 setId(e.target.value);
               }}
-              className={
-                "mt-1 w-full rounded-[var(--ck-radius-sm)] border bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] " +
-                (availability.state === "available"
-                  ? "border-emerald-400/50"
-                  : availability.state === "taken"
-                    ? "border-red-400/60"
-                    : "border-white/10")
-              }
+              className={getIdInputClass(availability.state)}
             />
             <div className="mt-1 text-xs text-[color:var(--ck-text-tertiary)]">
-              {availability.state === "taken" ? "That id is already taken." : availability.state === "available" ? "Id is available." : ""}
+              {availability.state === "taken" && "That id is already taken."}
+              {availability.state === "available" && "Id is available."}
             </div>
 
             {availability.state === "taken" ? (

@@ -2,18 +2,11 @@
 
 import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
-
-type AgentListItem = {
-  id: string;
-  identityName?: string;
-  workspace?: string;
-  model?: string;
-  isDefault?: boolean;
-};
+import { type AgentListItem } from "@/lib/agents";
+import { type FileListEntry, normalizeFileListEntries } from "@/lib/editor-utils";
+import { errorMessage } from "@/lib/errors";
 
 type FileListResponse = { ok?: boolean; files?: unknown[] };
-
-type FileEntry = { name: string; missing: boolean };
 
 function DeleteAgentModal({
   open,
@@ -74,6 +67,7 @@ function DeleteAgentModal({
   );
 }
 
+/* eslint-disable sonarjs/cognitive-complexity -- component orchestrates many concerns; logic extracted to loadAgentData */
 export default function AgentEditor({ agentId }: { agentId: string }) {
   const [agent, setAgent] = useState<AgentListItem | null>(null);
   const [loading, setLoading] = useState(true);
@@ -96,60 +90,50 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
 
   const [skillsList, setSkillsList] = useState<string[]>([]);
 
-  const [agentFiles, setAgentFiles] = useState<Array<FileEntry & { required?: boolean; rationale?: string }>>([]);
+  const [agentFiles, setAgentFiles] = useState<FileListEntry[]>([]);
   const [showOptionalFiles, setShowOptionalFiles] = useState(false);
   const [fileName, setFileName] = useState<string>("IDENTITY.md");
   const [fileContent, setFileContent] = useState<string>("");
 
   const [saveAsNewId, setSaveAsNewId] = useState<string>("");
 
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      setMessage("");
-      try {
-        const [agentsRes, filesRes, skillsRes] = await Promise.all([
-          fetch("/api/agents", { cache: "no-store" }),
-          fetch(`/api/agents/files?agentId=${encodeURIComponent(agentId)}`, { cache: "no-store" }),
-          fetch(`/api/agents/skills?agentId=${encodeURIComponent(agentId)}`, { cache: "no-store" }),
-        ]);
+  async function loadAgentData() {
+    setLoading(true);
+    setMessage("");
+    try {
+      const [agentsRes, filesRes, skillsRes] = await Promise.all([
+        fetch("/api/agents", { cache: "no-store" }),
+        fetch(`/api/agents/files?agentId=${encodeURIComponent(agentId)}`, { cache: "no-store" }),
+        fetch(`/api/agents/skills?agentId=${encodeURIComponent(agentId)}`, { cache: "no-store" }),
+      ]);
 
-        const agentsJson = (await agentsRes.json()) as { agents?: unknown[] };
-        const list = Array.isArray(agentsJson.agents) ? (agentsJson.agents as AgentListItem[]) : [];
-        const found = list.find((a) => a.id === agentId) ?? null;
-        setAgent(found);
-        setName(found?.identityName ?? "");
-        setModel(found?.model ?? "");
+      const agentsJson = (await agentsRes.json()) as { agents?: unknown[] };
+      const list = Array.isArray(agentsJson.agents) ? (agentsJson.agents as AgentListItem[]) : [];
+      const found = list.find((a) => a.id === agentId) ?? null;
+      setAgent(found);
+      setName(found?.identityName ?? "");
+      setModel(found?.model ?? "");
 
-        const filesJson = (await filesRes.json()) as FileListResponse;
-        if (filesRes.ok && filesJson.ok) {
-          const files = Array.isArray(filesJson.files) ? filesJson.files : [];
-          setAgentFiles(
-            files.map((f) => {
-              const entry = f as { name?: unknown; missing?: unknown };
-              return {
-                name: String(entry.name ?? ""),
-                missing: Boolean(entry.missing),
-                required: Boolean((entry as { required?: unknown }).required),
-                rationale:
-                  typeof (entry as { rationale?: unknown }).rationale === "string"
-                    ? ((entry as { rationale?: string }).rationale as string)
-                    : undefined,
-              };
-            }),
-          );
-        }
-
-        const skillsJson = (await skillsRes.json()) as { ok?: boolean; skills?: unknown[] };
-        if (skillsRes.ok && skillsJson.ok) {
-          setSkillsList(Array.isArray(skillsJson.skills) ? (skillsJson.skills as string[]) : []);
-        }
-      } catch (e: unknown) {
-        setMessage(e instanceof Error ? e.message : String(e));
-      } finally {
-        setLoading(false);
+      const filesJson = (await filesRes.json()) as FileListResponse;
+      if (filesRes.ok && filesJson.ok) {
+        const files = Array.isArray(filesJson.files) ? filesJson.files : [];
+        setAgentFiles(normalizeFileListEntries(files));
       }
-    })();
+
+      const skillsJson = (await skillsRes.json()) as { ok?: boolean; skills?: unknown[] };
+      if (skillsRes.ok && skillsJson.ok) {
+        setSkillsList(Array.isArray(skillsJson.skills) ? (skillsJson.skills as string[]) : []);
+      }
+    } catch (e: unknown) {
+      setMessage(errorMessage(e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadAgentData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentId]);
 
   async function onSaveIdentity() {
@@ -165,7 +149,7 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
       if (!res.ok) throw new Error(json.message || json.error || "Save failed");
       setMessage("Saved identity via openclaw agents set-identity");
     } catch (e: unknown) {
-      setMessage(e instanceof Error ? e.message : String(e));
+      setMessage(errorMessage(e));
     } finally {
       setSaving(false);
     }
@@ -184,7 +168,7 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
       if (!res.ok) throw new Error(json.error || "Save config failed");
       setMessage("Saved agent config (model) and restarted gateway");
     } catch (e: unknown) {
-      setMessage(e instanceof Error ? e.message : String(e));
+      setMessage(errorMessage(e));
     } finally {
       setSaving(false);
     }
@@ -206,7 +190,7 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
       if (!res.ok) throw new Error(json.message || json.error || "Save As New failed");
       setMessage(`Created new agent: ${newAgentId}`);
     } catch (e: unknown) {
-      setMessage(e instanceof Error ? e.message : String(e));
+      setMessage(errorMessage(e));
     } finally {
       setSaving(false);
     }
@@ -225,7 +209,7 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
       setFileName(nextName);
       setFileContent(String(json.content ?? ""));
     } catch (e: unknown) {
-      setMessage(e instanceof Error ? e.message : String(e));
+      setMessage(errorMessage(e));
     } finally {
       setLoadingFile(false);
     }
@@ -265,7 +249,7 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
       if (!res.ok || !json.ok) throw new Error(json.error || "Failed to save file");
       setMessage(`Saved ${fileName}`);
     } catch (e: unknown) {
-      setMessage(e instanceof Error ? e.message : String(e));
+      setMessage(errorMessage(e));
     } finally {
       setSaving(false);
     }
@@ -283,7 +267,7 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
 
       window.location.href = "/";
     } catch (e: unknown) {
-      setDeleteError(e instanceof Error ? e.message : String(e));
+      setDeleteError(errorMessage(e));
       setDeleteBusy(false);
     }
   }

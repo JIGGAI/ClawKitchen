@@ -2,44 +2,184 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { type AgentListItem } from "@/lib/agents";
+import { cronJobId, cronJobLabel, type CronJobShape } from "@/lib/cron";
+import { type FileListEntry, normalizeFileListEntries } from "@/lib/editor-utils";
+import { errorMessage } from "@/lib/errors";
+import { forceFrontmatterId, type RecipeDetail, type RecipeListItem } from "@/lib/recipes";
 import { CloneTeamModal } from "./CloneTeamModal";
 import { DeleteTeamModal } from "./DeleteTeamModal";
 import { useToast } from "@/components/ToastProvider";
 
-type RecipeListItem = {
-  id: string;
-  name: string;
-  kind: "agent" | "team";
-  source: "builtin" | "workspace";
-};
-
-type RecipeDetail = RecipeListItem & {
-  content: string;
-  filePath: string | null;
-};
-
-
-function forceFrontmatterId(md: string, id: string) {
-  if (!md.startsWith("---\n")) return md;
-  const end = md.indexOf("\n---\n", 4);
-  if (end === -1) return md;
-  const fm = md.slice(4, end);
-  const body = md.slice(end + 5);
-
-  const lines = fm.split("\n");
-  let found = false;
-  const nextLines = lines.map((line) => {
-    if (/^id\s*:/i.test(line)) {
-      found = true;
-      return `id: ${id}`;
-    }
-    return line;
-  });
-  if (!found) nextLines.unshift(`id: ${id}`);
-
-  return `---\n${nextLines.join("\n")}\n---\n${body}`;
+function getTabButtonClass(activeTab: string, tabId: string): string {
+  const isActive = activeTab === tabId;
+  const base = "rounded-[var(--ck-radius-sm)] px-3 py-2 text-sm font-medium shadow-[var(--ck-shadow-1)]";
+  if (isActive) {
+    return `${base} bg-[var(--ck-accent-red)] text-white`;
+  }
+  return `${base} border border-white/10 bg-white/5 text-[color:var(--ck-text-primary)] hover:bg-white/10`;
 }
 
+function getFileButtonClass(fileName: string, fName: string): string {
+  const isSelected = fileName === fName;
+  const base = "w-full rounded-[var(--ck-radius-sm)] px-3 py-2 text-left text-sm";
+  if (isSelected) {
+    return `${base} bg-white/10 text-[color:var(--ck-text-primary)]`;
+  }
+  return `${base} text-[color:var(--ck-text-secondary)] hover:bg-white/5`;
+}
+
+function applyLockedOrFallback(
+  locked: { recipeId: string; recipeName?: string } | null,
+  list: RecipeListItem[],
+  teamId: string,
+  setLockedFromId: (v: string | null) => void,
+  setLockedFromName: (v: string | null) => void,
+  setProvenanceMissing: (v: boolean) => void,
+  setFromId: (v: string) => void
+) {
+  if (locked) {
+    setLockedFromId(locked.recipeId);
+    setLockedFromName(locked.recipeName ?? null);
+    setProvenanceMissing(false);
+    setFromId(locked.recipeId);
+  } else {
+    setLockedFromId(null);
+    setLockedFromName(null);
+    setProvenanceMissing(true);
+    const preferred = list.find((r) => r.kind === "team" && r.id === teamId);
+    const fallback = list.find((r) => r.kind === "team");
+    const pick = preferred ?? fallback;
+    if (pick) setFromId(pick.id);
+  }
+}
+
+async function parseMetaForLocked(metaRes: Response): Promise<{ recipeId: string; recipeName?: string } | null> {
+  try {
+    const metaJson = await metaRes.json();
+    if (!metaRes.ok || !metaJson.ok || !metaJson.meta || !(metaJson.meta as { recipeId?: unknown }).recipeId) {
+      return null;
+    }
+    const m = metaJson.meta as { recipeId?: unknown; recipeName?: unknown };
+    return {
+      recipeId: String(m.recipeId),
+      recipeName: typeof m.recipeName === "string" ? m.recipeName : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function loadAncillaryData(
+  teamId: string,
+  setTeamFiles: React.Dispatch<React.SetStateAction<FileListEntry[]>>,
+  setCronJobs: React.Dispatch<React.SetStateAction<unknown[]>>,
+  setTeamAgents: React.Dispatch<React.SetStateAction<Pick<AgentListItem, "id" | "identityName">[]>>,
+  setSkillsList: React.Dispatch<React.SetStateAction<string[]>>
+) {
+  const [filesRes, cronRes, agentsRes, skillsRes] = await Promise.all([
+    fetch(`/api/teams/files?teamId=${encodeURIComponent(teamId)}`, { cache: "no-store" }),
+    fetch(`/api/cron/jobs?teamId=${encodeURIComponent(teamId)}`, { cache: "no-store" }),
+    fetch("/api/agents", { cache: "no-store" }),
+    fetch(`/api/teams/skills?teamId=${encodeURIComponent(teamId)}`, { cache: "no-store" }),
+  ]);
+
+  const filesJson = (await filesRes.json()) as { ok?: boolean; files?: unknown[] };
+  if (filesRes.ok && filesJson.ok) {
+    const files = Array.isArray(filesJson.files) ? filesJson.files : [];
+    setTeamFiles(normalizeFileListEntries(files));
+  }
+
+  const cronJson = (await cronRes.json()) as { ok?: boolean; jobs?: unknown[] };
+  if (cronRes.ok && cronJson.ok) {
+    setCronJobs(Array.isArray(cronJson.jobs) ? cronJson.jobs : []);
+  }
+
+  const agentsJson = (await agentsRes.json()) as { agents?: unknown[] };
+  if (agentsRes.ok) {
+    const all = Array.isArray(agentsJson.agents) ? agentsJson.agents : [];
+    const filtered = all.filter((a) => String((a as { id?: unknown }).id ?? "").startsWith(`${teamId}-`));
+    setTeamAgents(
+      filtered.map((a) => {
+        const agent = a as { id?: unknown; identityName?: unknown };
+        return { id: String(agent.id ?? ""), identityName: typeof agent.identityName === "string" ? agent.identityName : undefined };
+      })
+    );
+  }
+
+  const skillsJson = await skillsRes.json();
+  if (skillsRes.ok && skillsJson.ok) {
+    setSkillsList(Array.isArray(skillsJson.skills) ? skillsJson.skills : []);
+  }
+}
+
+function CronJobListItem({
+  job,
+  saving,
+  setSaving,
+  flashMessage,
+}: {
+  job: unknown;
+  saving: boolean;
+  setSaving: (v: boolean) => void;
+  flashMessage: (msg: string, kind?: "success" | "error" | "info") => void;
+}) {
+  const j = job as CronJobShape;
+  const id = cronJobId(j);
+  const label = cronJobLabel(j);
+  const enabled = j.enabled ?? j.state?.enabled;
+
+  async function onCronAction(action: "enable" | "disable" | "run") {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/cron/job", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id, action }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json.error || "Cron action failed");
+      flashMessage(`Cron ${action}: ${label}`, "success");
+    } catch (e: unknown) {
+      flashMessage(errorMessage(e), "error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <li className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3">
+      <div className="font-medium text-[color:var(--ck-text-primary)]">{label}</div>
+      <div className="mt-1 text-xs text-[color:var(--ck-text-secondary)]">Enabled: {String(enabled ?? "?")}</div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <button
+          disabled={saving || !id}
+          onClick={() => onCronAction("run")}
+          className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10 disabled:opacity-50"
+        >
+          Run
+        </button>
+        <button
+          disabled={saving || !id}
+          onClick={() => onCronAction("enable")}
+          className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10 disabled:opacity-50"
+        >
+          Enable
+        </button>
+        <button
+          disabled={saving || !id}
+          onClick={() => onCronAction("disable")}
+          className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10 disabled:opacity-50"
+        >
+          Disable
+        </button>
+        {!id ? <div className="text-xs text-[color:var(--ck-text-tertiary)]">(missing id)</div> : null}
+      </div>
+    </li>
+  );
+}
+
+/* eslint-disable sonarjs/cognitive-complexity -- component orchestrates many tabs/features; logic extracted to helpers */
 export default function TeamEditor({ teamId }: { teamId: string }) {
   const router = useRouter();
   const [recipes, setRecipes] = useState<RecipeListItem[]>([]);
@@ -66,12 +206,12 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
     toast.push({ kind, message: msg });
   }
 
-  const [teamFiles, setTeamFiles] = useState<Array<{ name: string; missing: boolean; required: boolean; rationale?: string }>>([]);
+  const [teamFiles, setTeamFiles] = useState<FileListEntry[]>([]);
   const [showOptionalFiles, setShowOptionalFiles] = useState(false);
   const [fileName, setFileName] = useState<string>("SOUL.md");
   const [fileContent, setFileContent] = useState<string>("");
   const [cronJobs, setCronJobs] = useState<unknown[]>([]);
-  const [teamAgents, setTeamAgents] = useState<Array<{ id: string; identityName?: string }>>([]);
+  const [teamAgents, setTeamAgents] = useState<Pick<AgentListItem, "id" | "identityName">[]>([]);
   const [newRole, setNewRole] = useState<string>("");
   const [newRoleName, setNewRoleName] = useState<string>("");
   const [skillsList, setSkillsList] = useState<string[]>([]);
@@ -98,108 +238,31 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
     setToName(teamId);
   }, [teamId]);
 
+  async function loadTeamData() {
+    setLoading(true);
+    try {
+      const [recipesRes, metaRes] = await Promise.all([
+        fetch("/api/recipes", { cache: "no-store" }),
+        fetch(`/api/teams/meta?teamId=${encodeURIComponent(teamId)}`, { cache: "no-store" }),
+      ]);
+
+      const json = await recipesRes.json();
+      const list = (json.recipes ?? []) as RecipeListItem[];
+      setRecipes(list);
+
+      const locked = await parseMetaForLocked(metaRes);
+      applyLockedOrFallback(locked, list, teamId, setLockedFromId, setLockedFromName, setProvenanceMissing, setFromId);
+
+      await loadAncillaryData(teamId, setTeamFiles, setCronJobs, setTeamAgents, setSkillsList);
+    } catch (e: unknown) {
+      flashMessage(errorMessage(e), "error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        const [recipesRes, metaRes] = await Promise.all([
-          fetch("/api/recipes", { cache: "no-store" }),
-          fetch(`/api/teams/meta?teamId=${encodeURIComponent(teamId)}`, { cache: "no-store" }),
-        ]);
-
-        const json = await recipesRes.json();
-        const list = (json.recipes ?? []) as RecipeListItem[];
-        setRecipes(list);
-
-        // Note: do not sync toName/toId from remote state here.
-        // Edits to the target id/name must not trigger reload loops while typing.
-
-        // Prefer a recipe that corresponds to this teamId.
-        // Primary source of truth: provenance stored in the team workspace.
-        // Fallback: heuristic matching (legacy teams without provenance).
-        let locked: { recipeId: string; recipeName?: string } | null = null;
-        try {
-          const metaJson = await metaRes.json();
-          if (metaRes.ok && metaJson.ok && metaJson.meta && (metaJson.meta as { recipeId?: unknown }).recipeId) {
-            const m = metaJson.meta as { recipeId?: unknown; recipeName?: unknown };
-            locked = {
-              recipeId: String(m.recipeId),
-              recipeName: typeof m.recipeName === "string" ? m.recipeName : undefined,
-            };
-          }
-        } catch {
-          // ignore
-        }
-
-        if (locked) {
-          setLockedFromId(locked.recipeId);
-          setLockedFromName(locked.recipeName ?? null);
-          setProvenanceMissing(false);
-          setFromId(locked.recipeId);
-        } else {
-          setLockedFromId(null);
-          setLockedFromName(null);
-          setProvenanceMissing(true);
-
-          const preferred = list.find((r) => r.kind === "team" && r.id === teamId);
-          const fallback = list.find((r) => r.kind === "team");
-          const pick = preferred ?? fallback;
-          if (pick) setFromId(pick.id);
-        }
-
-        // Load ancillary data for sub-areas.
-        const [filesRes, cronRes, agentsRes, skillsRes] = await Promise.all([
-          fetch(`/api/teams/files?teamId=${encodeURIComponent(teamId)}`, { cache: "no-store" }),
-          fetch(`/api/cron/jobs?teamId=${encodeURIComponent(teamId)}`, { cache: "no-store" }),
-          fetch("/api/agents", { cache: "no-store" }),
-          fetch(`/api/teams/skills?teamId=${encodeURIComponent(teamId)}`, { cache: "no-store" }),
-        ]);
-
-        const filesJson = (await filesRes.json()) as { ok?: boolean; files?: unknown[] };
-        if (filesRes.ok && filesJson.ok) {
-          const files = Array.isArray(filesJson.files) ? filesJson.files : [];
-          setTeamFiles(
-            files.map((f) => {
-              const entry = f as { name?: unknown; missing?: unknown; required?: unknown; rationale?: unknown };
-              return {
-                name: String(entry.name ?? ""),
-                missing: Boolean(entry.missing),
-                required: Boolean(entry.required),
-                rationale: typeof entry.rationale === "string" ? entry.rationale : undefined,
-              };
-            }),
-          );
-        }
-
-        const cronJson = (await cronRes.json()) as { ok?: boolean; jobs?: unknown[] };
-        if (cronRes.ok && cronJson.ok) {
-          const all = Array.isArray(cronJson.jobs) ? cronJson.jobs : [];
-          setCronJobs(all);
-        }
-
-        const agentsJson = (await agentsRes.json()) as { agents?: unknown[] };
-        if (agentsRes.ok) {
-          const all = Array.isArray(agentsJson.agents) ? agentsJson.agents : [];
-          // Team membership for agents is by id convention: <teamId>-<role>
-          const filtered = all.filter((a) => String((a as { id?: unknown }).id ?? "").startsWith(`${teamId}-`));
-          setTeamAgents(
-            filtered.map((a) => {
-              const agent = a as { id?: unknown; identityName?: unknown };
-              return { id: String(agent.id ?? ""), identityName: typeof agent.identityName === "string" ? agent.identityName : undefined };
-            }),
-          );
-        }
-
-        const skillsJson = await skillsRes.json();
-        if (skillsRes.ok && skillsJson.ok) {
-          setSkillsList(Array.isArray(skillsJson.skills) ? skillsJson.skills : []);
-        }
-      } catch (e: unknown) {
-        flashMessage(e instanceof Error ? e.message : String(e), "error");
-      } finally {
-        setLoading(false);
-      }
-    })();
+    void loadTeamData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teamId]);
 
@@ -218,7 +281,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
       setContent(r.content);
       flashMessage(`Loaded team recipe: ${r.id}`, "success");
     } catch (e: unknown) {
-      flashMessage(e instanceof Error ? e.message : String(e), "error");
+      flashMessage(errorMessage(e), "error");
     } finally {
       setLoadingSource(false);
     }
@@ -274,7 +337,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
 
       flashMessage(`Saved team recipe: ${json.filePath}`, "success");
     } catch (e: unknown) {
-      const raw = e instanceof Error ? e.message : String(e);
+      const raw = errorMessage(e);
       flashMessage(raw, "error");
     } finally {
       setSaving(false);
@@ -293,7 +356,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
       setFileName(name);
       setFileContent(String(json.content ?? ""));
     } catch (e: unknown) {
-      flashMessage(e instanceof Error ? e.message : String(e), "error");
+      flashMessage(errorMessage(e), "error");
     } finally {
       setSaving(false);
     }
@@ -311,7 +374,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
       if (!res.ok || !json.ok) throw new Error(json.error || "Failed to save file");
       flashMessage(`Saved ${fileName}`, "success");
     } catch (e: unknown) {
-      flashMessage(e instanceof Error ? e.message : String(e), "error");
+      flashMessage(errorMessage(e), "error");
     } finally {
       setSaving(false);
     }
@@ -339,11 +402,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
           <button
             key={t.id}
             onClick={() => setActiveTab(t.id)}
-            className={
-              activeTab === t.id
-                ? "rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)]"
-                : "rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] hover:bg-white/10"
-            }
+            className={getTabButtonClass(activeTab, t.id)}
           >
             {t.label}
           </button>
@@ -432,16 +491,17 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
                   </option>
                 ))}
               </select>
-              {lockedFromId ? (
+              {lockedFromId && (
                 <div className="mt-2 text-xs text-[color:var(--ck-text-tertiary)]">
                   <code>{lockedFromId}</code>
                   {lockedFromName ? ` (${lockedFromName})` : ""}
                 </div>
-              ) : provenanceMissing ? (
+              )}
+              {!lockedFromId && provenanceMissing && (
                 <div className="mt-2 text-xs text-[color:var(--ck-text-tertiary)]">
                   Provenance not found for this team. The parent recipe above is a best-guess.
                 </div>
-              ) : null}
+              )}
 
 
             </div>
@@ -506,7 +566,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
                   setContent(String(json.content ?? content));
                   flashMessage(`Updated agents list in ${toId}`, "success");
                 } catch (e: unknown) {
-                  flashMessage(e instanceof Error ? e.message : String(e), "error");
+                  flashMessage(errorMessage(e), "error");
                 } finally {
                   setSaving(false);
                 }
@@ -531,7 +591,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
                   setContent(String(json.content ?? content));
                   flashMessage(`Removed role ${newRole} from ${toId}`, "success");
                 } catch (e: unknown) {
-                  flashMessage(e instanceof Error ? e.message : String(e), "error");
+                  flashMessage(errorMessage(e), "error");
                 } finally {
                   setSaving(false);
                 }
@@ -584,70 +644,15 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
           <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Cron jobs (filtered by team name)</div>
           <ul className="mt-3 space-y-3">
             {cronJobs.length ? (
-              cronJobs.map((j) => {
-                const job = j as {
-                  id?: unknown;
-                  jobId?: unknown;
-                  name?: unknown;
-                  enabled?: unknown;
-                  state?: { enabled?: unknown };
-                };
-                const id = String(job.id ?? job.jobId ?? "").trim();
-                const key = id || String(job.name ?? "job");
-                const label = String(job.name ?? job.id ?? job.jobId ?? "(unnamed)");
-                const enabled = job.enabled ?? job.state?.enabled;
-
-                async function act(action: "enable" | "disable" | "run") {
-                  setSaving(true);
-                                    try {
-                    const res = await fetch("/api/cron/job", {
-                      method: "POST",
-                      headers: { "content-type": "application/json" },
-                      body: JSON.stringify({ id, action }),
-                    });
-                    const json = await res.json();
-                    if (!res.ok || !json.ok) throw new Error(json.error || "Cron action failed");
-                    flashMessage(`Cron ${action}: ${label}`, "success");
-                  } catch (e: unknown) {
-                    flashMessage(e instanceof Error ? e.message : String(e), "error");
-                  } finally {
-                    setSaving(false);
-                  }
-                }
-
-                return (
-                  <li key={key} className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3">
-                    <div className="font-medium text-[color:var(--ck-text-primary)]">{label}</div>
-                    <div className="mt-1 text-xs text-[color:var(--ck-text-secondary)]">Enabled: {String(enabled ?? "?")}</div>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <button
-                        disabled={saving || !id}
-                        onClick={() => act("run")}
-                        className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10 disabled:opacity-50"
-                      >
-                        Run
-                      </button>
-                      <button
-                        disabled={saving || !id}
-                        onClick={() => act("enable")}
-                        className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10 disabled:opacity-50"
-                      >
-                        Enable
-                      </button>
-                      <button
-                        disabled={saving || !id}
-                        onClick={() => act("disable")}
-                        className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10 disabled:opacity-50"
-                      >
-                        Disable
-                      </button>
-                      {!id ? (
-                        <div className="text-xs text-[color:var(--ck-text-tertiary)]">(missing id)</div>
-                      ) : null}
-                    </div>
-                  </li>
-                );
-              })
+              cronJobs.map((j) => (
+                <CronJobListItem
+                  key={cronJobId(j) || cronJobLabel(j) || "job"}
+                  job={j}
+                  saving={saving}
+                  setSaving={setSaving}
+                  flashMessage={flashMessage}
+                />
+              ))
             ) : (
               <li className="text-sm text-[color:var(--ck-text-secondary)]">No cron jobs detected for this team.</li>
             )}
@@ -679,11 +684,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
                 <li key={f.name}>
                   <button
                     onClick={() => onLoadTeamFile(f.name)}
-                    className={
-                      fileName === f.name
-                        ? "w-full rounded-[var(--ck-radius-sm)] bg-white/10 px-3 py-2 text-left text-sm text-[color:var(--ck-text-primary)]"
-                        : "w-full rounded-[var(--ck-radius-sm)] px-3 py-2 text-left text-sm text-[color:var(--ck-text-secondary)] hover:bg-white/5"
-                    }
+                    className={getFileButtonClass(fileName, f.name)}
                   >
                     <span className={f.required ? "text-[color:var(--ck-text-primary)]" : "text-[color:var(--ck-text-secondary)]"}>
                       {f.name}
@@ -766,7 +767,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
             setDeleteOpen(false);
             setTimeout(() => router.push("/"), 250);
           } catch (e: unknown) {
-            flashMessage(e instanceof Error ? e.message : String(e), "error");
+            flashMessage(errorMessage(e), "error");
           } finally {
             setSaving(false);
           }

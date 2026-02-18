@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { errorMessage } from "@/lib/errors";
 
 type Mode = "off" | "prompt" | "on";
 
@@ -22,7 +23,7 @@ export default function SettingsClient() {
         if (v === "off" || v === "prompt" || v === "on") setMode(v);
         else setMode("prompt");
       } catch (e: unknown) {
-        setMsg(e instanceof Error ? e.message : String(e));
+        setMsg(errorMessage(e));
       } finally {
         setLoading(false);
       }
@@ -43,7 +44,7 @@ export default function SettingsClient() {
       setMode(next);
       setMsg("Saved.");
     } catch (e: unknown) {
-      setMsg(e instanceof Error ? e.message : String(e));
+      setMsg(errorMessage(e));
     } finally {
       setSaving(false);
     }

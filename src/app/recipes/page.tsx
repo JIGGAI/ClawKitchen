@@ -1,15 +1,9 @@
 import Link from "next/link";
 import { runOpenClaw } from "@/lib/openclaw";
+import type { RecipeListItem } from "@/lib/recipes";
 import RecipesClient from "./recipes-client";
 
-type Recipe = {
-  id: string;
-  name: string;
-  kind: "agent" | "team";
-  source: "builtin" | "workspace";
-};
-
-async function getRecipes(): Promise<{ recipes: Recipe[]; error: string | null }> {
+async function getRecipes(): Promise<{ recipes: RecipeListItem[]; error: string | null }> {
   const res = await runOpenClaw(["recipes", "list"]);
   if (!res.ok) {
     const err = res.stderr.trim() || `openclaw recipes list failed (exit=${res.exitCode})`;
@@ -17,7 +11,7 @@ async function getRecipes(): Promise<{ recipes: Recipe[]; error: string | null }
   }
 
   try {
-    return { recipes: JSON.parse(res.stdout) as Recipe[], error: null };
+    return { recipes: JSON.parse(res.stdout) as RecipeListItem[], error: null };
   } catch {
     return { recipes: [], error: "Failed to parse openclaw recipes list output" };
   }

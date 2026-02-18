@@ -1,26 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-
-type CronJob = {
-  id: string;
-  name?: string;
-  enabled?: boolean;
-  schedule?: { kind?: string; expr?: string; everyMs?: number };
-  state?: { nextRunAtMs?: number };
-  agentId?: string;
-  sessionTarget?: string;
-};
-
-function fmtSchedule(s?: CronJob["schedule"]): string {
-  if (!s) return "";
-  if (s.kind === "cron" && s.expr) return s.expr;
-  if (s.kind === "every" && s.everyMs) {
-    const mins = Math.round(s.everyMs / 60000);
-    return mins >= 60 ? `every ${Math.round(mins / 60)}h` : `every ${mins}m`;
-  }
-  return s.kind ?? "";
-}
+import { type CronJob, fmtCronSchedule } from "@/lib/cron";
+import { errorMessage } from "@/lib/errors";
 
 export default function CronJobsClient() {
   const [loading, setLoading] = useState(false);
@@ -43,7 +25,7 @@ export default function CronJobsClient() {
         setMsg("No cron jobs found.");
       }
     } catch (e: unknown) {
-      setMsg(e instanceof Error ? e.message : String(e));
+      setMsg(errorMessage(e));
       setJobs([]);
     } finally {
       setLoading(false);
@@ -68,7 +50,7 @@ export default function CronJobsClient() {
       setMsg(action === "run" ? "Triggered run." : "Updated.");
       await refresh();
     } catch (e: unknown) {
-      setMsg(e instanceof Error ? e.message : String(e));
+      setMsg(errorMessage(e));
     } finally {
       setLoading(false);
     }
@@ -108,7 +90,7 @@ export default function CronJobsClient() {
               <div className="min-w-0">
                 <div className="truncate font-medium">{j.name ?? j.id}</div>
                 <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-[color:var(--ck-text-secondary)]">
-                  <span>{fmtSchedule(j.schedule)}</span>
+                  <span>{fmtCronSchedule(j.schedule)}</span>
                   <span>{j.enabled ? "✅ enabled" : "⏸ disabled"}</span>
                   {j.agentId ? <span>agent: {j.agentId}</span> : null}
                   {j.sessionTarget ? <span>target: {j.sessionTarget}</span> : null}

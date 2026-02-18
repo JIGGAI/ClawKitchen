@@ -1,7 +1,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
-import { toolsInvoke } from "@/lib/gateway";
+import { cronJobId } from "@/lib/cron";
+import { getContentText, toolsInvoke } from "@/lib/gateway";
+import { teamDirFromBaseWorkspace } from "@/lib/paths";
 
 type MappingStateV1 = {
   version: 1;
@@ -25,7 +27,7 @@ export async function GET(req: Request) {
     tool: "gateway",
     args: { action: "config.get", raw: "{}" },
   });
-  const cfgText = result?.content?.find((c) => c.type === "text")?.text ?? "";
+  const cfgText = getContentText(result?.content) ?? "";
   if (!cfgText) {
     return NextResponse.json({ ok: false, error: "Failed to fetch config via gateway" }, { status: 500 });
   }
@@ -36,7 +38,7 @@ export async function GET(req: Request) {
   if (!baseWorkspace) {
     return NextResponse.json({ ok: false, error: "agents.defaults.workspace not set" }, { status: 500 });
   }
-  const teamDir = path.resolve(baseWorkspace, "..", `workspace-${teamId}`);
+  const teamDir = teamDirFromBaseWorkspace(baseWorkspace, teamId);
   const mappingPath = path.join(teamDir, "notes", "cron-jobs.json");
 
   let mapping: MappingStateV1 | null = null;
@@ -57,7 +59,7 @@ export async function GET(req: Request) {
     tool: "cron",
     args: { action: "list", includeDisabled: true },
   })) as { jobs: unknown[] };
-  const jobs = (parsed.jobs ?? []).filter((j) => ids.has(String((j as { id?: unknown })?.id ?? "")));
+  const jobs = (parsed.jobs ?? []).filter((j) => ids.has(cronJobId(j)));
 
   return NextResponse.json({ ok: true, teamId, teamDir, mappingPath, jobCount: jobs.length, jobs });
 }
