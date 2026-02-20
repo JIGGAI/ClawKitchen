@@ -1,0 +1,24 @@
+{
+  "id": "kitchen",
+  "name": "ClawKitchen",
+  "description": "Local UI for managing OpenClaw recipes, teams, agents, cron jobs, and skills.",
+  "version": "0.1.0",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": { "type": "boolean", "default": true },
+      "dev": { "type": "boolean", "default": true, "description": "Run Next.js in dev mode (no prebuild required)." },
+      "host": { "type": "string", "default": "127.0.0.1" },
+      "port": { "type": "integer", "default": 7777, "minimum": 1, "maximum": 65535 },
+      "authToken": { "type": "string", "default": "" }
+    }
+  },
+  "uiHints": {
+    "enabled": { "label": "Enabled" },
+    "dev": { "label": "Dev mode", "help": "If true, Kitchen runs in Next dev mode. For production packaging, set this to false and ship built assets." },
+    "host": { "label": "Host", "help": "Default binds to localhost. For Tailscale remote access, bind to your Tailscale IP or 0.0.0.0 and set authToken." },
+    "port": { "label": "Port" },
+    "authToken": { "label": "Auth token", "help": "Required when host is not localhost. Used for HTTP Basic auth (username: kitchen)." }
+  }
+}
