@@ -59,9 +59,22 @@ export async function POST(req: Request) {
 
   let nextAgents = agents.slice();
 
+  // Templates are optional, but if present we must keep them consistent with role duplication.
+  const templatesRaw = fm.templates;
+  const templates: Record<string, unknown> =
+    templatesRaw && typeof templatesRaw === "object" && !Array.isArray(templatesRaw)
+      ? (templatesRaw as Record<string, unknown>)
+      : {};
+  let nextTemplates: Record<string, unknown> = { ...templates };
+
   if (op === "remove") {
     const role = normalizeRole(String(body.role ?? ""));
     nextAgents = nextAgents.filter((a) => String(a.role ?? "") !== role);
+
+    // Best-effort: remove templates for this role as well.
+    for (const k of Object.keys(nextTemplates)) {
+      if (k.startsWith(`${role}.`)) delete nextTemplates[k];
+    }
   } else if (op === "add") {
     const role = normalizeRole(String(body.role ?? ""));
     // add or update by role
@@ -74,7 +87,7 @@ export async function POST(req: Request) {
     if (idx === -1) nextAgents.push(next);
     else nextAgents[idx] = next;
   } else {
-    // addLike: create a *new* role entry based on an existing role's capabilities.
+    // addLike: create a *new* role entry based on an existing role's capabilities AND templates.
     const baseRole = normalizeRole(String(body.baseRole ?? ""));
     const base = agents.find((a) => String(a.role ?? "") === baseRole);
     if (!base) {
@@ -130,12 +143,21 @@ export async function POST(req: Request) {
 
     const clone = { ...base, role: nextRole, ...(nextName ? { name: nextName } : {}) };
     nextAgents.push(clone);
+
+    // Duplicate templates: templates.<baseRole>.* => templates.<nextRole>.*
+    // This is required so scaffold-team can generate role files for the duplicated role.
+    for (const [k, v] of Object.entries(templates)) {
+      if (!k.startsWith(`${baseRole}.`)) continue;
+      const suffix = k.slice(baseRole.length); // includes leading '.'
+      const nextKey = `${nextRole}${suffix}`;
+      if (nextTemplates[nextKey] === undefined) nextTemplates[nextKey] = v;
+    }
   }
 
   // Keep stable order by role.
   nextAgents.sort((a, b) => String(a.role ?? "").localeCompare(String(b.role ?? "")));
 
-  const nextFm = { ...fm, agents: nextAgents };
+  const nextFm = { ...fm, agents: nextAgents, ...(Object.keys(nextTemplates).length ? { templates: nextTemplates } : {}) };
   const nextYaml = YAML.stringify(nextFm).trimEnd();
   const nextMd = `---\n${nextYaml}\n---\n${rest}`;
 
