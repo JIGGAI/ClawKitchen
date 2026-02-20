@@ -647,7 +647,13 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
               onClick={async () => {
                 setSaving(true);
                 try {
-                  await ensureCustomRecipeExists({ overwrite: false });
+                  try {
+                    await ensureCustomRecipeExists({ overwrite: false });
+                  } catch (e: unknown) {
+                    // If the custom recipe already exists, proceed; we only needed to ensure a workspace file exists.
+                    const msg = e instanceof Error ? e.message : String(e);
+                    if (!/Recipe id already exists:/i.test(msg)) throw e;
+                  }
                   const res = await fetch("/api/recipes/team-agents", {
                     method: "POST",
                     headers: { "content-type": "application/json" },
@@ -707,9 +713,9 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
                   setSaving(false);
                 }
               }}
-              className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] hover:bg-white/10 disabled:opacity-50"
+              className="hidden"
             >
-              Remove agent
+Remove agent
             </button>
           </div>
 
