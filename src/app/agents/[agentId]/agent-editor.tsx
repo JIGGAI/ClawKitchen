@@ -348,11 +348,6 @@ export default function AgentEditor({ agentId, returnTo }: { agentId: string; re
       ) : null}
       {teamId ? <div className="mt-1 text-xs text-[color:var(--ck-text-tertiary)]">Team: {teamId}</div> : null}
 
-      {pageMsg ? (
-        <div className="mt-4 rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 p-3 text-sm text-[color:var(--ck-text-secondary)]">
-          {pageMsg}
-        </div>
-      ) : null}
 
       <div className="mt-6 flex flex-wrap gap-2">
         {(
