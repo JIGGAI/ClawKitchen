@@ -2,6 +2,7 @@
 
 import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 type AgentListItem = {
   id: string;
@@ -74,12 +75,17 @@ function DeleteAgentModal({
   );
 }
 
-export default function AgentEditor({ agentId }: { agentId: string }) {
+export default function AgentEditor({ agentId, returnTo }: { agentId: string; returnTo?: string }) {
+  const router = useRouter();
   const [agent, setAgent] = useState<AgentListItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loadingFile, setLoadingFile] = useState(false);
-  const [message, setMessage] = useState<string>("");
+  // Split concerns: avoid file-load errors showing up in the Skills notice area.
+  const [pageMsg, setPageMsg] = useState<string>("");
+  const [fileError, setFileError] = useState<string>("");
+  const [skillMsg, setSkillMsg] = useState<string>("");
+  const [skillError, setSkillError] = useState<string>("");
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
@@ -95,25 +101,25 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
   const [model, setModel] = useState<string>("");
 
   const [skillsList, setSkillsList] = useState<string[]>([]);
+  const [availableSkills, setAvailableSkills] = useState<string[]>([]);
+  const [skillsLoading, setSkillsLoading] = useState(false);
+  const [selectedSkill, setSelectedSkill] = useState<string>("");
+  const [installingSkill, setInstallingSkill] = useState(false);
 
   const [agentFiles, setAgentFiles] = useState<Array<FileEntry & { required?: boolean; rationale?: string }>>([]);
+  const [agentFilesLoading, setAgentFilesLoading] = useState(false);
   const [showOptionalFiles, setShowOptionalFiles] = useState(false);
   const [fileName, setFileName] = useState<string>("IDENTITY.md");
   const [fileContent, setFileContent] = useState<string>("");
 
-  const [saveAsNewId, setSaveAsNewId] = useState<string>("");
+  const teamId = agentId.includes("-") ? agentId.split("-").slice(0, -1).join("-") : "";
 
   useEffect(() => {
     (async () => {
       setLoading(true);
-      setMessage("");
+      setPageMsg("");
       try {
-        const [agentsRes, filesRes, skillsRes] = await Promise.all([
-          fetch("/api/agents", { cache: "no-store" }),
-          fetch(`/api/agents/files?agentId=${encodeURIComponent(agentId)}`, { cache: "no-store" }),
-          fetch(`/api/agents/skills?agentId=${encodeURIComponent(agentId)}`, { cache: "no-store" }),
-        ]);
-
+        const agentsRes = await fetch("/api/agents", { cache: "no-store" });
         const agentsJson = (await agentsRes.json()) as { agents?: unknown[] };
         const list = Array.isArray(agentsJson.agents) ? (agentsJson.agents as AgentListItem[]) : [];
         const found = list.find((a) => a.id === agentId) ?? null;
@@ -121,32 +127,76 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
         setName(found?.identityName ?? "");
         setModel(found?.model ?? "");
 
-        const filesJson = (await filesRes.json()) as FileListResponse;
-        if (filesRes.ok && filesJson.ok) {
-          const files = Array.isArray(filesJson.files) ? filesJson.files : [];
-          setAgentFiles(
-            files.map((f) => {
-              const entry = f as { name?: unknown; missing?: unknown };
-              return {
-                name: String(entry.name ?? ""),
-                missing: Boolean(entry.missing),
-                required: Boolean((entry as { required?: unknown }).required),
-                rationale:
-                  typeof (entry as { rationale?: unknown }).rationale === "string"
-                    ? ((entry as { rationale?: string }).rationale as string)
-                    : undefined,
-              };
-            }),
-          );
-        }
+        // Render ASAP; load files/skills in the background.
+        setLoading(false);
 
-        const skillsJson = (await skillsRes.json()) as { ok?: boolean; skills?: unknown[] };
-        if (skillsRes.ok && skillsJson.ok) {
-          setSkillsList(Array.isArray(skillsJson.skills) ? (skillsJson.skills as string[]) : []);
-        }
+        void (async () => {
+          setAgentFilesLoading(true);
+          setSkillsLoading(true);
+
+          try {
+            const [filesRes, skillsRes, availableSkillsRes] = await Promise.all([
+              fetch(`/api/agents/files?agentId=${encodeURIComponent(agentId)}`, { cache: "no-store" }),
+              fetch(`/api/agents/skills?agentId=${encodeURIComponent(agentId)}`, { cache: "no-store" }),
+              fetch("/api/skills/available", { cache: "no-store" }),
+            ]);
+
+            let installedSkills: string[] = [];
+
+            try {
+              const filesJson = (await filesRes.json()) as FileListResponse;
+              if (filesRes.ok && filesJson.ok) {
+                const files = Array.isArray(filesJson.files) ? filesJson.files : [];
+                setAgentFiles(
+                  files.map((f) => {
+                    const entry = f as { name?: unknown; missing?: unknown };
+                    return {
+                      name: String(entry.name ?? ""),
+                      missing: Boolean(entry.missing),
+                      required: Boolean((entry as { required?: unknown }).required),
+                      rationale:
+                        typeof (entry as { rationale?: unknown }).rationale === "string"
+                          ? ((entry as { rationale?: string }).rationale as string)
+                          : undefined,
+                    };
+                  }),
+                );
+              }
+            } catch {
+              // ignore
+            }
+
+            try {
+              const skillsJson = (await skillsRes.json()) as { ok?: boolean; skills?: unknown[] };
+              if (skillsRes.ok && skillsJson.ok) {
+                installedSkills = Array.isArray(skillsJson.skills) ? (skillsJson.skills as string[]) : [];
+                setSkillsList(installedSkills);
+              }
+            } catch {
+              // ignore
+            }
+
+            try {
+              const availableSkillsJson = (await availableSkillsRes.json()) as { ok?: boolean; skills?: unknown[] };
+              if (availableSkillsRes.ok && availableSkillsJson.ok) {
+                const list = Array.isArray(availableSkillsJson.skills) ? (availableSkillsJson.skills as string[]) : [];
+                setAvailableSkills(list);
+                // Default select first available skill not already installed.
+                const first = list.find((s) => !installedSkills.includes(s));
+                setSelectedSkill(first ?? list[0] ?? "");
+              }
+            } catch {
+              // ignore
+            }
+          } finally {
+            setAgentFilesLoading(false);
+            setSkillsLoading(false);
+          }
+        })();
       } catch (e: unknown) {
-        setMessage(e instanceof Error ? e.message : String(e));
+        setPageMsg(e instanceof Error ? e.message : String(e));
       } finally {
+        // If the happy-path already flipped loading=false early, this is a no-op.
         setLoading(false);
       }
     })();
@@ -154,7 +204,7 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
 
   async function onSaveIdentity() {
     setSaving(true);
-    setMessage("");
+    setPageMsg("");
     try {
       const res = await fetch("/api/agents/identity", {
         method: "POST",
@@ -163,9 +213,9 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
       });
       const json = (await res.json()) as { message?: string; error?: string };
       if (!res.ok) throw new Error(json.message || json.error || "Save failed");
-      setMessage("Saved identity via openclaw agents set-identity");
+      setPageMsg("Saved identity via openclaw agents set-identity");
     } catch (e: unknown) {
-      setMessage(e instanceof Error ? e.message : String(e));
+      setPageMsg(e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);
     }
@@ -173,7 +223,10 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
 
   async function onSaveConfig() {
     setSaving(true);
-    setMessage("");
+    setPageMsg("");
+
+    // Auto-clear after a moment (non-blocking).
+    setTimeout(() => setPageMsg(""), 6000);
     try {
       const res = await fetch("/api/agents/update", {
         method: "POST",
@@ -182,39 +235,22 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
       });
       const json = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(json.error || "Save config failed");
-      setMessage("Saved agent config (model) and restarted gateway");
+      setPageMsg("Saved agent config (model) and restarted gateway");
     } catch (e: unknown) {
-      setMessage(e instanceof Error ? e.message : String(e));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function onSaveAsNew() {
-    const newAgentId = saveAsNewId.trim();
-    if (!newAgentId) return setMessage("New agent id is required");
-
-    setSaving(true);
-    setMessage("");
-    try {
-      const res = await fetch("/api/agents/add", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ newAgentId, name, emoji, theme, avatar, model: agent?.model }),
-      });
-      const json = (await res.json()) as { message?: string; error?: string };
-      if (!res.ok) throw new Error(json.message || json.error || "Save As New failed");
-      setMessage(`Created new agent: ${newAgentId}`);
-    } catch (e: unknown) {
-      setMessage(e instanceof Error ? e.message : String(e));
+      setPageMsg(e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);
     }
   }
 
   async function onLoadAgentFile(nextName: string) {
+    // Update selection immediately so the UI reflects what the user clicked,
+    // even if the network request fails.
+    setFileName(nextName);
+    setFileContent("");
+
     setLoadingFile(true);
-    setMessage("");
+    setFileError("");
     try {
       const res = await fetch(
         `/api/agents/file?agentId=${encodeURIComponent(agentId)}&name=${encodeURIComponent(nextName)}`,
@@ -222,10 +258,10 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
       );
       const json = (await res.json()) as { ok?: boolean; error?: string; content?: string };
       if (!res.ok || !json.ok) throw new Error(json.error || "Failed to load file");
-      setFileName(nextName);
       setFileContent(String(json.content ?? ""));
     } catch (e: unknown) {
-      setMessage(e instanceof Error ? e.message : String(e));
+      setFileError(e instanceof Error ? e.message : String(e));
+      setTimeout(() => setFileError(""), 12000);
     } finally {
       setLoadingFile(false);
     }
@@ -254,7 +290,7 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
 
   async function onSaveAgentFile() {
     setSaving(true);
-    setMessage("");
+    setFileError("");
     try {
       const res = await fetch("/api/agents/file", {
         method: "PUT",
@@ -263,9 +299,10 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
       });
       const json = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !json.ok) throw new Error(json.error || "Failed to save file");
-      setMessage(`Saved ${fileName}`);
+      // No-op: saving a file doesn't need a global notice.
     } catch (e: unknown) {
-      setMessage(e instanceof Error ? e.message : String(e));
+      setFileError(e instanceof Error ? e.message : String(e));
+      setTimeout(() => setFileError(""), 12000);
     } finally {
       setSaving(false);
     }
@@ -274,7 +311,7 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
   async function onDeleteAgent() {
     setDeleteBusy(true);
     setDeleteError(null);
-    setMessage("");
+    setPageMsg("");
 
     try {
       const res = await fetch(`/api/agents/${encodeURIComponent(agentId)}`, { method: "DELETE" });
@@ -288,6 +325,7 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
     }
   }
 
+  // Initial load only gates the minimal state (agent exists). Files/skills stream in.
   if (loading) return <div className="ck-glass mx-auto max-w-4xl p-6">Loading…</div>;
   if (!agent) return <div className="ck-glass mx-auto max-w-4xl p-6">Agent not found: {agentId}</div>;
 
@@ -317,6 +355,7 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
       {agent.workspace ? (
         <div className="mt-1 text-xs text-[color:var(--ck-text-tertiary)]">Workspace: {agent.workspace}</div>
       ) : null}
+      {teamId ? <div className="mt-1 text-xs text-[color:var(--ck-text-tertiary)]">Team: {teamId}</div> : null}
 
       <div className="mt-6 flex flex-wrap gap-2">
         {(
@@ -391,28 +430,18 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
               >
                 {saving ? "Saving…" : "Save"}
               </button>
-            </div>
-
-            <div className="mt-4 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3">
-              <div className="text-xs font-medium text-[color:var(--ck-text-secondary)]">Save As New (new agent id)</div>
-              <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
-                <input
-                  value={saveAsNewId}
-                  onChange={(e) => setSaveAsNewId(e.target.value)}
-                  placeholder={`${agentId}-copy`}
-                  className="w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
-                />
+              {returnTo ? (
                 <button
                   disabled={saving}
-                  onClick={onSaveAsNew}
-                  className="shrink-0 rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15 disabled:opacity-50"
+                  onClick={async () => {
+                    await onSaveIdentity();
+                    router.push(returnTo);
+                  }}
+                  className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15 disabled:opacity-50"
                 >
-                  {saving ? "Saving…" : "Save As New"}
+                  Save & return
                 </button>
-              </div>
-              <p className="mt-2 text-xs text-[color:var(--ck-text-tertiary)]">
-                This adds a new agent entry to OpenClaw config and restarts the gateway.
-              </p>
+              ) : null}
             </div>
           </div>
         ) : null}
@@ -446,14 +475,90 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
           <div className="ck-glass-strong p-4">
             <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Skills</div>
             <p className="mt-2 text-sm text-[color:var(--ck-text-secondary)]">
-              Installed skills detected in this agent workspace (<code>skills/</code>).
+              Skills installed in this <strong>agent</strong> workspace (<code>skills/</code>). If you want a skill available to all agents,
+              add it at the team level.
             </p>
-            <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-[color:var(--ck-text-secondary)]">
-              {skillsList.length ? skillsList.map((s) => <li key={s}>{s}</li>) : <li>None detected.</li>}
-            </ul>
-            <p className="mt-3 text-xs text-[color:var(--ck-text-tertiary)]">
-              Next: install/uninstall flows.
-            </p>
+
+            <div className="mt-4">
+              <div className="text-xs font-medium text-[color:var(--ck-text-secondary)]">Installed</div>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-[color:var(--ck-text-secondary)]">
+                {skillsLoading ? (
+                  <li>Loading…</li>
+                ) : skillsList.length ? (
+                  skillsList.map((s) => <li key={s}>{s}</li>)
+                ) : (
+                  <li>None installed.</li>
+                )}
+              </ul>
+            </div>
+
+            <div className="mt-5 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/15 p-3">
+              <div className="text-xs font-medium text-[color:var(--ck-text-secondary)]">Add a skill</div>
+              <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                <select
+                  value={selectedSkill}
+                  onChange={(e) => setSelectedSkill(e.target.value)}
+                  className="w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                  disabled={installingSkill || !availableSkills.length}
+                >
+                  {availableSkills.length ? (
+                    availableSkills.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="">No skills found</option>
+                  )}
+                </select>
+                <button
+                  type="button"
+                  disabled={installingSkill || !selectedSkill}
+                  onClick={async () => {
+                    setInstallingSkill(true);
+                    setSkillMsg("");
+                    setSkillError("");
+                    try {
+                      const res = await fetch("/api/agents/skills/install", {
+                        method: "POST",
+                        headers: { "content-type": "application/json" },
+                        body: JSON.stringify({ agentId, skill: selectedSkill }),
+                      });
+                      const json = await res.json();
+                      if (!res.ok || !json.ok) throw new Error(json.error || "Failed to install skill");
+                      setSkillMsg(`Installed skill: ${selectedSkill}`);
+                      setTimeout(() => setSkillMsg(""), 8000);
+                      // Refresh installed list.
+                      const r = await fetch(`/api/agents/skills?agentId=${encodeURIComponent(agentId)}`, { cache: "no-store" });
+                      const j = await r.json();
+                      if (r.ok && j.ok) setSkillsList(Array.isArray(j.skills) ? j.skills : []);
+                    } catch (e: unknown) {
+                      setSkillError(e instanceof Error ? e.message : String(e));
+                      setTimeout(() => setSkillError(""), 12000);
+                    } finally {
+                      setInstallingSkill(false);
+                    }
+                  }}
+                  className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] disabled:opacity-50"
+                >
+                  {installingSkill ? "Adding…" : "Add"}
+                </button>
+              </div>
+
+              {skillError ? (
+                <div className="mt-3 rounded-[var(--ck-radius-sm)] border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">
+                  {skillError}
+                </div>
+              ) : skillMsg ? (
+                <div className="mt-3 rounded-[var(--ck-radius-sm)] border border-emerald-400/30 bg-emerald-500/10 p-3 text-sm text-emerald-100">
+                  {skillMsg}
+                </div>
+              ) : null}
+
+              <div className="mt-2 text-xs text-[color:var(--ck-text-tertiary)]">
+                This uses <code>openclaw recipes install-skill &lt;skill&gt; --agent-id {agentId} --yes</code>.
+              </div>
+            </div>
           </div>
         ) : null}
 
@@ -463,40 +568,37 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
               <div className="flex items-center justify-between gap-3">
                 <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Agent files</div>
                 <label className="flex items-center gap-2 text-xs text-[color:var(--ck-text-secondary)]">
-                  <input
-                    type="checkbox"
-                    checked={showOptionalFiles}
-                    onChange={(e) => setShowOptionalFiles(e.target.checked)}
-                  />
+                  <input type="checkbox" checked={showOptionalFiles} onChange={(e) => setShowOptionalFiles(e.target.checked)} />
                   Show optional
                 </label>
               </div>
-              <div className="mt-2 text-xs text-[color:var(--ck-text-tertiary)]">
-                Default view hides optional missing files to reduce noise.
-              </div>
+              <div className="mt-2 text-xs text-[color:var(--ck-text-tertiary)]">Default view hides optional missing files to reduce noise.</div>
               <ul className="mt-3 space-y-1">
+                {agentFilesLoading ? (
+                  <li className="text-sm text-[color:var(--ck-text-secondary)]">Loading…</li>
+                ) : null}
                 {agentFiles
                   .filter((f) => (showOptionalFiles ? true : Boolean(f.required) || !f.missing))
                   .map((f) => (
-                  <li key={f.name}>
-                    <button
-                      onClick={() => onLoadAgentFile(f.name)}
-                      className={
-                        fileName === f.name
-                          ? "w-full rounded-[var(--ck-radius-sm)] bg-white/10 px-3 py-2 text-left text-sm text-[color:var(--ck-text-primary)]"
-                          : "w-full rounded-[var(--ck-radius-sm)] px-3 py-2 text-left text-sm text-[color:var(--ck-text-secondary)] hover:bg-white/5"
-                      }
-                    >
-                      <span className={f.required ? "text-[color:var(--ck-text-primary)]" : "text-[color:var(--ck-text-secondary)]"}>
-                        {f.name}
-                      </span>
-                      <span className="ml-2 text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">
-                        {f.required ? "required" : "optional"}
-                      </span>
-                      {f.missing ? <span className="ml-2 text-xs text-[color:var(--ck-text-tertiary)]">missing</span> : null}
-                    </button>
-                  </li>
-                ))}
+                    <li key={f.name}>
+                      <button
+                        onClick={() => onLoadAgentFile(f.name)}
+                        className={
+                          fileName === f.name
+                            ? "w-full rounded-[var(--ck-radius-sm)] bg-white/10 px-3 py-2 text-left text-sm text-[color:var(--ck-text-primary)]"
+                            : "w-full rounded-[var(--ck-radius-sm)] px-3 py-2 text-left text-sm text-[color:var(--ck-text-secondary)] hover:bg-white/5"
+                        }
+                      >
+                        <span className={f.required ? "text-[color:var(--ck-text-primary)]" : "text-[color:var(--ck-text-secondary)]"}>
+                          {f.name}
+                        </span>
+                        <span className="ml-2 text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">
+                          {f.required ? "required" : "optional"}
+                        </span>
+                        {f.missing ? <span className="ml-2 text-xs text-[color:var(--ck-text-tertiary)]">missing</span> : null}
+                      </button>
+                    </li>
+                  ))}
               </ul>
             </div>
 
@@ -504,9 +606,7 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
               <div className="flex items-center justify-between gap-3">
                 <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Edit: {fileName}</div>
                 <div className="flex items-center gap-3">
-                  {loadingFile ? (
-                    <span className="text-xs text-[color:var(--ck-text-tertiary)]">Loading…</span>
-                  ) : null}
+                  {loadingFile ? <span className="text-xs text-[color:var(--ck-text-tertiary)]">Loading…</span> : null}
                   <button
                     disabled={saving}
                     onClick={onSaveAgentFile}
@@ -523,12 +623,6 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
                 spellCheck={false}
               />
             </div>
-          </div>
-        ) : null}
-
-        {message ? (
-          <div className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3 text-sm text-[color:var(--ck-text-primary)]">
-            {message}
           </div>
         ) : null}
       </div>

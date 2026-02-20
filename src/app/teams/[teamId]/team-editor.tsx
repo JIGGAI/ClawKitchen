@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CloneTeamModal } from "./CloneTeamModal";
 import { DeleteTeamModal } from "./DeleteTeamModal";
+import { PublishChangesModal } from "./PublishChangesModal";
 import { useToast } from "@/components/ToastProvider";
 
 type RecipeListItem = {
@@ -50,15 +50,19 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
   const [toId, setToId] = useState<string>(teamId);
   const [toName, setToName] = useState<string>(teamId);
   const [content, setContent] = useState<string>("");
+  const [loadedRecipeHash, setLoadedRecipeHash] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"recipe" | "agents" | "skills" | "cron" | "files">("recipe");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   const [loadingSource, setLoadingSource] = useState(false);
+  const [recipeLoadError, setRecipeLoadError] = useState<string>("");
   const toast = useToast();
 
-  const [cloneOpen, setCloneOpen] = useState(false);
-  const [cloneNonce, setCloneNonce] = useState(0);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [publishOpen, setPublishOpen] = useState(false);
+
+  const [teamMetaRecipeHash, setTeamMetaRecipeHash] = useState<string | null>(null);
 
   function flashMessage(next: string, kind: "success" | "error" | "info" = "info") {
     const msg = String(next ?? "").trim();
@@ -67,14 +71,28 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
   }
 
   const [teamFiles, setTeamFiles] = useState<Array<{ name: string; missing: boolean; required: boolean; rationale?: string }>>([]);
+  const [teamFilesLoading, setTeamFilesLoading] = useState(false);
+  const [teamFileError, setTeamFileError] = useState<string>("");
   const [showOptionalFiles, setShowOptionalFiles] = useState(false);
   const [fileName, setFileName] = useState<string>("SOUL.md");
   const [fileContent, setFileContent] = useState<string>("");
+
   const [cronJobs, setCronJobs] = useState<unknown[]>([]);
+  const [cronLoading, setCronLoading] = useState(false);
+
   const [teamAgents, setTeamAgents] = useState<Array<{ id: string; identityName?: string }>>([]);
+  const [teamAgentsLoading, setTeamAgentsLoading] = useState(false);
+
   const [newRole, setNewRole] = useState<string>("");
   const [newRoleName, setNewRoleName] = useState<string>("");
+
   const [skillsList, setSkillsList] = useState<string[]>([]);
+  const [availableSkills, setAvailableSkills] = useState<string[]>([]);
+  const [skillsLoading, setSkillsLoading] = useState(false);
+  const [selectedSkill, setSelectedSkill] = useState<string>("");
+  const [installingSkill, setInstallingSkill] = useState(false);
+  const [teamSkillMsg, setTeamSkillMsg] = useState<string>("");
+  const [teamSkillError, setTeamSkillError] = useState<string>("");
 
   const teamRecipes = useMemo(() => recipes.filter((r) => r.kind === "team"), [recipes]);
 
@@ -96,6 +114,11 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
   useEffect(() => {
     setToId(teamId);
     setToName(teamId);
+    setContent("");
+    setLoadedRecipeHash(null);
+    setTeamMetaRecipeHash(null);
+    setPublishOpen(false);
+    setDeleteOpen(false);
   }, [teamId]);
 
   useEffect(() => {
@@ -121,11 +144,15 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
         try {
           const metaJson = await metaRes.json();
           if (metaRes.ok && metaJson.ok && metaJson.meta && (metaJson.meta as { recipeId?: unknown }).recipeId) {
-            const m = metaJson.meta as { recipeId?: unknown; recipeName?: unknown };
+            const m = metaJson.meta as { recipeId?: unknown; recipeName?: unknown; recipeHash?: unknown };
             locked = {
               recipeId: String(m.recipeId),
               recipeName: typeof m.recipeName === "string" ? m.recipeName : undefined,
             };
+            const h = typeof m.recipeHash === "string" ? m.recipeHash : null;
+            setTeamMetaRecipeHash(h);
+          } else {
+            setTeamMetaRecipeHash(null);
           }
         } catch {
           // ignore
@@ -147,56 +174,105 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
           if (pick) setFromId(pick.id);
         }
 
-        // Load ancillary data for sub-areas.
-        const [filesRes, cronRes, agentsRes, skillsRes] = await Promise.all([
-          fetch(`/api/teams/files?teamId=${encodeURIComponent(teamId)}`, { cache: "no-store" }),
-          fetch(`/api/cron/jobs?teamId=${encodeURIComponent(teamId)}`, { cache: "no-store" }),
-          fetch("/api/agents", { cache: "no-store" }),
-          fetch(`/api/teams/skills?teamId=${encodeURIComponent(teamId)}`, { cache: "no-store" }),
-        ]);
+        // Render ASAP; load the heavier per-tab data in the background.
+        setLoading(false);
 
-        const filesJson = (await filesRes.json()) as { ok?: boolean; files?: unknown[] };
-        if (filesRes.ok && filesJson.ok) {
-          const files = Array.isArray(filesJson.files) ? filesJson.files : [];
-          setTeamFiles(
-            files.map((f) => {
-              const entry = f as { name?: unknown; missing?: unknown; required?: unknown; rationale?: unknown };
-              return {
-                name: String(entry.name ?? ""),
-                missing: Boolean(entry.missing),
-                required: Boolean(entry.required),
-                rationale: typeof entry.rationale === "string" ? entry.rationale : undefined,
-              };
-            }),
-          );
-        }
+        void (async () => {
+          setTeamFilesLoading(true);
+          setCronLoading(true);
+          setTeamAgentsLoading(true);
+          setSkillsLoading(true);
 
-        const cronJson = (await cronRes.json()) as { ok?: boolean; jobs?: unknown[] };
-        if (cronRes.ok && cronJson.ok) {
-          const all = Array.isArray(cronJson.jobs) ? cronJson.jobs : [];
-          setCronJobs(all);
-        }
+          try {
+            const [filesRes, cronRes, agentsRes, skillsRes, availableSkillsRes] = await Promise.all([
+              fetch(`/api/teams/files?teamId=${encodeURIComponent(teamId)}`, { cache: "no-store" }),
+              fetch(`/api/cron/jobs?teamId=${encodeURIComponent(teamId)}`, { cache: "no-store" }),
+              fetch("/api/agents", { cache: "no-store" }),
+              fetch(`/api/teams/skills?teamId=${encodeURIComponent(teamId)}`, { cache: "no-store" }),
+              fetch("/api/skills/available", { cache: "no-store" }),
+            ]);
 
-        const agentsJson = (await agentsRes.json()) as { agents?: unknown[] };
-        if (agentsRes.ok) {
-          const all = Array.isArray(agentsJson.agents) ? agentsJson.agents : [];
-          // Team membership for agents is by id convention: <teamId>-<role>
-          const filtered = all.filter((a) => String((a as { id?: unknown }).id ?? "").startsWith(`${teamId}-`));
-          setTeamAgents(
-            filtered.map((a) => {
-              const agent = a as { id?: unknown; identityName?: unknown };
-              return { id: String(agent.id ?? ""), identityName: typeof agent.identityName === "string" ? agent.identityName : undefined };
-            }),
-          );
-        }
+            try {
+              const filesJson = (await filesRes.json()) as { ok?: boolean; files?: unknown[] };
+              if (filesRes.ok && filesJson.ok) {
+                const files = Array.isArray(filesJson.files) ? filesJson.files : [];
+                setTeamFiles(
+                  files.map((f) => {
+                    const entry = f as { name?: unknown; missing?: unknown; required?: unknown; rationale?: unknown };
+                    return {
+                      name: String(entry.name ?? ""),
+                      missing: Boolean(entry.missing),
+                      required: Boolean(entry.required),
+                      rationale: typeof entry.rationale === "string" ? entry.rationale : undefined,
+                    };
+                  }),
+                );
+              }
+            } catch {
+              // ignore
+            }
 
-        const skillsJson = await skillsRes.json();
-        if (skillsRes.ok && skillsJson.ok) {
-          setSkillsList(Array.isArray(skillsJson.skills) ? skillsJson.skills : []);
-        }
+            try {
+              const cronJson = (await cronRes.json()) as { ok?: boolean; jobs?: unknown[] };
+              if (cronRes.ok && cronJson.ok) {
+                const all = Array.isArray(cronJson.jobs) ? cronJson.jobs : [];
+                setCronJobs(all);
+              }
+            } catch {
+              // ignore
+            }
+
+            try {
+              const agentsJson = (await agentsRes.json()) as { agents?: unknown[] };
+              if (agentsRes.ok) {
+                const all = Array.isArray(agentsJson.agents) ? agentsJson.agents : [];
+                // Team membership for agents is by id convention: <teamId>-<role>
+                const filtered = all.filter((a) => String((a as { id?: unknown }).id ?? "").startsWith(`${teamId}-`));
+                setTeamAgents(
+                  filtered.map((a) => {
+                    const agent = a as { id?: unknown; identityName?: unknown };
+                    return { id: String(agent.id ?? ""), identityName: typeof agent.identityName === "string" ? agent.identityName : undefined };
+                  }),
+                );
+              }
+            } catch {
+              // ignore
+            }
+
+            try {
+              const skillsJson = await skillsRes.json();
+              if (skillsRes.ok && skillsJson.ok) {
+                setSkillsList(Array.isArray(skillsJson.skills) ? (skillsJson.skills as string[]) : []);
+              }
+            } catch {
+              // ignore
+            }
+
+            try {
+              const availableSkillsJson = (await availableSkillsRes.json()) as { ok?: boolean; skills?: unknown[] };
+              if (availableSkillsRes.ok && availableSkillsJson.ok) {
+                const list = Array.isArray(availableSkillsJson.skills) ? (availableSkillsJson.skills as string[]) : [];
+                setAvailableSkills(list);
+                setSelectedSkill((prev) => {
+                  const p = String(prev ?? "").trim();
+                  if (p && list.includes(p)) return p;
+                  return list[0] ?? "";
+                });
+              }
+            } catch {
+              // ignore
+            }
+          } finally {
+            setTeamFilesLoading(false);
+            setCronLoading(false);
+            setTeamAgentsLoading(false);
+            setSkillsLoading(false);
+          }
+        })();
       } catch (e: unknown) {
         flashMessage(e instanceof Error ? e.message : String(e), "error");
       } finally {
+        // If the happy-path already flipped loading=false early, this is a no-op.
         setLoading(false);
       }
     })();
@@ -207,22 +283,33 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
     const id = toId.trim();
     if (!id) return;
     setLoadingSource(true);
+    setRecipeLoadError("");
     try {
       const res = await fetch(`/api/recipes/${encodeURIComponent(id)}`, { cache: "no-store" });
       const json = await res.json();
       if (!res.ok) {
         // Usually means the workspace recipe doesn't exist yet.
-        throw new Error(json.error || `Recipe not found: ${id}. Save or Clone first to create it.`);
+        throw new Error(json.error || `Recipe not found: ${id}. Save first to create it.`);
       }
       const r = json.recipe as RecipeDetail;
       setContent(r.content);
-      flashMessage(`Loaded team recipe: ${r.id}`, "success");
+      setLoadedRecipeHash(typeof json.recipeHash === "string" ? json.recipeHash : null);
     } catch (e: unknown) {
-      flashMessage(e instanceof Error ? e.message : String(e), "error");
+      setRecipeLoadError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoadingSource(false);
     }
   }
+
+  // Load raw recipe markdown by default (no "click to load").
+  useEffect(() => {
+    const id = toId.trim();
+    if (!id) return;
+    if (content.trim()) return;
+    if (loadingSource) return;
+    void onLoadTeamRecipeMarkdown();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toId]);
 
   async function ensureCustomRecipeExists(args: { overwrite: boolean; toId?: string; toName?: string; scaffold?: boolean }) {
     const f = fromId.trim();
@@ -272,6 +359,15 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
         setContent(json.content);
       }
 
+      // Refresh hash from server so Publish can reliably detect unpropagated changes.
+      try {
+        const res = await fetch(`/api/recipes/${encodeURIComponent(toId.trim())}`, { cache: "no-store" });
+        const next = await res.json();
+        if (res.ok && typeof next.recipeHash === "string") setLoadedRecipeHash(next.recipeHash);
+      } catch {
+        setLoadedRecipeHash(null);
+      }
+
       flashMessage(`Saved team recipe: ${json.filePath}`, "success");
     } catch (e: unknown) {
       const raw = e instanceof Error ? e.message : String(e);
@@ -283,6 +379,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
 
   async function onLoadTeamFile(name: string) {
     setSaving(true);
+    setTeamFileError("");
     try {
       const res = await fetch(
         `/api/teams/file?teamId=${encodeURIComponent(teamId)}&name=${encodeURIComponent(name)}`,
@@ -293,7 +390,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
       setFileName(name);
       setFileContent(String(json.content ?? ""));
     } catch (e: unknown) {
-      flashMessage(e instanceof Error ? e.message : String(e), "error");
+      setTeamFileError(e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);
     }
@@ -301,6 +398,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
 
   async function onSaveTeamFile() {
     setSaving(true);
+    setTeamFileError("");
     try {
       const res = await fetch("/api/teams/file", {
         method: "PUT",
@@ -309,14 +407,15 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
       });
       const json = await res.json();
       if (!res.ok || !json.ok) throw new Error(json.error || "Failed to save file");
-      flashMessage(`Saved ${fileName}`, "success");
+      // No toast; keep file-related messaging local.
     } catch (e: unknown) {
-      flashMessage(e instanceof Error ? e.message : String(e), "error");
+      setTeamFileError(e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);
     }
   }
 
+  // Initial load only gates the minimal state (recipes + team meta). Everything else streams in.
   if (loading) return <div className="ck-glass mx-auto max-w-4xl p-6">Loading…</div>;
 
   return (
@@ -373,20 +472,10 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
             />
 
             <div className="mt-4 grid grid-cols-1 gap-2">
-              <button
-                type="button"
-                disabled={loadingSource || !targetIdValid || targetIsBuiltin}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  void onLoadTeamRecipeMarkdown();
-                }}
-                className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15 disabled:opacity-60"
-              >
-                {loadingSource ? "Loading…" : "Load team markdown"}
-              </button>
+              {/* Load team markdown removed (auto-loads by default). */}
 
               <button
+                type="button"
                 disabled={saving || !teamIdValid || !targetIdValid || targetIsBuiltin}
                 onClick={() => onSaveCustom(true)}
                 className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] transition-colors hover:bg-[var(--ck-accent-red-hover)] active:bg-[var(--ck-accent-red-active)] disabled:opacity-50"
@@ -395,17 +484,25 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
               </button>
 
               <button
-                disabled={saving || !teamIdValid || targetIsBuiltin}
-                onClick={() => {
-                  setCloneNonce((n) => n + 1);
-                  setCloneOpen(true);
-                }}
-                className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15 disabled:opacity-50"
+                type="button"
+                disabled={
+                  saving ||
+                  !teamIdValid ||
+                  !targetIdValid ||
+                  targetIsBuiltin ||
+                  // Enabled only when there are unpropagated (saved) changes.
+                  !loadedRecipeHash ||
+                  !teamMetaRecipeHash ||
+                  loadedRecipeHash === teamMetaRecipeHash
+                }
+                onClick={() => setPublishOpen(true)}
+                className="rounded-[var(--ck-radius-sm)] bg-emerald-600 px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] transition-colors hover:bg-emerald-500 active:bg-emerald-700 disabled:opacity-50"
               >
-                Clone Team
+                {publishing ? "Publishing…" : "Publish changes"}
               </button>
 
               <button
+                type="button"
                 disabled={saving}
                 onClick={() => setDeleteOpen(true)}
                 className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15 disabled:opacity-50"
@@ -451,7 +548,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
                 <strong>Save</strong> writes/overwrites the custom recipe file identified by “Team id”.
               </li>
               <li>
-                <strong>Clone Team</strong> creates a new custom recipe copy (fails if it already exists).
+                <strong>Publish changes</strong> re-scaffolds this team from your current custom recipe and applies config (complete overwrite).
               </li>
               <li>
                 <strong>Delete Team</strong> runs the safe uninstall command (<code>openclaw recipes remove-team</code>).
@@ -556,12 +653,14 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
                     </div>
                     <a
                       className="text-sm font-medium text-[color:var(--ck-accent-red)] hover:text-[color:var(--ck-accent-red-hover)]"
-                      href={`/agents/${encodeURIComponent(a.id)}`}
+                      href={`/agents/${encodeURIComponent(a.id)}?returnTo=${encodeURIComponent(`/teams/${teamId}?tab=agents`)}`}
                     >
                       Edit
                     </a>
                   </li>
                 ))
+              ) : teamAgentsLoading ? (
+                <li className="text-sm text-[color:var(--ck-text-secondary)]">Loading…</li>
               ) : (
                 <li className="text-sm text-[color:var(--ck-text-secondary)]">No team agents detected.</li>
               )}
@@ -572,10 +671,86 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
 
       {activeTab === "skills" ? (
         <div className="mt-6 ck-glass-strong p-4">
-          <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Installed skills (team workspace)</div>
-          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-[color:var(--ck-text-secondary)]">
-            {skillsList.length ? skillsList.map((s) => <li key={s}>{s}</li>) : <li>No skills installed.</li>}
-          </ul>
+          <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Skills</div>
+          <p className="mt-2 text-sm text-[color:var(--ck-text-secondary)]">
+            Skills installed in this <strong>team</strong> workspace (<code>skills/</code>). These are available to all agents in the team.
+            For agent-specific skills, open the agent from the Agents tab.
+          </p>
+
+          <div className="mt-4">
+            <div className="text-xs font-medium text-[color:var(--ck-text-secondary)]">Installed</div>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-[color:var(--ck-text-secondary)]">
+              {skillsList.length ? skillsList.map((s) => <li key={s}>{s}</li>) : <li>None installed.</li>}
+            </ul>
+          </div>
+
+          <div className="mt-5 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/15 p-3">
+            <div className="text-xs font-medium text-[color:var(--ck-text-secondary)]">Add a skill</div>
+            <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+              <select
+                value={selectedSkill}
+                onChange={(e) => setSelectedSkill(e.target.value)}
+                className="w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                disabled={installingSkill || !availableSkills.length}
+              >
+                {availableSkills.length ? (
+                  availableSkills.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))
+                ) : (
+                  <option value="">No skills found</option>
+                )}
+              </select>
+              <button
+                type="button"
+                disabled={installingSkill || !selectedSkill}
+                onClick={async () => {
+                  setInstallingSkill(true);
+                  setTeamSkillMsg("");
+                  setTeamSkillError("");
+                  try {
+                    const res = await fetch("/api/teams/skills/install", {
+                      method: "POST",
+                      headers: { "content-type": "application/json" },
+                      body: JSON.stringify({ teamId, skill: selectedSkill }),
+                    });
+                    const json = await res.json();
+                    if (!res.ok || !json.ok) throw new Error(json.error || "Failed to install skill");
+                    setTeamSkillMsg(`Installed skill: ${selectedSkill}`);
+
+                    // Refresh installed list.
+                    const r = await fetch(`/api/teams/skills?teamId=${encodeURIComponent(teamId)}`, { cache: "no-store" });
+                    const j = await r.json();
+                    if (r.ok && j.ok) setSkillsList(Array.isArray(j.skills) ? (j.skills as string[]) : []);
+                  } catch (e: unknown) {
+                    setTeamSkillError(e instanceof Error ? e.message : String(e));
+                  } finally {
+                    setInstallingSkill(false);
+                  }
+                }}
+                className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] disabled:opacity-50"
+              >
+                {installingSkill ? "Adding…" : "Add"}
+              </button>
+            </div>
+            {teamSkillError ? (
+              <div className="mt-3 rounded-[var(--ck-radius-sm)] border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">
+                {teamSkillError}
+              </div>
+            ) : null}
+
+            {teamSkillMsg ? (
+              <div className="mt-3 rounded-[var(--ck-radius-sm)] border border-emerald-400/30 bg-emerald-500/10 p-3 text-sm text-emerald-100">
+                {teamSkillMsg}
+              </div>
+            ) : null}
+
+            <div className="mt-2 text-xs text-[color:var(--ck-text-tertiary)]">
+              This uses <code>openclaw recipes install-skill &lt;skill&gt; --team-id {teamId} --yes</code>.
+            </div>
+          </div>
         </div>
       ) : null}
 
@@ -648,6 +823,8 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
                   </li>
                 );
               })
+            ) : cronLoading ? (
+              <li className="text-sm text-[color:var(--ck-text-secondary)]">Loading…</li>
             ) : (
               <li className="text-sm text-[color:var(--ck-text-secondary)]">No cron jobs detected for this team.</li>
             )}
@@ -673,6 +850,9 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
               Default view hides optional missing files to reduce noise.
             </div>
             <ul className="mt-3 space-y-1">
+              {teamFilesLoading ? (
+                <li className="text-sm text-[color:var(--ck-text-secondary)]">Loading…</li>
+              ) : null}
               {teamFiles
                 .filter((f) => (showOptionalFiles ? true : f.required || !f.missing))
                 .map((f) => (
@@ -709,6 +889,13 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
                 {saving ? "Saving…" : "Save file"}
               </button>
             </div>
+
+            {teamFileError ? (
+              <div className="mt-3 rounded-[var(--ck-radius-sm)] border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">
+                {teamFileError}
+              </div>
+            ) : null}
+
             <textarea
               value={fileContent}
               onChange={(e) => setFileContent(e.target.value)}
@@ -723,27 +910,70 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
       {activeTab === "recipe" ? (
         <div className="mt-6 ck-glass-strong p-4">
           <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Recipe markdown</div>
+
+          {recipeLoadError ? (
+            <div className="mt-3 rounded-[var(--ck-radius-sm)] border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">
+              {recipeLoadError}
+            </div>
+          ) : null}
+
           <textarea
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={(e) => {
+              setContent(e.target.value);
+              setLoadedRecipeHash(null);
+            }}
             className="mt-2 h-[55vh] w-full resize-none rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-3 font-mono text-xs text-[color:var(--ck-text-primary)]"
             spellCheck={false}
           />
         </div>
       ) : null}
 
-      <CloneTeamModal
-        key={cloneNonce}
-        open={cloneOpen}
-        onClose={() => setCloneOpen(false)}
-        recipes={recipes}
-        onConfirm={async ({ id, name, scaffold }) => {
-          setCloneOpen(false);
-          // Set the target fields for UI, but DO NOT rely on them for the clone.
-          // Clone must use the modal-provided id/name.
-          setToId(id);
-          setToName(name);
-          await onSaveCustom(false, { toId: id, toName: name, scaffold });
+      {/* Clone Team removed (per #0075). */}
+
+      <PublishChangesModal
+        open={publishOpen}
+        teamId={teamId}
+        recipeId={toId}
+        busy={publishing}
+        onClose={() => setPublishOpen(false)}
+        onConfirm={async () => {
+          setPublishing(true);
+          try {
+            const res = await fetch("/api/scaffold", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({
+                kind: "team",
+                recipeId: toId.trim(),
+                teamId,
+                overwrite: true,
+                applyConfig: true,
+              }),
+            });
+            const json = await res.json();
+            if (!res.ok || !json.ok) throw new Error(json.error || "Publish failed");
+
+            // Refresh team meta so we can reflect published hash/state.
+            try {
+              const metaRes = await fetch(`/api/teams/meta?teamId=${encodeURIComponent(teamId)}`, {
+                cache: "no-store",
+              });
+              const metaJson = await metaRes.json();
+              if (metaRes.ok && metaJson.ok && metaJson.meta && typeof metaJson.meta.recipeHash === "string") {
+                setTeamMetaRecipeHash(metaJson.meta.recipeHash);
+              }
+            } catch {
+              // ignore
+            }
+
+            setPublishOpen(false);
+            flashMessage("Published changes to active team", "success");
+          } catch (e: unknown) {
+            flashMessage(e instanceof Error ? e.message : String(e), "error");
+          } finally {
+            setPublishing(false);
+          }
         }}
       />
 

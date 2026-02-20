@@ -13,9 +13,12 @@ type AgentListItem = {
 
 function inferTeamIdFromWorkspace(workspace: string | undefined) {
   if (!workspace) return null;
-  const base = workspace.split("/").filter(Boolean).pop() ?? "";
-  if (!base.startsWith("workspace-")) return null;
-  const team = base.slice("workspace-".length);
+  const parts = workspace.split("/").filter(Boolean);
+  // Team workspaces are typically ~/.openclaw/workspace-<teamId>/..., so the workspace- segment
+  // is not always the last path component.
+  const wsPart = parts.find((p) => p.startsWith("workspace-")) ?? "";
+  if (!wsPart) return null;
+  const team = wsPart.slice("workspace-".length);
   return team || null;
 }
 

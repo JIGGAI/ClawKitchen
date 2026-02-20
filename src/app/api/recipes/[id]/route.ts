@@ -1,6 +1,11 @@
+import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { runOpenClaw } from "@/lib/openclaw";
 import { parseFrontmatterId, resolveRecipePath, type RecipeListItem, writeRecipeFile } from "@/lib/recipes";
+
+function sha256(text: string) {
+  return crypto.createHash("sha256").update(text, "utf8").digest("hex");
+}
 
 export async function GET(
   _req: Request,
@@ -17,7 +22,9 @@ export async function GET(
   const shown = await runOpenClaw(["recipes", "show", id]);
   const filePath = await resolveRecipePath(item).catch(() => null);
 
-  return NextResponse.json({ recipe: { ...item, content: shown.stdout, filePath }, stderr: shown.stderr });
+  const recipeHash = sha256(shown.stdout);
+
+  return NextResponse.json({ recipe: { ...item, content: shown.stdout, filePath }, recipeHash, stderr: shown.stderr });
 }
 
 export async function PUT(
