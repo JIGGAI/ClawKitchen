@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { parse as parseYaml } from "yaml";
 import { useRouter } from "next/navigation";
 import { DeleteTeamModal } from "./DeleteTeamModal";
 import { PublishChangesModal } from "./PublishChangesModal";
@@ -138,6 +139,24 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
   const [teamAgents, setTeamAgents] = useState<Array<{ id: string; identityName?: string }>>([]);
   const [teamAgentsLoading, setTeamAgentsLoading] = useState(false);
 
+  const recipeAgents = useMemo(() => {
+    const md = String(content ?? "");
+    if (!md.startsWith("---\n")) return [] as Array<{ role: string; name?: string }>;
+    const end = md.indexOf("\n---\n", 4);
+    if (end === -1) return [] as Array<{ role: string; name?: string }>;
+    const fmText = md.slice(4, end + 1);
+    try {
+      const fm = (parseYaml(fmText) ?? {}) as { agents?: unknown };
+      const agents = Array.isArray(fm.agents) ? fm.agents : [];
+      return agents
+        .map((a) => a as { role?: unknown; name?: unknown })
+        .map((a) => ({ role: String(a.role ?? "").trim(), name: typeof a.name === "string" ? a.name : undefined }))
+        .filter((a) => Boolean(a.role));
+    } catch {
+      return [] as Array<{ role: string; name?: string }>;
+    }
+  }, [content]);
+
   const [newRole, setNewRole] = useState<string>("");
   const [customRole, setCustomRole] = useState<string>("");
   const [newRoleName, setNewRoleName] = useState<string>("");
@@ -145,9 +164,8 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
   const derivedRole = useMemo(() => {
     const v = (newRole === "__custom__" ? customRole : newRole).trim();
     if (!v) return "";
-    if (v.startsWith(`${teamId}-`)) return v.slice(teamId.length + 1);
     return v;
-  }, [newRole, customRole, teamId]);
+  }, [newRole, customRole]);
 
   const [skillsList, setSkillsList] = useState<string[]>([]);
   const [availableSkills, setAvailableSkills] = useState<string[]>([]);
@@ -642,15 +660,15 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
                     return;
                   }
                   setCustomRole("");
-                  const match = teamAgents.find((a) => a.id === v);
-                  setNewRoleName(match?.identityName || "");
+                  const match = recipeAgents.find((a) => a.role === v);
+                  setNewRoleName(match?.name || "");
                 }}
                 className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
               >
                 <option value="">Select…</option>
-                {teamAgents.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.identityName || a.id}
+                {recipeAgents.map((a) => (
+                  <option key={a.role} value={a.role}>
+                    {a.name || a.role}
                   </option>
                 ))}
                 <option value="__custom__">Other…</option>
@@ -700,12 +718,22 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
                   const res = await fetch("/api/recipes/team-agents", {
                     method: "POST",
                     headers: { "content-type": "application/json" },
-                    body: JSON.stringify({
-                      recipeId: toId.trim(),
-                      op: "add",
-                      role: derivedRole,
-                      name: newRoleName,
-                    }),
+                    body: JSON.stringify(
+                      newRole === "__custom__"
+                        ? {
+                            recipeId: toId.trim(),
+                            op: "add",
+                            role: derivedRole,
+                            name: newRoleName,
+                          }
+                        : {
+                            recipeId: toId.trim(),
+                            op: "addLike",
+                            baseRole: derivedRole,
+                            teamId,
+                            name: newRoleName,
+                          },
+                    ),
                   });
                   const json = await res.json();
                   if (!res.ok || !json.ok) throw new Error(json.error || "Failed updating agents list");
