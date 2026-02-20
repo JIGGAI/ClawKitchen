@@ -75,6 +75,9 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
   const [newRole, setNewRole] = useState<string>("");
   const [newRoleName, setNewRoleName] = useState<string>("");
   const [skillsList, setSkillsList] = useState<string[]>([]);
+  const [availableSkills, setAvailableSkills] = useState<string[]>([]);
+  const [selectedSkill, setSelectedSkill] = useState<string>("");
+  const [installingSkill, setInstallingSkill] = useState(false);
 
   const teamRecipes = useMemo(() => recipes.filter((r) => r.kind === "team"), [recipes]);
 
@@ -148,11 +151,12 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
         }
 
         // Load ancillary data for sub-areas.
-        const [filesRes, cronRes, agentsRes, skillsRes] = await Promise.all([
+        const [filesRes, cronRes, agentsRes, skillsRes, availableSkillsRes] = await Promise.all([
           fetch(`/api/teams/files?teamId=${encodeURIComponent(teamId)}`, { cache: "no-store" }),
           fetch(`/api/cron/jobs?teamId=${encodeURIComponent(teamId)}`, { cache: "no-store" }),
           fetch("/api/agents", { cache: "no-store" }),
           fetch(`/api/teams/skills?teamId=${encodeURIComponent(teamId)}`, { cache: "no-store" }),
+          fetch("/api/skills/available", { cache: "no-store" }),
         ]);
 
         const filesJson = (await filesRes.json()) as { ok?: boolean; files?: unknown[] };
@@ -192,7 +196,18 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
 
         const skillsJson = await skillsRes.json();
         if (skillsRes.ok && skillsJson.ok) {
-          setSkillsList(Array.isArray(skillsJson.skills) ? skillsJson.skills : []);
+          setSkillsList(Array.isArray(skillsJson.skills) ? (skillsJson.skills as string[]) : []);
+        }
+
+        const availableSkillsJson = (await availableSkillsRes.json()) as { ok?: boolean; skills?: unknown[] };
+        if (availableSkillsRes.ok && availableSkillsJson.ok) {
+          const list = Array.isArray(availableSkillsJson.skills) ? (availableSkillsJson.skills as string[]) : [];
+          setAvailableSkills(list);
+          setSelectedSkill((prev) => {
+            const p = String(prev ?? "").trim();
+            if (p && list.includes(p)) return p;
+            return list[0] ?? "";
+          });
         }
       } catch (e: unknown) {
         flashMessage(e instanceof Error ? e.message : String(e), "error");
@@ -572,10 +587,72 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
 
       {activeTab === "skills" ? (
         <div className="mt-6 ck-glass-strong p-4">
-          <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Installed skills (team workspace)</div>
-          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-[color:var(--ck-text-secondary)]">
-            {skillsList.length ? skillsList.map((s) => <li key={s}>{s}</li>) : <li>No skills installed.</li>}
-          </ul>
+          <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Skills</div>
+          <p className="mt-2 text-sm text-[color:var(--ck-text-secondary)]">
+            Skills installed in this <strong>team</strong> workspace (<code>skills/</code>). These are available to all agents in the team.
+            For agent-specific skills, open the agent from the Agents tab.
+          </p>
+
+          <div className="mt-4">
+            <div className="text-xs font-medium text-[color:var(--ck-text-secondary)]">Installed</div>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-[color:var(--ck-text-secondary)]">
+              {skillsList.length ? skillsList.map((s) => <li key={s}>{s}</li>) : <li>None installed.</li>}
+            </ul>
+          </div>
+
+          <div className="mt-5 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/15 p-3">
+            <div className="text-xs font-medium text-[color:var(--ck-text-secondary)]">Add a skill</div>
+            <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+              <select
+                value={selectedSkill}
+                onChange={(e) => setSelectedSkill(e.target.value)}
+                className="w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                disabled={installingSkill || !availableSkills.length}
+              >
+                {availableSkills.length ? (
+                  availableSkills.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))
+                ) : (
+                  <option value="">No skills found</option>
+                )}
+              </select>
+              <button
+                type="button"
+                disabled={installingSkill || !selectedSkill}
+                onClick={async () => {
+                  setInstallingSkill(true);
+                  try {
+                    const res = await fetch("/api/teams/skills/install", {
+                      method: "POST",
+                      headers: { "content-type": "application/json" },
+                      body: JSON.stringify({ teamId, skill: selectedSkill }),
+                    });
+                    const json = await res.json();
+                    if (!res.ok || !json.ok) throw new Error(json.error || "Failed to install skill");
+                    flashMessage(`Installed skill: ${selectedSkill}`, "success");
+
+                    // Refresh installed list.
+                    const r = await fetch(`/api/teams/skills?teamId=${encodeURIComponent(teamId)}`, { cache: "no-store" });
+                    const j = await r.json();
+                    if (r.ok && j.ok) setSkillsList(Array.isArray(j.skills) ? (j.skills as string[]) : []);
+                  } catch (e: unknown) {
+                    flashMessage(e instanceof Error ? e.message : String(e), "error");
+                  } finally {
+                    setInstallingSkill(false);
+                  }
+                }}
+                className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] disabled:opacity-50"
+              >
+                {installingSkill ? "Adding…" : "Add"}
+              </button>
+            </div>
+            <div className="mt-2 text-xs text-[color:var(--ck-text-tertiary)]">
+              This uses <code>openclaw recipes install-skill &lt;skill&gt; --team-id {teamId} --yes</code>.
+            </div>
+          </div>
         </div>
       ) : null}
 
