@@ -59,6 +59,9 @@ export async function POST(req: Request) {
   if (body.overwrite) args.push("--overwrite");
   if (body.applyConfig) args.push("--apply-config");
 
+  // scaffold/scaffold-team also writes a workspace recipe file; allow re-runs against existing teams.
+  if (body.allowExisting || body.overwrite) args.push("--overwrite-recipe");
+
   if (body.kind === "agent") {
     if (body.agentId) args.push("--agent-id", body.agentId);
     if (body.name) args.push("--name", body.name);
