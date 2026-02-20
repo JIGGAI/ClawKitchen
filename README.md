@@ -2,34 +2,13 @@
 
 Local-first UI companion for **ClawRecipes** (OpenClaw Recipes plugin).
 
-Phase 1 focus:
-- list recipes (builtin + workspace)
-- edit recipes (including builtin) and save back to disk
-- scaffold agents/teams via `openclaw recipes scaffold` / `scaffold-team`
-
 ## Prerequisites
 - OpenClaw installed and on PATH (`openclaw`)
 - ClawRecipes plugin installed/linked so `openclaw recipes ...` works
 
 ---
 
-## Option A: Run as a standalone app (dev)
-
-```bash
-npm install
-npm run dev -- --port 3001
-```
-
-Open:
-- http://localhost:3001
-
-Notes:
-- This is the fastest iteration loop.
-- This mode is local-only unless you separately expose the port.
-
----
-
-## Option B: Run as an OpenClaw plugin (@jiggai/kitchen)
+## Run as an OpenClaw plugin (@jiggai/kitchen)
 
 ClawKitchen can be loaded as an OpenClaw plugin so it runs locally on the orchestrator.
 
