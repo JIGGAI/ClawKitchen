@@ -357,6 +357,12 @@ export default function AgentEditor({ agentId, returnTo }: { agentId: string; re
       ) : null}
       {teamId ? <div className="mt-1 text-xs text-[color:var(--ck-text-tertiary)]">Team: {teamId}</div> : null}
 
+      {pageMsg ? (
+        <div className="mt-4 rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 p-3 text-sm text-[color:var(--ck-text-secondary)]">
+          {pageMsg}
+        </div>
+      ) : null}
+
       <div className="mt-6 flex flex-wrap gap-2">
         {(
           [
@@ -616,6 +622,13 @@ export default function AgentEditor({ agentId, returnTo }: { agentId: string; re
                   </button>
                 </div>
               </div>
+
+              {fileError ? (
+                <div className="mt-3 rounded-[var(--ck-radius-sm)] border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">
+                  {fileError}
+                </div>
+              ) : null}
+
               <textarea
                 value={fileContent}
                 onChange={(e) => setFileContent(e.target.value)}

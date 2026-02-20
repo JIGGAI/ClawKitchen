@@ -691,7 +691,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
                 value={selectedSkill}
                 onChange={(e) => setSelectedSkill(e.target.value)}
                 className="w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
-                disabled={installingSkill || !availableSkills.length}
+                disabled={installingSkill || skillsLoading || !availableSkills.length}
               >
                 {availableSkills.length ? (
                   availableSkills.map((s) => (
@@ -705,7 +705,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
               </select>
               <button
                 type="button"
-                disabled={installingSkill || !selectedSkill}
+                disabled={installingSkill || skillsLoading || !selectedSkill}
                 onClick={async () => {
                   setInstallingSkill(true);
                   setTeamSkillMsg("");
