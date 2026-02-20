@@ -2,6 +2,7 @@
 
 import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 type AgentListItem = {
   id: string;
@@ -74,7 +75,8 @@ function DeleteAgentModal({
   );
 }
 
-export default function AgentEditor({ agentId }: { agentId: string }) {
+export default function AgentEditor({ agentId, returnTo }: { agentId: string; returnTo?: string }) {
+  const router = useRouter();
   const [agent, setAgent] = useState<AgentListItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -388,6 +390,18 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
               >
                 {saving ? "Saving…" : "Save"}
               </button>
+              {returnTo ? (
+                <button
+                  disabled={saving}
+                  onClick={async () => {
+                    await onSaveIdentity();
+                    router.push(returnTo);
+                  }}
+                  className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15 disabled:opacity-50"
+                >
+                  Save & return
+                </button>
+              ) : null}
             </div>
           </div>
         ) : null}
