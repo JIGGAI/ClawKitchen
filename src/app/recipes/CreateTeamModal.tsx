@@ -160,6 +160,14 @@ export function CreateTeamModal({
               <div className="mt-2 text-xs text-[color:var(--ck-text-tertiary)]">
                 This will scaffold ~/.openclaw/workspace-&lt;teamId&gt; and add the team to config.
               </div>
+
+              {availability.state === "checking" ? (
+                <div className="mt-2 text-xs text-[color:var(--ck-text-tertiary)]">Checking availability…</div>
+              ) : availability.state === "taken" ? (
+                <div className="mt-2 text-xs text-red-200">That id is already taken.</div>
+              ) : availability.state === "available" ? (
+                <div className="mt-2 text-xs text-emerald-200">Id available.</div>
+              ) : null}
             </div>
 
             <label className="mt-4 flex items-center gap-2 text-sm text-[color:var(--ck-text-secondary)]">
@@ -187,7 +195,7 @@ export function CreateTeamModal({
               </button>
               <button
                 type="button"
-                disabled={busy || !effectiveId.trim()}
+                disabled={busy || !effectiveId.trim() || availability.state === "taken" || availability.state === "checking"}
                 onClick={onConfirm}
                 className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] hover:bg-[var(--ck-accent-red-hover)] disabled:opacity-50"
               >
