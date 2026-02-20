@@ -101,6 +101,9 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
   useEffect(() => {
     setToId(teamId);
     setToName(teamId);
+    setContent("");
+    setLoadedRecipeHash(null);
+    setTeamMetaRecipeHash(null);
   }, [teamId]);
 
   useEffect(() => {
@@ -233,7 +236,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
       const json = await res.json();
       if (!res.ok) {
         // Usually means the workspace recipe doesn't exist yet.
-        throw new Error(json.error || `Recipe not found: ${id}. Save or Clone first to create it.`);
+        throw new Error(json.error || `Recipe not found: ${id}. Save first to create it.`);
       }
       const r = json.recipe as RecipeDetail;
       setContent(r.content);
@@ -245,6 +248,16 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
       setLoadingSource(false);
     }
   }
+
+  // Load raw recipe markdown by default (no "click to load").
+  useEffect(() => {
+    const id = toId.trim();
+    if (!id) return;
+    if (content.trim()) return;
+    if (loadingSource) return;
+    void onLoadTeamRecipeMarkdown();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toId]);
 
   async function ensureCustomRecipeExists(args: { overwrite: boolean; toId?: string; toName?: string; scaffold?: boolean }) {
     const f = fromId.trim();
@@ -294,8 +307,14 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
         setContent(json.content);
       }
 
-      // Content changed; hash is now stale until we reload.
-      setLoadedRecipeHash(null);
+      // Refresh hash from server so Publish can reliably detect unpropagated changes.
+      try {
+        const res = await fetch(`/api/recipes/${encodeURIComponent(toId.trim())}`, { cache: "no-store" });
+        const next = await res.json();
+        if (res.ok && typeof next.recipeHash === "string") setLoadedRecipeHash(next.recipeHash);
+      } catch {
+        setLoadedRecipeHash(null);
+      }
 
       flashMessage(`Saved team recipe: ${json.filePath}`, "success");
     } catch (e: unknown) {
@@ -425,8 +444,10 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
                   !teamIdValid ||
                   !targetIdValid ||
                   targetIsBuiltin ||
-                  // If we don't have hashes yet (e.g. you haven't loaded), allow publish so users can force-sync.
-                  (loadedRecipeHash !== null && loadedRecipeHash === teamMetaRecipeHash)
+                  // Enabled only when there are unpropagated (saved) changes.
+                  !loadedRecipeHash ||
+                  !teamMetaRecipeHash ||
+                  loadedRecipeHash === teamMetaRecipeHash
                 }
                 onClick={async () => {
                   setSaving(true);
@@ -866,7 +887,10 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
           <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Recipe markdown</div>
           <textarea
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={(e) => {
+              setContent(e.target.value);
+              setLoadedRecipeHash(null);
+            }}
             className="mt-2 h-[55vh] w-full resize-none rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-3 font-mono text-xs text-[color:var(--ck-text-primary)]"
             spellCheck={false}
           />
