@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { parse as parseYaml } from "yaml";
 import { useRouter } from "next/navigation";
 import { DeleteTeamModal } from "./DeleteTeamModal";
 import { PublishChangesModal } from "./PublishChangesModal";
@@ -83,24 +82,6 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
 
   const [teamAgents, setTeamAgents] = useState<Array<{ id: string; identityName?: string }>>([]);
   const [teamAgentsLoading, setTeamAgentsLoading] = useState(false);
-
-  const recipeAgents = useMemo(() => {
-    const md = String(content ?? "");
-    if (!md.startsWith("---\n")) return [] as Array<{ role: string; name?: string }>;
-    const end = md.indexOf("\n---\n", 4);
-    if (end === -1) return [] as Array<{ role: string; name?: string }>;
-    const fmText = md.slice(4, end + 1);
-    try {
-      const fm = (parseYaml(fmText) ?? {}) as { agents?: unknown };
-      const agents = Array.isArray(fm.agents) ? fm.agents : [];
-      return agents
-        .map((a) => a as { role?: unknown; name?: unknown })
-        .map((a) => ({ role: String(a.role ?? "").trim(), name: typeof a.name === "string" ? a.name : undefined }))
-        .filter((a) => Boolean(a.role));
-    } catch {
-      return [] as Array<{ role: string; name?: string }>;
-    }
-  }, [content]);
 
   const [newRole, setNewRole] = useState<string>("");
   const [customRole, setCustomRole] = useState<string>("");
@@ -582,7 +563,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
         <div className="mt-6 ck-glass-strong p-4">
           <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Agents in this team</div>
           <p className="mt-2 text-sm text-[color:var(--ck-text-secondary)]">
-            This editor updates the <code>agents:</code> list in your custom team recipe (<code>{toId}</code>). Changes won’t affect installed agents until you publish.
+            Add/remove agents by updating the <code>agents:</code> list in your custom team recipe (<code>{toId}</code>).
           </p>
 
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -600,8 +581,8 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
                   }
                   setCustomRole("");
                   if (v) {
-                    const match = recipeAgents.find((a) => a.role === v);
-                    setNewRoleName(match?.name || "");
+                    const match = teamAgents.find((a) => a.id === v);
+                    setNewRoleName(match?.identityName || "");
                   } else {
                     setNewRoleName("");
                   }
@@ -609,15 +590,15 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
                 className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
               >
                 <option value="">Select…</option>
-                {recipeAgents.map((a) => (
-                  <option key={a.role} value={a.role}>
-                    {a.name || a.role}
+                {teamAgents.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.identityName || a.id}
                   </option>
                 ))}
-                <option value="__custom__">New role…</option>
+                <option value="__custom__">Custom role…</option>
               </select>
               <div className="mt-1 text-xs text-[color:var(--ck-text-tertiary)]">
-                This list is based on the current recipe’s <code>agents:</code> frontmatter.
+                For now this list is based on detected installed team agents. Choose “Custom role…” to type a new role.
               </div>
             </div>
 
