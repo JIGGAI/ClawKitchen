@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { runOpenClaw } from "@/lib/openclaw";
 import RecipeEditor from "./RecipeEditor";
 
@@ -25,11 +24,9 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
   const { id } = await params;
   const kind = await getKind(id);
 
-  // Team recipes should use the Team editor UI.
-  if (kind === "team") {
-    // Team recipes map directly to /teams/<teamId> (no extra "-team" suffix).
-    redirect(`/teams/${encodeURIComponent(id)}`);
-  }
+  // NOTE: We do NOT redirect team recipes to /teams/<id>.
+  // /recipes/<id> is the recipe editor/preview surface; /teams/<id> is the installed team editor.
+  void kind;
 
   return (
     <main className="min-h-screen p-8">

@@ -32,17 +32,18 @@ type TeamRecipeFrontmatter = {
     message?: string;
     enabledByDefault?: boolean;
   }>;
+  // ClawRecipes team recipes define agents at top-level `agents:`
+  agents?: Array<{
+    role?: string;
+    name?: string;
+    tools?: {
+      profile?: string;
+      allow?: string[];
+      deny?: string[];
+    };
+  }>;
   team?: {
     teamId?: string;
-    agents?: Array<{
-      role?: string;
-      name?: string;
-      tools?: {
-        profile?: string;
-        allow?: string[];
-        deny?: string[];
-      };
-    }>;
   };
   templates?: Record<string, string>;
 };
@@ -97,7 +98,7 @@ export default function RecipeEditor({ recipeId }: { recipeId: string }) {
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [content, setContent] = useState<string>("");
   const [message, setMessage] = useState<string>("");
-  const [scaffoldOut, setScaffoldOut] = useState<string>("");
+  // (scaffold output removed from UI)
 
   // Team create modal state
   const [createOpen, setCreateOpen] = useState(false);
@@ -154,29 +155,7 @@ export default function RecipeEditor({ recipeId }: { recipeId: string }) {
     }
   }
 
-  async function onScaffold() {
-    if (!recipe) return;
-    setScaffoldOut("");
-    setMessage("");
-    try {
-      const res = await fetch("/api/scaffold", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          kind: recipe.kind,
-          recipeId: recipe.id,
-          applyConfig: false,
-          overwrite: false,
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Scaffold failed");
-      setScaffoldOut([json.stdout, json.stderr].filter(Boolean).join("\n"));
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setScaffoldOut(msg);
-    }
-  }
+  // NOTE: Removed dedicated Scaffold action/output from UI.
 
   function openCreateTeam() {
     setCreateMsg("");
@@ -244,12 +223,6 @@ export default function RecipeEditor({ recipeId }: { recipeId: string }) {
 
         <div className="flex gap-2">
           <button
-            onClick={onScaffold}
-            className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15"
-          >
-            Scaffold
-          </button>
-          <button
             disabled={!canSave || saving}
             onClick={onSave}
             className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] transition-colors hover:bg-[var(--ck-accent-red-hover)] active:bg-[var(--ck-accent-red-active)] disabled:opacity-50"
@@ -301,30 +274,12 @@ export default function RecipeEditor({ recipeId }: { recipeId: string }) {
             ) : null}
 
             <div className="mt-4 space-y-3">
-              <details className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/15 p-3" open>
-                <summary className="cursor-pointer text-sm font-medium text-[color:var(--ck-text-primary)]">
-                  Metadata
-                </summary>
-                <div className="mt-2 space-y-1 text-xs text-[color:var(--ck-text-secondary)]">
-                  <div>
-                    <span className="text-[color:var(--ck-text-tertiary)]">Recipe id:</span> {fm?.id ?? recipe.id}
-                  </div>
-                  <div>
-                    <span className="text-[color:var(--ck-text-tertiary)]">Version:</span> {fm?.version ?? "(unknown)"}
-                  </div>
-                  <div>
-                    <span className="text-[color:var(--ck-text-tertiary)]">Team id:</span> {fm?.team?.teamId ?? "(not set)"}
-                  </div>
-                  {fm?.description ? <div className="whitespace-pre-wrap">{fm.description}</div> : null}
-                </div>
-              </details>
-
               <details className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/15 p-3">
                 <summary className="cursor-pointer text-sm font-medium text-[color:var(--ck-text-primary)]">
-                  Agents ({fm?.team?.agents?.length ?? 0})
+                  Agents ({fm?.agents?.length ?? 0})
                 </summary>
                 <div className="mt-2 space-y-2">
-                  {(fm?.team?.agents ?? []).map((a, idx) => (
+                  {(fm?.agents ?? []).map((a, idx) => (
                     <details
                       key={`${a.role ?? "agent"}:${idx}`}
                       className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3"
@@ -358,7 +313,7 @@ export default function RecipeEditor({ recipeId }: { recipeId: string }) {
                       </div>
                     </details>
                   ))}
-                  {(!fm?.team?.agents || fm.team.agents.length === 0) ? (
+                  {(!fm?.agents || fm.agents.length === 0) ? (
                     <div className="text-xs text-[color:var(--ck-text-tertiary)]">(No agents listed in frontmatter)</div>
                   ) : null}
                 </div>
@@ -409,13 +364,22 @@ export default function RecipeEditor({ recipeId }: { recipeId: string }) {
                 </div>
               </details>
 
-              <details className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/15 p-3">
+              <details className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/15 p-3" open>
                 <summary className="cursor-pointer text-sm font-medium text-[color:var(--ck-text-primary)]">
-                  Scaffold output
+                  Metadata
                 </summary>
-                <pre className="mt-2 h-[30vh] w-full overflow-auto rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-3 text-xs text-[color:var(--ck-text-primary)]">
-                  {scaffoldOut || "(no output yet)"}
-                </pre>
+                <div className="mt-2 space-y-1 text-xs text-[color:var(--ck-text-secondary)]">
+                  <div>
+                    <span className="text-[color:var(--ck-text-tertiary)]">Recipe id:</span> {fm?.id ?? recipe.id}
+                  </div>
+                  <div>
+                    <span className="text-[color:var(--ck-text-tertiary)]">Version:</span> {fm?.version ?? "(unknown)"}
+                  </div>
+                  <div>
+                    <span className="text-[color:var(--ck-text-tertiary)]">Team id:</span> {fm?.team?.teamId ?? "(not set)"}
+                  </div>
+                  {fm?.description ? <div className="whitespace-pre-wrap">{fm.description}</div> : null}
+                </div>
               </details>
 
               <p className="text-xs text-[color:var(--ck-text-tertiary)]">
@@ -425,10 +389,10 @@ export default function RecipeEditor({ recipeId }: { recipeId: string }) {
           </div>
         ) : (
           <div className="ck-glass-strong p-4">
-            <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Scaffold output</div>
-            <pre className="mt-2 h-[70vh] w-full overflow-auto rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-3 text-xs text-[color:var(--ck-text-primary)]">
-              {scaffoldOut || "(no output yet)"}
-            </pre>
+            <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Agent recipe</div>
+            <div className="mt-1 text-xs text-[color:var(--ck-text-tertiary)]">
+              (Agent recipe preview panel coming soon — use the markdown editor on the left.)
+            </div>
           </div>
         )}
       </div>
@@ -506,8 +470,7 @@ export default function RecipeEditor({ recipeId }: { recipeId: string }) {
       ) : null}
 
       <p className="mt-6 text-xs text-[color:var(--ck-text-tertiary)]">
-        Phase 1: Scaffold button runs <code>openclaw recipes scaffold</code> or <code>scaffold-team</code>. The right panel adds a
-        lightweight preview for team recipes (agents + cron jobs) and a Create Team flow.
+        This page edits the recipe markdown and previews what will be created when you click Create Team.
       </p>
     </div>
   );
