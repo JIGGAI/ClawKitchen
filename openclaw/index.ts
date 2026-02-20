@@ -117,21 +117,54 @@ const kitchenPlugin = {
         cmd
           .command("status")
           .description("Print Kitchen status")
-          .action(() => {
+          .action(async () => {
             const host = String(cfg.host || "127.0.0.1").trim();
             const port = Number(cfg.port || 7777);
-            console.log(
-              JSON.stringify(
-                {
-                  ok: true,
-                  running: Boolean(server),
-                  url: `http://${host}:${port}`,
-                  startedAt,
-                },
-                null,
-                2,
-              ),
-            );
+            const url = `http://${host}:${port}`;
+
+            // Do a real health check so status works even when the service is running
+            // in a different process/context than this CLI handler.
+            const healthUrl = `${url}/healthz`;
+
+            const result: {
+              ok: boolean;
+              running: boolean;
+              url: string;
+              startedAt: string | null;
+              error?: string;
+            } = { ok: true, running: false, url, startedAt: null };
+
+            try {
+              const json = await new Promise<{ ok?: boolean; startedAt?: unknown }>((resolve, reject) => {
+                const req = http.get(healthUrl, (res) => {
+                  const status = res.statusCode || 0;
+                  let buf = "";
+                  res.setEncoding("utf8");
+                  res.on("data", (d) => (buf += d));
+                  res.on("end", () => {
+                    if (status < 200 || status >= 300) {
+                      reject(new Error(`healthz returned HTTP ${status}`));
+                      return;
+                    }
+                    try {
+                      resolve(JSON.parse(buf));
+                    } catch (e) {
+                      reject(e);
+                    }
+                  });
+                });
+                req.on("error", reject);
+              });
+
+              result.running = Boolean(json.ok);
+              result.startedAt = typeof json.startedAt === "string" ? json.startedAt : null;
+            } catch (e: unknown) {
+              result.running = false;
+              result.startedAt = null;
+              result.error = e instanceof Error ? e.message : String(e);
+            }
+
+            console.log(JSON.stringify(result, null, 2));
           });
 
         cmd
