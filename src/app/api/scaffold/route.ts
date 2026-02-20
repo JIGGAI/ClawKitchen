@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { runOpenClaw } from "@/lib/openclaw";
 import { readOpenClawConfig } from "@/lib/paths";
@@ -28,6 +29,10 @@ const asString = (v: unknown) => {
   return "";
 };
 
+function sha256(text: string) {
+  return crypto.createHash("sha256").update(text, "utf8").digest("hex");
+}
+
 function teamDirFromTeamId(baseWorkspace: string, teamId: string) {
   return path.resolve(baseWorkspace, "..", `workspace-${teamId}`);
 }
@@ -39,6 +44,16 @@ export async function POST(req: Request) {
   const body = (await req.json()) as ReqBody & { cronInstallChoice?: "yes" | "no" };
 
   const args: string[] = ["recipes", body.kind === "team" ? "scaffold-team" : "scaffold", body.recipeId];
+
+  // Used for "Publish changes" detection in the UI.
+  // Best-effort only (we don't want to block scaffolding on hashing).
+  let recipeHash: string | null = null;
+  try {
+    const shown = await runOpenClaw(["recipes", "show", body.recipeId]);
+    if (shown.ok) recipeHash = sha256(shown.stdout);
+  } catch {
+    // ignore
+  }
 
   if (body.overwrite) args.push("--overwrite");
   if (body.applyConfig) args.push("--apply-config");
@@ -56,7 +71,41 @@ export async function POST(req: Request) {
   const override = body.cronInstallChoice;
 
   try {
-    // Collision guards: do not allow creating a team/agent that already exists unless --overwrite was explicitly set.
+    // Collision guards: site-wide rules.
+    // 1) Do not allow creating a team/agent with an id that collides with ANY recipe id.
+    // 2) Do not allow creating a team/agent that already exists unless overwrite was explicitly set.
+    {
+      const recipesRes = await runOpenClaw(["recipes", "list"]);
+      if (recipesRes.ok) {
+        try {
+          const recipes = JSON.parse(recipesRes.stdout) as Array<{ id?: unknown }>;
+          const recipeIds = new Set(recipes.map((r) => String(r.id ?? "").trim()).filter(Boolean));
+
+          if (body.kind === "agent") {
+            const agentId = String(body.agentId ?? "").trim();
+            if (agentId && recipeIds.has(agentId)) {
+              return NextResponse.json(
+                { ok: false, error: `Agent id cannot match an existing recipe id: ${agentId}. Choose a new agent id.` },
+                { status: 409 },
+              );
+            }
+          }
+
+          if (body.kind === "team") {
+            const teamId = String(body.teamId ?? "").trim();
+            if (teamId && recipeIds.has(teamId)) {
+              return NextResponse.json(
+                { ok: false, error: `Team id cannot match an existing recipe id: ${teamId}. Choose a new team id.` },
+                { status: 409 },
+              );
+            }
+          }
+        } catch {
+          // ignore parse errors
+        }
+      }
+    }
+
     if (!body.overwrite) {
       if (body.kind === "agent") {
         const agentId = String(body.agentId ?? "").trim();
@@ -161,6 +210,7 @@ export async function POST(req: Request) {
               teamId,
               recipeId: body.recipeId,
               ...(recipeName ? { recipeName } : {}),
+              ...(recipeHash ? { recipeHash } : {}),
               scaffoldedAt: now,
               attachedAt: now,
             };
@@ -203,6 +253,7 @@ export async function POST(req: Request) {
               agentId,
               recipeId: body.recipeId,
               ...(recipeName ? { recipeName } : {}),
+              ...(recipeHash ? { recipeHash } : {}),
               scaffoldedAt: now,
               attachedAt: now,
             };

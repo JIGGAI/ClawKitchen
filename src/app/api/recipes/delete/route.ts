@@ -84,12 +84,17 @@ export async function POST(req: Request) {
   if (kind === "agent") {
     // Agent recipes can scaffold many agents with different agentIds.
     // We treat any agents/<agentId>/agent.json referencing this recipe as "in use".
+    // Additionally, if an active agent exists with the SAME id as the recipe, we must block deletion
+    // (older installs may not have agent.json provenance yet).
     const agentsRes = await runOpenClaw(["agents", "list", "--json"]);
     const attachedAgents: string[] = [];
+    let hasSameIdAgent = false;
 
     if (agentsRes.ok) {
       try {
         const agents = JSON.parse(agentsRes.stdout) as Array<{ id?: unknown }>;
+        hasSameIdAgent = agents.some((a) => String(a.id ?? "").trim() === id);
+
         for (const a of agents) {
           const agentId = String(a.id ?? "").trim();
           if (!agentId) continue;
@@ -105,6 +110,17 @@ export async function POST(req: Request) {
       } catch {
         // ignore
       }
+    }
+
+    if (hasSameIdAgent) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `Agent recipe ${id} cannot be deleted because an active agent exists with the same id: ${id}. Delete the agent first, then delete the recipe.`,
+          details: { agentId: id },
+        },
+        { status: 409 },
+      );
     }
 
     if (attachedAgents.length) {

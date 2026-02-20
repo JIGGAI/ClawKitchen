@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CloneTeamModal } from "./CloneTeamModal";
 import { DeleteTeamModal } from "./DeleteTeamModal";
 import { useToast } from "@/components/ToastProvider";
 
@@ -50,15 +49,16 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
   const [toId, setToId] = useState<string>(teamId);
   const [toName, setToName] = useState<string>(teamId);
   const [content, setContent] = useState<string>("");
+  const [loadedRecipeHash, setLoadedRecipeHash] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"recipe" | "agents" | "skills" | "cron" | "files">("recipe");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loadingSource, setLoadingSource] = useState(false);
   const toast = useToast();
 
-  const [cloneOpen, setCloneOpen] = useState(false);
-  const [cloneNonce, setCloneNonce] = useState(0);
   const [deleteOpen, setDeleteOpen] = useState(false);
+
+  const [teamMetaRecipeHash, setTeamMetaRecipeHash] = useState<string | null>(null);
 
   function flashMessage(next: string, kind: "success" | "error" | "info" = "info") {
     const msg = String(next ?? "").trim();
@@ -124,11 +124,15 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
         try {
           const metaJson = await metaRes.json();
           if (metaRes.ok && metaJson.ok && metaJson.meta && (metaJson.meta as { recipeId?: unknown }).recipeId) {
-            const m = metaJson.meta as { recipeId?: unknown; recipeName?: unknown };
+            const m = metaJson.meta as { recipeId?: unknown; recipeName?: unknown; recipeHash?: unknown };
             locked = {
               recipeId: String(m.recipeId),
               recipeName: typeof m.recipeName === "string" ? m.recipeName : undefined,
             };
+            const h = typeof m.recipeHash === "string" ? m.recipeHash : null;
+            setTeamMetaRecipeHash(h);
+          } else {
+            setTeamMetaRecipeHash(null);
           }
         } catch {
           // ignore
@@ -231,6 +235,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
       }
       const r = json.recipe as RecipeDetail;
       setContent(r.content);
+      setLoadedRecipeHash(typeof json.recipeHash === "string" ? json.recipeHash : null);
       flashMessage(`Loaded team recipe: ${r.id}`, "success");
     } catch (e: unknown) {
       flashMessage(e instanceof Error ? e.message : String(e), "error");
@@ -286,6 +291,9 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
       } else {
         setContent(json.content);
       }
+
+      // Content changed; hash is now stale until we reload.
+      setLoadedRecipeHash(null);
 
       flashMessage(`Saved team recipe: ${json.filePath}`, "success");
     } catch (e: unknown) {
@@ -410,14 +418,54 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
               </button>
 
               <button
-                disabled={saving || !teamIdValid || targetIsBuiltin}
-                onClick={() => {
-                  setCloneNonce((n) => n + 1);
-                  setCloneOpen(true);
+                disabled={
+                  saving ||
+                  !teamIdValid ||
+                  !targetIdValid ||
+                  targetIsBuiltin ||
+                  // If we don't have hashes yet (e.g. you haven't loaded), allow publish so users can force-sync.
+                  (loadedRecipeHash !== null && loadedRecipeHash === teamMetaRecipeHash)
+                }
+                onClick={async () => {
+                  setSaving(true);
+                  try {
+                    const res = await fetch("/api/scaffold", {
+                      method: "POST",
+                      headers: { "content-type": "application/json" },
+                      body: JSON.stringify({
+                        kind: "team",
+                        recipeId: toId.trim(),
+                        teamId,
+                        overwrite: true,
+                        applyConfig: true,
+                      }),
+                    });
+                    const json = await res.json();
+                    if (!res.ok || !json.ok) throw new Error(json.error || "Publish failed");
+
+                    // Refresh team meta so we can reflect published hash/state.
+                    try {
+                      const metaRes = await fetch(`/api/teams/meta?teamId=${encodeURIComponent(teamId)}`, {
+                        cache: "no-store",
+                      });
+                      const metaJson = await metaRes.json();
+                      if (metaRes.ok && metaJson.ok && metaJson.meta && typeof metaJson.meta.recipeHash === "string") {
+                        setTeamMetaRecipeHash(metaJson.meta.recipeHash);
+                      }
+                    } catch {
+                      // ignore
+                    }
+
+                    flashMessage("Published changes to active team", "success");
+                  } catch (e: unknown) {
+                    flashMessage(e instanceof Error ? e.message : String(e), "error");
+                  } finally {
+                    setSaving(false);
+                  }
                 }}
-                className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15 disabled:opacity-50"
+                className="rounded-[var(--ck-radius-sm)] bg-emerald-600 px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] transition-colors hover:bg-emerald-500 active:bg-emerald-700 disabled:opacity-50"
               >
-                Clone Team
+                {saving ? "Publishing…" : "Publish changes"}
               </button>
 
               <button
@@ -466,7 +514,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
                 <strong>Save</strong> writes/overwrites the custom recipe file identified by “Team id”.
               </li>
               <li>
-                <strong>Clone Team</strong> creates a new custom recipe copy (fails if it already exists).
+                <strong>Publish changes</strong> re-scaffolds this team from your current custom recipe and applies config (safe overwrite).
               </li>
               <li>
                 <strong>Delete Team</strong> runs the safe uninstall command (<code>openclaw recipes remove-team</code>).
@@ -571,7 +619,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
                     </div>
                     <a
                       className="text-sm font-medium text-[color:var(--ck-accent-red)] hover:text-[color:var(--ck-accent-red-hover)]"
-                      href={`/agents/${encodeURIComponent(a.id)}`}
+                      href={`/agents/${encodeURIComponent(a.id)}?returnTo=${encodeURIComponent(`/teams/${teamId}?tab=agents`)}`}
                     >
                       Edit
                     </a>
@@ -809,20 +857,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
         </div>
       ) : null}
 
-      <CloneTeamModal
-        key={cloneNonce}
-        open={cloneOpen}
-        onClose={() => setCloneOpen(false)}
-        recipes={recipes}
-        onConfirm={async ({ id, name, scaffold }) => {
-          setCloneOpen(false);
-          // Set the target fields for UI, but DO NOT rely on them for the clone.
-          // Clone must use the modal-provided id/name.
-          setToId(id);
-          setToName(name);
-          await onSaveCustom(false, { toId: id, toName: name, scaffold });
-        }}
-      />
+      {/* Clone Team removed (per #0075). */}
 
       <DeleteTeamModal
         open={deleteOpen}
