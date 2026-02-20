@@ -700,8 +700,30 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
           </div>
 
           <div className="mt-6">
-            <div className="text-xs font-medium text-[color:var(--ck-text-secondary)]">Detected installed team agents (read-only)</div>
-            <ul className="mt-2 space-y-2">
+            <div className="text-xs font-medium text-[color:var(--ck-text-secondary)]">Installed team agents</div>
+
+            <div className="mt-2 max-w-md">
+              <label className="block text-xs font-medium text-[color:var(--ck-text-secondary)]">Open agent</label>
+              <select
+                value={""}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (!v) return;
+                  router.push(`/agents/${encodeURIComponent(v)}?returnTo=${encodeURIComponent(`/teams/${teamId}?tab=agents`)}`);
+                }}
+                className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                disabled={teamAgentsLoading || !teamAgents.length}
+              >
+                <option value="">Select an agent…</option>
+                {teamAgents.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.identityName || a.id}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <ul className="mt-4 space-y-2">
               {teamAgents.length ? (
                 teamAgents.map((a) => (
                   <li key={a.id} className="flex items-center justify-between gap-3">
