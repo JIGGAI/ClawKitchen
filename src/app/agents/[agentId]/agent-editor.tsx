@@ -101,7 +101,9 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
   const [fileName, setFileName] = useState<string>("IDENTITY.md");
   const [fileContent, setFileContent] = useState<string>("");
 
-  const [saveAsNewId, setSaveAsNewId] = useState<string>("");
+
+
+  const teamId = agentId.includes("-") ? agentId.split("-").slice(0, -1).join("-") : "";
 
   useEffect(() => {
     (async () => {
@@ -190,27 +192,6 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
     }
   }
 
-  async function onSaveAsNew() {
-    const newAgentId = saveAsNewId.trim();
-    if (!newAgentId) return setMessage("New agent id is required");
-
-    setSaving(true);
-    setMessage("");
-    try {
-      const res = await fetch("/api/agents/add", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ newAgentId, name, emoji, theme, avatar, model: agent?.model }),
-      });
-      const json = (await res.json()) as { message?: string; error?: string };
-      if (!res.ok) throw new Error(json.message || json.error || "Save As New failed");
-      setMessage(`Created new agent: ${newAgentId}`);
-    } catch (e: unknown) {
-      setMessage(e instanceof Error ? e.message : String(e));
-    } finally {
-      setSaving(false);
-    }
-  }
 
   async function onLoadAgentFile(nextName: string) {
     setLoadingFile(true);
@@ -317,6 +298,9 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
       {agent.workspace ? (
         <div className="mt-1 text-xs text-[color:var(--ck-text-tertiary)]">Workspace: {agent.workspace}</div>
       ) : null}
+      {teamId ? (
+        <div className="mt-1 text-xs text-[color:var(--ck-text-tertiary)]">Team: {teamId}</div>
+      ) : null}
 
       <div className="mt-6 flex flex-wrap gap-2">
         {(
@@ -391,28 +375,6 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
               >
                 {saving ? "Saving…" : "Save"}
               </button>
-            </div>
-
-            <div className="mt-4 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3">
-              <div className="text-xs font-medium text-[color:var(--ck-text-secondary)]">Save As New (new agent id)</div>
-              <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
-                <input
-                  value={saveAsNewId}
-                  onChange={(e) => setSaveAsNewId(e.target.value)}
-                  placeholder={`${agentId}-copy`}
-                  className="w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
-                />
-                <button
-                  disabled={saving}
-                  onClick={onSaveAsNew}
-                  className="shrink-0 rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15 disabled:opacity-50"
-                >
-                  {saving ? "Saving…" : "Save As New"}
-                </button>
-              </div>
-              <p className="mt-2 text-xs text-[color:var(--ck-text-tertiary)]">
-                This adds a new agent entry to OpenClaw config and restarts the gateway.
-              </p>
             </div>
           </div>
         ) : null}
