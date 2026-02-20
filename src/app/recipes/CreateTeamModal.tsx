@@ -187,7 +187,7 @@ export function CreateTeamModal({
               </button>
               <button
                 type="button"
-                disabled={busy || !effectiveId.trim() || availability.state === "taken" || availability.state === "checking"}
+                disabled={busy || !effectiveId.trim()}
                 onClick={onConfirm}
                 className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] hover:bg-[var(--ck-accent-red-hover)] disabled:opacity-50"
               >

@@ -2,8 +2,9 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
+import YAML from "yaml";
 import { runOpenClaw } from "@/lib/openclaw";
-import { readOpenClawConfig } from "@/lib/paths";
+import { readOpenClawConfig, getWorkspaceRecipesDir } from "@/lib/paths";
 
 type ReqBody =
   | {
@@ -218,6 +219,34 @@ export async function POST(req: Request) {
 
             await fs.mkdir(teamDir, { recursive: true });
             await fs.writeFile(path.join(teamDir, TEAM_META_FILE), JSON.stringify(meta, null, 2) + "\n", "utf8");
+          }
+
+          // Best-effort: ensure the generated workspace recipe's `team.teamId` matches the new team id.
+          // Some template recipes carry a `team.teamId` that should not leak into cloned/scaffolded copies.
+          try {
+            const recipesDir = await getWorkspaceRecipesDir();
+            const recipePath = path.join(recipesDir, `${teamId}.md`);
+            const md = await fs.readFile(recipePath, "utf8");
+            if (md.startsWith("---\n")) {
+              const end = md.indexOf("\n---\n", 4);
+              if (end !== -1) {
+                const yamlText = md.slice(4, end + 1);
+                const rest = md.slice(end + 5);
+                const fm = (YAML.parse(yamlText) ?? {}) as Record<string, unknown>;
+                const nextFm: Record<string, unknown> = {
+                  ...fm,
+                  team: {
+                    ...(typeof fm.team === "object" && fm.team ? (fm.team as Record<string, unknown>) : {}),
+                    teamId,
+                  },
+                };
+                const nextYaml = YAML.stringify(nextFm).trimEnd();
+                const nextMd = `---\n${nextYaml}\n---\n${rest}`;
+                if (nextMd !== md) await fs.writeFile(recipePath, nextMd, "utf8");
+              }
+            }
+          } catch {
+            // ignore
           }
         } catch {
           // best-effort only; scaffold should still succeed
