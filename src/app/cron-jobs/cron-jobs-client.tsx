@@ -39,7 +39,12 @@ export default function CronJobsClient() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const sorted = useMemo(() => {
-    return [...jobs].sort((a, b) => String(a.name ?? "").localeCompare(String(b.name ?? "")));
+    return [...jobs].sort((a, b) => {
+      const ae = Boolean(a.enabled);
+      const be = Boolean(b.enabled);
+      if (ae !== be) return ae ? -1 : 1; // enabled first
+      return String(a.name ?? "").localeCompare(String(b.name ?? ""));
+    });
   }, [jobs]);
 
   async function refresh() {

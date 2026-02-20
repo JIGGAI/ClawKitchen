@@ -54,6 +54,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
   const [activeTab, setActiveTab] = useState<"recipe" | "agents" | "skills" | "cron" | "files">("recipe");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   const [loadingSource, setLoadingSource] = useState(false);
   const [recipeLoadError, setRecipeLoadError] = useState<string>("");
   const toast = useToast();
@@ -116,6 +117,8 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
     setContent("");
     setLoadedRecipeHash(null);
     setTeamMetaRecipeHash(null);
+    setPublishOpen(false);
+    setDeleteOpen(false);
   }, [teamId]);
 
   useEffect(() => {
@@ -495,7 +498,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
                 onClick={() => setPublishOpen(true)}
                 className="rounded-[var(--ck-radius-sm)] bg-emerald-600 px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] transition-colors hover:bg-emerald-500 active:bg-emerald-700 disabled:opacity-50"
               >
-                {saving ? "Publishing…" : "Publish changes"}
+                {publishing ? "Publishing…" : "Publish changes"}
               </button>
 
               <button
@@ -932,10 +935,10 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
         open={publishOpen}
         teamId={teamId}
         recipeId={toId}
-        busy={saving}
+        busy={publishing}
         onClose={() => setPublishOpen(false)}
         onConfirm={async () => {
-          setSaving(true);
+          setPublishing(true);
           try {
             const res = await fetch("/api/scaffold", {
               method: "POST",
@@ -969,7 +972,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
           } catch (e: unknown) {
             flashMessage(e instanceof Error ? e.message : String(e), "error");
           } finally {
-            setSaving(false);
+            setPublishing(false);
           }
         }}
       />

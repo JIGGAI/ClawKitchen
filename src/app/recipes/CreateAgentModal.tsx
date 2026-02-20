@@ -26,6 +26,8 @@ export function CreateAgentModal({
   setAgentId,
   agentName,
   setAgentName,
+  existingRecipeIds,
+  existingAgentIds,
   busy,
   error,
   onClose,
@@ -38,6 +40,8 @@ export function CreateAgentModal({
   setAgentId: (v: string) => void;
   agentName: string;
   setAgentName: (v: string) => void;
+  existingRecipeIds: string[];
+  existingAgentIds: string[];
   busy?: boolean;
   error?: string | null;
   onClose: () => void;
@@ -66,7 +70,9 @@ export function CreateAgentModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // Check id availability (debounced).
+  // Check id availability.
+  // Fast path: local check (recipes list + agent list already in memory).
+  // Slow path: server check for any edge cases.
   useEffect(() => {
     if (!open) return;
     const v = String(effectiveId ?? "").trim();
@@ -75,6 +81,19 @@ export function CreateAgentModal({
       return;
     }
 
+    // Local rules (instant)
+    if (existingRecipeIds.includes(v)) {
+      setAvailability({ state: "taken", reason: "recipe-id-collision" });
+      return;
+    }
+    if (existingAgentIds.includes(v)) {
+      setAvailability({ state: "taken", reason: "agent-exists" });
+      return;
+    }
+
+    setAvailability({ state: "available" });
+
+    // Server confirm (debounced)
     const t = setTimeout(() => {
       void (async () => {
         setAvailability({ state: "checking" });
@@ -85,13 +104,13 @@ export function CreateAgentModal({
           if (json.available) setAvailability({ state: "available" });
           else setAvailability({ state: "taken", reason: json.reason });
         } catch {
-          setAvailability({ state: "empty" });
+          setAvailability({ state: "available" });
         }
       })();
-    }, 500);
+    }, 250);
 
     return () => clearTimeout(t);
-  }, [effectiveId, open]);
+  }, [effectiveId, open, existingRecipeIds, existingAgentIds]);
 
   if (!open) return null;
 

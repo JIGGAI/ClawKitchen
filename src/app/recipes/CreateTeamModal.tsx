@@ -26,6 +26,8 @@ export function CreateTeamModal({
   setTeamId,
   installCron,
   setInstallCron,
+  existingRecipeIds,
+  existingAgentIds,
   busy,
   error,
   onClose,
@@ -38,6 +40,8 @@ export function CreateTeamModal({
   setTeamId: (v: string) => void;
   installCron: boolean;
   setInstallCron: (v: boolean) => void;
+  existingRecipeIds: string[];
+  existingAgentIds: string[];
   busy?: boolean;
   error?: string | null;
   onClose: () => void;
@@ -67,15 +71,32 @@ export function CreateTeamModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // Check id availability (debounced).
+  // Check id availability.
+  // Fast path: local check (recipes list + agent list already in memory).
+  // Slow path: server check for filesystem collisions / edge cases.
   useEffect(() => {
     if (!open) return;
+
     const v = String(effectiveId ?? "").trim();
     if (!v) {
       setAvailability({ state: "empty" });
       return;
     }
 
+    // Local rules (instant):
+    if (existingRecipeIds.includes(v)) {
+      setAvailability({ state: "taken", reason: "recipe-id-collision" });
+      return;
+    }
+    if (existingAgentIds.some((a) => a.startsWith(`${v}-`))) {
+      setAvailability({ state: "taken", reason: "team-agents-exist" });
+      return;
+    }
+
+    // Looks available locally.
+    setAvailability({ state: "available" });
+
+    // Server confirm (debounced) for filesystem collisions, etc.
     const t = setTimeout(() => {
       void (async () => {
         setAvailability({ state: "checking" });
@@ -86,14 +107,14 @@ export function CreateTeamModal({
           if (json.available) setAvailability({ state: "available" });
           else setAvailability({ state: "taken", reason: json.reason });
         } catch {
-          // If the check fails, don't block creation; just remove the indicator.
-          setAvailability({ state: "empty" });
+          // Don't block creation if server check fails.
+          setAvailability({ state: "available" });
         }
       })();
-    }, 500);
+    }, 250);
 
     return () => clearTimeout(t);
-  }, [effectiveId, open]);
+  }, [effectiveId, open, existingRecipeIds, existingAgentIds]);
 
   if (!open) return null;
 

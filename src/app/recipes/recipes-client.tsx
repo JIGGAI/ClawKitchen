@@ -345,6 +345,8 @@ export default function RecipesClient({
         setTeamId={setCreateTeamId}
         installCron={installCron}
         setInstallCron={setInstallCron}
+        existingRecipeIds={[...builtin, ...customTeamRecipes, ...customAgentRecipes].map((r) => r.id)}
+        existingAgentIds={installedAgentIds}
         busy={createBusy}
         error={createError}
         onClose={() => setCreateOpen(false)}
@@ -359,6 +361,8 @@ export default function RecipesClient({
         setAgentId={setCreateAgentId}
         agentName={createAgentName}
         setAgentName={setCreateAgentName}
+        existingRecipeIds={[...builtin, ...customTeamRecipes, ...customAgentRecipes].map((r) => r.id)}
+        existingAgentIds={installedAgentIds}
         busy={createAgentBusy}
         error={createAgentError}
         onClose={() => setCreateAgentOpen(false)}
