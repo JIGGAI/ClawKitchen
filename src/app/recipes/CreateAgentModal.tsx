@@ -88,7 +88,7 @@ export function CreateAgentModal({
           setAvailability({ state: "empty" });
         }
       })();
-    }, 250);
+    }, 500);
 
     return () => clearTimeout(t);
   }, [effectiveId, open]);

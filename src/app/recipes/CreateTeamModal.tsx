@@ -90,7 +90,7 @@ export function CreateTeamModal({
           setAvailability({ state: "empty" });
         }
       })();
-    }, 250);
+    }, 500);
 
     return () => clearTimeout(t);
   }, [effectiveId, open]);

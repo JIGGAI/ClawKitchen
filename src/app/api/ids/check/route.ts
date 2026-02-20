@@ -6,8 +6,64 @@ import { readOpenClawConfig } from "@/lib/paths";
 
 type Kind = "team" | "agent";
 
+type Snapshot = {
+  atMs: number;
+  recipeIds: Set<string>;
+  agentIds: Set<string>;
+};
+
+const SNAPSHOT_TTL_MS = 10_000;
+let snapshot: Snapshot | null = null;
+let snapshotPromise: Promise<Snapshot> | null = null;
+
 function normalizeId(v: unknown) {
   return String(v ?? "").trim();
+}
+
+async function getSnapshot(): Promise<Snapshot> {
+  const now = Date.now();
+  if (snapshot && now - snapshot.atMs < SNAPSHOT_TTL_MS) return snapshot;
+  if (snapshotPromise) return snapshotPromise;
+
+  snapshotPromise = (async () => {
+    const [recipesRes, agentsRes] = await Promise.all([
+      runOpenClaw(["recipes", "list"]),
+      runOpenClaw(["agents", "list", "--json"]),
+    ]);
+
+    const recipeIds = new Set<string>();
+    if (recipesRes.ok) {
+      try {
+        const items = JSON.parse(recipesRes.stdout) as Array<{ id?: unknown }>;
+        for (const r of items) {
+          const id = normalizeId(r.id);
+          if (id) recipeIds.add(id);
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    const agentIds = new Set<string>();
+    if (agentsRes.ok) {
+      try {
+        const items = JSON.parse(agentsRes.stdout) as Array<{ id?: unknown }>;
+        for (const a of items) {
+          const id = normalizeId(a.id);
+          if (id) agentIds.add(id);
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    const s: Snapshot = { atMs: now, recipeIds, agentIds };
+    snapshot = s;
+    snapshotPromise = null;
+    return s;
+  })();
+
+  return snapshotPromise;
 }
 
 export async function GET(req: Request) {
@@ -23,32 +79,15 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: true, available: false, reason: "empty" });
     }
 
+    const snap = await getSnapshot();
+
     // Disallow collisions with any recipe id.
-    const recipesRes = await runOpenClaw(["recipes", "list"]);
-    if (recipesRes.ok) {
-      try {
-        const items = JSON.parse(recipesRes.stdout) as Array<{ id?: unknown }>;
-        const ids = new Set(items.map((r) => normalizeId(r.id)).filter(Boolean));
-        if (ids.has(id)) {
-          return NextResponse.json({ ok: true, available: false, reason: "recipe-id-collision" });
-        }
-      } catch {
-        // ignore
-      }
+    if (snap.recipeIds.has(id)) {
+      return NextResponse.json({ ok: true, available: false, reason: "recipe-id-collision" });
     }
 
     if (kind === "agent") {
-      const agentsRes = await runOpenClaw(["agents", "list", "--json"]);
-      if (agentsRes.ok) {
-        try {
-          const agents = JSON.parse(agentsRes.stdout) as Array<{ id?: unknown }>;
-          const exists = agents.some((a) => normalizeId(a.id) === id);
-          if (exists) return NextResponse.json({ ok: true, available: false, reason: "agent-exists" });
-        } catch {
-          // ignore
-        }
-      }
-
+      if (snap.agentIds.has(id)) return NextResponse.json({ ok: true, available: false, reason: "agent-exists" });
       return NextResponse.json({ ok: true, available: true });
     }
 
@@ -68,16 +107,9 @@ export async function GET(req: Request) {
       // ignore
     }
 
-    const agentsRes = await runOpenClaw(["agents", "list", "--json"]);
-    if (agentsRes.ok) {
-      try {
-        const agents = JSON.parse(agentsRes.stdout) as Array<{ id?: unknown }>;
-        const hasAgents = agents.some((a) => normalizeId(a.id).startsWith(`${id}-`));
-        if (hasAgents) return NextResponse.json({ ok: true, available: false, reason: "team-agents-exist" });
-      } catch {
-        // ignore
-      }
-    }
+    const snap2 = await getSnapshot();
+    const hasAgents = Array.from(snap2.agentIds).some((a) => a.startsWith(`${id}-`));
+    if (hasAgents) return NextResponse.json({ ok: true, available: false, reason: "team-agents-exist" });
 
     return NextResponse.json({ ok: true, available: true });
   } catch (e: unknown) {

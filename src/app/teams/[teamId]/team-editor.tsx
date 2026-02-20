@@ -71,6 +71,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
 
   const [teamFiles, setTeamFiles] = useState<Array<{ name: string; missing: boolean; required: boolean; rationale?: string }>>([]);
   const [teamFilesLoading, setTeamFilesLoading] = useState(false);
+  const [teamFileError, setTeamFileError] = useState<string>("");
   const [showOptionalFiles, setShowOptionalFiles] = useState(false);
   const [fileName, setFileName] = useState<string>("SOUL.md");
   const [fileContent, setFileContent] = useState<string>("");
@@ -375,6 +376,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
 
   async function onLoadTeamFile(name: string) {
     setSaving(true);
+    setTeamFileError("");
     try {
       const res = await fetch(
         `/api/teams/file?teamId=${encodeURIComponent(teamId)}&name=${encodeURIComponent(name)}`,
@@ -385,7 +387,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
       setFileName(name);
       setFileContent(String(json.content ?? ""));
     } catch (e: unknown) {
-      flashMessage(e instanceof Error ? e.message : String(e), "error");
+      setTeamFileError(e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);
     }
@@ -393,6 +395,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
 
   async function onSaveTeamFile() {
     setSaving(true);
+    setTeamFileError("");
     try {
       const res = await fetch("/api/teams/file", {
         method: "PUT",
@@ -401,9 +404,9 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
       });
       const json = await res.json();
       if (!res.ok || !json.ok) throw new Error(json.error || "Failed to save file");
-      flashMessage(`Saved ${fileName}`, "success");
+      // No toast; keep file-related messaging local.
     } catch (e: unknown) {
-      flashMessage(e instanceof Error ? e.message : String(e), "error");
+      setTeamFileError(e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);
     }
@@ -883,6 +886,13 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
                 {saving ? "Saving…" : "Save file"}
               </button>
             </div>
+
+            {teamFileError ? (
+              <div className="mt-3 rounded-[var(--ck-radius-sm)] border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">
+                {teamFileError}
+              </div>
+            ) : null}
+
             <textarea
               value={fileContent}
               onChange={(e) => setFileContent(e.target.value)}
