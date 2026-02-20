@@ -33,7 +33,7 @@ Edit your OpenClaw config (`~/.openclaw/openclaw.json`) and add:
         "enabled": true,
         "config": {
           "enabled": true,
-          "dev": true,
+          "dev": false,
           "host": "127.0.0.1",
           "port": 7777,
           "authToken": ""
@@ -101,7 +101,7 @@ Update OpenClaw config:
           "host": "<tailscale-ip>",
           "port": 7777,
           "authToken": "<token>",
-          "dev": true
+          "dev": false
         }
       }
     }
