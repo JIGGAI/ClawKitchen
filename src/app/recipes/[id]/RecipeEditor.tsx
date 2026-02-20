@@ -24,8 +24,11 @@ type TeamRecipeFrontmatter = {
     id?: string;
     name?: string;
     schedule?: string;
+    timezone?: string;
     agentId?: string;
     channel?: string;
+    to?: string;
+    description?: string;
     message?: string;
     enabledByDefault?: boolean;
   }>;
@@ -41,6 +44,7 @@ type TeamRecipeFrontmatter = {
       };
     }>;
   };
+  templates?: Record<string, string>;
 };
 
 function parseFrontmatter(raw: string): { fm: TeamRecipeFrontmatter | null; error?: string } {
@@ -57,6 +61,32 @@ function parseFrontmatter(raw: string): { fm: TeamRecipeFrontmatter | null; erro
   } catch (e) {
     return { fm: null, error: e instanceof Error ? e.message : String(e) };
   }
+}
+
+function templateKeyToFileName(key: string): string {
+  const suffix = key.split(".").slice(1).join(".");
+  switch (suffix) {
+    case "soul":
+      return "SOUL.md";
+    case "agents":
+      return "AGENTS.md";
+    case "tools":
+      return "TOOLS.md";
+    case "identity":
+      return "IDENTITY.md";
+    case "install":
+      return "INSTALL.md";
+    default:
+      return suffix ? `${suffix.toUpperCase()}` : key;
+  }
+}
+
+function expectedFilesForRole(fm: TeamRecipeFrontmatter | null, role: string | undefined): string[] {
+  if (!fm || !role || !fm.templates) return [];
+  const keys = Object.keys(fm.templates).filter((k) => k.startsWith(`${role}.`));
+  const files = keys.map(templateKeyToFileName);
+  // De-dupe while preserving order
+  return [...new Set(files)];
 }
 
 export default function RecipeEditor({ recipeId }: { recipeId: string }) {
@@ -277,7 +307,13 @@ export default function RecipeEditor({ recipeId }: { recipeId: string }) {
                 </summary>
                 <div className="mt-2 space-y-1 text-xs text-[color:var(--ck-text-secondary)]">
                   <div>
+                    <span className="text-[color:var(--ck-text-tertiary)]">Recipe id:</span> {fm?.id ?? recipe.id}
+                  </div>
+                  <div>
                     <span className="text-[color:var(--ck-text-tertiary)]">Version:</span> {fm?.version ?? "(unknown)"}
+                  </div>
+                  <div>
+                    <span className="text-[color:var(--ck-text-tertiary)]">Team id:</span> {fm?.team?.teamId ?? "(not set)"}
                   </div>
                   {fm?.description ? <div className="whitespace-pre-wrap">{fm.description}</div> : null}
                 </div>
@@ -299,6 +335,9 @@ export default function RecipeEditor({ recipeId }: { recipeId: string }) {
                       </summary>
                       <div className="mt-2 space-y-1 text-xs text-[color:var(--ck-text-secondary)]">
                         <div>
+                          <span className="text-[color:var(--ck-text-tertiary)]">Role:</span> {a.role ?? "(none)"}
+                        </div>
+                        <div>
                           <span className="text-[color:var(--ck-text-tertiary)]">Tools profile:</span> {a.tools?.profile ?? "(default)"}
                         </div>
                         <div>
@@ -308,6 +347,13 @@ export default function RecipeEditor({ recipeId }: { recipeId: string }) {
                         <div>
                           <span className="text-[color:var(--ck-text-tertiary)]">Deny:</span>{" "}
                           {(a.tools?.deny ?? []).length ? (a.tools?.deny ?? []).join(", ") : "(none)"}
+                        </div>
+
+                        <div className="pt-1">
+                          <span className="text-[color:var(--ck-text-tertiary)]">Expected files:</span>{" "}
+                          {expectedFilesForRole(fm, a.role).length
+                            ? expectedFilesForRole(fm, a.role).join(", ")
+                            : "(not listed)"}
                         </div>
                       </div>
                     </details>

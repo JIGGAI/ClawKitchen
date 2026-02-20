@@ -38,7 +38,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <NavLink href="/recipes" label="Recipes" />
               <NavLink href="/tickets" label="Tickets" />
               <NavLink href="/goals" label="Goals" />
-              <NavLink href="/channels" label="Channels" />
+              {/* Channels hidden for release */}
               <NavLink href="/cron-jobs" label="Cron jobs" />
               <NavLink href="/settings" label="Settings" />
             </nav>
