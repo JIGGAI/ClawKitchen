@@ -95,6 +95,9 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
   const [model, setModel] = useState<string>("");
 
   const [skillsList, setSkillsList] = useState<string[]>([]);
+  const [availableSkills, setAvailableSkills] = useState<string[]>([]);
+  const [selectedSkill, setSelectedSkill] = useState<string>("");
+  const [installingSkill, setInstallingSkill] = useState(false);
 
   const [agentFiles, setAgentFiles] = useState<Array<FileEntry & { required?: boolean; rationale?: string }>>([]);
   const [showOptionalFiles, setShowOptionalFiles] = useState(false);
@@ -110,10 +113,11 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
       setLoading(true);
       setMessage("");
       try {
-        const [agentsRes, filesRes, skillsRes] = await Promise.all([
+        const [agentsRes, filesRes, skillsRes, availableSkillsRes] = await Promise.all([
           fetch("/api/agents", { cache: "no-store" }),
           fetch(`/api/agents/files?agentId=${encodeURIComponent(agentId)}`, { cache: "no-store" }),
           fetch(`/api/agents/skills?agentId=${encodeURIComponent(agentId)}`, { cache: "no-store" }),
+          fetch("/api/skills/available", { cache: "no-store" }),
         ]);
 
         const agentsJson = (await agentsRes.json()) as { agents?: unknown[] };
@@ -145,6 +149,15 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
         const skillsJson = (await skillsRes.json()) as { ok?: boolean; skills?: unknown[] };
         if (skillsRes.ok && skillsJson.ok) {
           setSkillsList(Array.isArray(skillsJson.skills) ? (skillsJson.skills as string[]) : []);
+        }
+
+        const availableSkillsJson = (await availableSkillsRes.json()) as { ok?: boolean; skills?: unknown[] };
+        if (availableSkillsRes.ok && availableSkillsJson.ok) {
+          const list = Array.isArray(availableSkillsJson.skills) ? (availableSkillsJson.skills as string[]) : [];
+          setAvailableSkills(list);
+          // Default select first available skill not already installed.
+          const first = list.find((s) => !(Array.isArray(skillsJson.skills) ? skillsJson.skills.includes(s) : false));
+          setSelectedSkill(first ?? list[0] ?? "");
         }
       } catch (e: unknown) {
         setMessage(e instanceof Error ? e.message : String(e));
@@ -408,14 +421,70 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
           <div className="ck-glass-strong p-4">
             <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Skills</div>
             <p className="mt-2 text-sm text-[color:var(--ck-text-secondary)]">
-              Installed skills detected in this agent workspace (<code>skills/</code>).
+              Skills installed in this <strong>agent</strong> workspace (<code>skills/</code>). If you want a skill available to all agents,
+              add it at the team level.
             </p>
-            <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-[color:var(--ck-text-secondary)]">
-              {skillsList.length ? skillsList.map((s) => <li key={s}>{s}</li>) : <li>None detected.</li>}
-            </ul>
-            <p className="mt-3 text-xs text-[color:var(--ck-text-tertiary)]">
-              Next: install/uninstall flows.
-            </p>
+
+            <div className="mt-4">
+              <div className="text-xs font-medium text-[color:var(--ck-text-secondary)]">Installed</div>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-[color:var(--ck-text-secondary)]">
+                {skillsList.length ? skillsList.map((s) => <li key={s}>{s}</li>) : <li>None installed.</li>}
+              </ul>
+            </div>
+
+            <div className="mt-5 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/15 p-3">
+              <div className="text-xs font-medium text-[color:var(--ck-text-secondary)]">Add a skill</div>
+              <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                <select
+                  value={selectedSkill}
+                  onChange={(e) => setSelectedSkill(e.target.value)}
+                  className="w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                  disabled={installingSkill || !availableSkills.length}
+                >
+                  {availableSkills.length ? (
+                    availableSkills.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="">No skills found</option>
+                  )}
+                </select>
+                <button
+                  type="button"
+                  disabled={installingSkill || !selectedSkill}
+                  onClick={async () => {
+                    setInstallingSkill(true);
+                    setMessage("");
+                    try {
+                      const res = await fetch("/api/agents/skills/install", {
+                        method: "POST",
+                        headers: { "content-type": "application/json" },
+                        body: JSON.stringify({ agentId, skill: selectedSkill }),
+                      });
+                      const json = await res.json();
+                      if (!res.ok || !json.ok) throw new Error(json.error || "Failed to install skill");
+                      setMessage(`Installed skill: ${selectedSkill}`);
+                      // Refresh installed list.
+                      const r = await fetch(`/api/agents/skills?agentId=${encodeURIComponent(agentId)}`, { cache: "no-store" });
+                      const j = await r.json();
+                      if (r.ok && j.ok) setSkillsList(Array.isArray(j.skills) ? j.skills : []);
+                    } catch (e: unknown) {
+                      setMessage(e instanceof Error ? e.message : String(e));
+                    } finally {
+                      setInstallingSkill(false);
+                    }
+                  }}
+                  className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] disabled:opacity-50"
+                >
+                  {installingSkill ? "Adding…" : "Add"}
+                </button>
+              </div>
+              <div className="mt-2 text-xs text-[color:var(--ck-text-tertiary)]">
+                This uses <code>openclaw recipes install-skill &lt;skill&gt; --agent-id {agentId} --yes</code>.
+              </div>
+            </div>
           </div>
         ) : null}
 
