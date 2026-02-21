@@ -230,10 +230,12 @@ export default function RecipesClient({
         const list = Array.isArray(recipesJson.recipes) ? recipesJson.recipes : [];
         const hasRecipe = list.some((r) => String(r.id ?? "") === teamId && String(r.kind ?? "") === "team");
 
-        const metaJson = (await metaRes.json()) as { ok?: boolean; missing?: boolean };
+        const metaJson = (await metaRes.json()) as { ok?: boolean; missing?: boolean; meta?: unknown };
         const hasMeta = Boolean(metaRes.ok && metaJson.ok && !metaJson.missing);
 
-        if (hasRecipe && hasMeta) return true;
+        // Meta is best-effort provenance. Don't block navigation forever on it.
+        // If the recipe exists, the team page can still load and the editor will show provenanceMissing.
+        if (hasRecipe && (hasMeta || Date.now() - started > 3_000)) return true;
       } catch {
         // ignore
       }
