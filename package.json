@@ -1,6 +1,6 @@
 {
   "name": "@jiggai/kitchen",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": false,
   "openclaw": {
     "extensions": [
@@ -22,7 +22,6 @@
     "next.config.ts",
     "public/",
     "src/",
-
     ".next/BUILD_ID",
     ".next/server/",
     ".next/static/",
