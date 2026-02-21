@@ -111,6 +111,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [loadingSource, setLoadingSource] = useState(false);
   const [recipeLoadError, setRecipeLoadError] = useState<string>("");
   const toast = useToast();
@@ -1165,10 +1166,10 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
       <DeleteTeamModal
         open={deleteOpen}
         teamId={teamId}
-        busy={saving}
+        busy={deleting}
         onClose={() => setDeleteOpen(false)}
         onConfirm={async () => {
-          setSaving(true);
+          setDeleting(true);
           try {
             const res = await fetch("/api/teams/remove-team", {
               method: "POST",
@@ -1183,7 +1184,7 @@ export default function TeamEditor({ teamId }: { teamId: string }) {
           } catch (e: unknown) {
             flashMessage(e instanceof Error ? e.message : String(e), "error");
           } finally {
-            setSaving(false);
+            setDeleting(false);
           }
         }}
       />
