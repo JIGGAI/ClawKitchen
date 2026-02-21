@@ -24,13 +24,17 @@ export function ScaffoldOverlay({
   return createPortal(
     <div className="fixed inset-0 z-[9999]">
       {/* Slightly transparent full-screen overlay so we hide the app while still showing a hint of context. */}
-      <div className="fixed inset-0 bg-white/90 dark:bg-black/90" />
+      <div className="fixed inset-0 bg-white/90 dark:bg-black/90 pointer-events-none" />
 
       {onDismiss ? (
         <button
           type="button"
-          onClick={onDismiss}
-          className="fixed right-4 top-4 rounded-full border border-white/10 bg-[color:var(--ck-bg-glass)] px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] hover:bg-[color:var(--ck-bg-glass-strong)]"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onDismiss();
+          }}
+          className="fixed right-4 top-4 z-[10000] rounded-full border border-white/10 bg-[color:var(--ck-bg-glass)] px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] hover:bg-[color:var(--ck-bg-glass-strong)]"
           aria-label="Dismiss loading overlay"
           title="Dismiss"
         >
