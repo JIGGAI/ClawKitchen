@@ -56,6 +56,15 @@ export default async function TeamPage({ params }: { params: Promise<{ teamId: s
         </div>
       </div>
 
+      <div className="mx-auto mb-4 flex max-w-6xl items-center justify-end">
+        <Link
+          href={`/goals?team=${encodeURIComponent(teamId)}`}
+          className="text-sm font-medium text-[color:var(--ck-text-secondary)] hover:underline"
+        >
+          View goals for this team →
+        </Link>
+      </div>
+
       <TeamEditor teamId={teamId} />
     </main>
   );

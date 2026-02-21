@@ -227,13 +227,7 @@ export default function RecipesClient({
       const t = setTimeout(() => ctl.abort(), ms);
       try {
         const res = await fetch(url, { cache: "no-store", signal: ctl.signal });
-
-        // When the gateway is restarting, requests can return 200 with an empty/aborted body.
-        // Using res.text() avoids throwing "Unexpected end of JSON input".
-        const raw = await res.text();
-        if (!raw.trim()) throw new Error("empty-response");
-        const json = JSON.parse(raw) as unknown;
-
+        const json = (await res.json()) as unknown;
         return { res, json };
       } finally {
         clearTimeout(t);
@@ -256,13 +250,18 @@ export default function RecipesClient({
           continue;
         }
 
-        // 2) Once recipe exists, try meta (required) with timeout.
-        // This avoids navigating into the Team page while provenance is still being written,
-        // which was triggering the "raw markdown" load error.
-        const metaOut = await fetchJsonWithTimeout(`/api/teams/meta?teamId=${encodeURIComponent(teamId)}`, 5_000);
-        const metaJson = metaOut.json as { ok?: boolean; missing?: boolean };
-        const hasMeta = Boolean(metaOut.res.ok && metaJson.ok && !metaJson.missing);
-        if (hasMeta) return true;
+        // 2) Once recipe exists, try meta (best-effort) with timeout.
+        try {
+          const metaOut = await fetchJsonWithTimeout(`/api/teams/meta?teamId=${encodeURIComponent(teamId)}`, 5_000);
+          const metaJson = metaOut.json as { ok?: boolean; missing?: boolean };
+          const hasMeta = Boolean(metaOut.res.ok && metaJson.ok && !metaJson.missing);
+          if (hasMeta) return true;
+        } catch {
+          // ignore meta failures; we fall back to recipe-only readiness below
+        }
+
+        // Meta can be flaky during restarts; don't block forever.
+        if (Date.now() - started > 3_000) return true;
 
         consecutiveNetworkFails = 0;
       } catch {

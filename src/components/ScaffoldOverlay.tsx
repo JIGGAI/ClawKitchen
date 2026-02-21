@@ -23,23 +23,22 @@ export function ScaffoldOverlay({
 
   return createPortal(
     <div className="fixed inset-0 z-[500]">
-      {/* Full blackout/whiteout to hide the app while gateway/Kitchen may be restarting. */}
-      <div className="fixed inset-0 bg-[color:var(--ck-bg)]" />
-      <div className="fixed inset-0 flex items-center justify-center p-6 sm:p-10">
-        <div className="w-full max-w-2xl rounded-2xl border border-white/10 bg-[color:var(--ck-bg-glass-strong)] p-8 sm:p-10 shadow-[var(--ck-shadow-2)]">
-          <div className="text-2xl font-semibold text-[color:var(--ck-text-primary)]">Claw Kitchen</div>
-          <div className="mt-3 text-base text-[color:var(--ck-text-secondary)]">Hang tight — we’re updating your OpenClaw install.</div>
+      <div className="fixed inset-0 bg-black/70" />
+      <div className="fixed inset-0 flex items-center justify-center p-4">
+        <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-[color:var(--ck-bg-glass-strong)] p-6 shadow-[var(--ck-shadow-2)]">
+          <div className="text-lg font-semibold text-[color:var(--ck-text-primary)]">Claw Kitchen</div>
+          <div className="mt-2 text-sm text-[color:var(--ck-text-secondary)]">Hang tight — we’re updating your OpenClaw install.</div>
 
-          <div className="mt-8 space-y-4 text-base">
+          <div className="mt-5 space-y-3 text-sm">
             {[1, 2, 3].map((n) => {
               const s = n as ScaffoldOverlayStep;
               const active = s === step;
               const done = s < step;
               return (
-                <div key={s} className="flex items-center gap-4">
+                <div key={s} className="flex items-center gap-3">
                   <div
                     className={
-                      "h-3.5 w-3.5 rounded-full " +
+                      "h-2.5 w-2.5 rounded-full " +
                       (done
                         ? "bg-emerald-400"
                         : active
