@@ -16,6 +16,15 @@ ClawKitchen can be loaded as an OpenClaw plugin so it runs locally on the orches
 
 **Recommended (end users):** install the published plugin package (ships with a prebuilt `.next/` so you don’t run any npm commands).
 
+```bash
+openclaw plugins install @jiggai/kitchen
+
+# If you use a plugin allowlist (plugins.allow), you must explicitly trust it:
+openclaw config get plugins.allow --json
+# then add "kitchen" and set it back, e.g.
+openclaw config set plugins.allow --json '["memory-core","telegram","recipes","kitchen"]'
+```
+
 **Developer/testing:** you can also load it directly from a local repo path via `plugins.load.paths`.
 
 Edit your OpenClaw config (`~/.openclaw/openclaw.json`) and add:
