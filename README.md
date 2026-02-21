@@ -23,6 +23,7 @@ Edit your OpenClaw config (`~/.openclaw/openclaw.json`) and add:
 ```json5
 {
   "plugins": {
+    // Local developers only
     "load": {
       "paths": ["/home/control/clawkitchen"]
     },
