@@ -265,6 +265,8 @@ export default function RecipesClient({
     setOverlayStep(1);
     setOverlayDetails("");
 
+    let serveTimer: ReturnType<typeof setTimeout> | null = null;
+
     try {
       const res = await fetch("/api/scaffold", {
         method: "POST",
@@ -282,6 +284,12 @@ export default function RecipesClient({
       if (!res.ok || !json.ok) throw new Error(String(json.error || "Create team failed"));
 
       setOverlayStep(2);
+
+      // If scaffolding takes a while, switch copy to "Serving..." so users know we're in the
+      // apply/restart phase even if the CLI didn't print the restart hint yet.
+      serveTimer = setTimeout(() => {
+        setOverlayStep((prev) => (prev < 3 ? 3 : prev));
+      }, 15_000);
 
       const stderr = typeof json.stderr === "string" ? json.stderr : "";
       if (stderr.trim()) setOverlayDetails(stderr.trim());
@@ -308,6 +316,8 @@ export default function RecipesClient({
       // This avoids the destination page throwing "raw markdown" load errors.
       await waitForTeamPageReady(t, { timeoutMs: 60_000 });
 
+      if (serveTimer) clearTimeout(serveTimer);
+
       toast.push({ kind: "success", message: `Created team: ${t}` });
       setCreateOpen(false);
 
@@ -317,6 +327,7 @@ export default function RecipesClient({
       // Give the next page a beat to mount before removing the overlay.
       setTimeout(() => setOverlayOpen(false), 500);
     } catch (e: unknown) {
+      if (serveTimer) clearTimeout(serveTimer);
       setOverlayOpen(false);
       const msg = e instanceof Error ? e.message : String(e);
       setCreateError(msg);
@@ -347,6 +358,8 @@ export default function RecipesClient({
     setOverlayStep(1);
     setOverlayDetails("");
 
+    let serveTimer: ReturnType<typeof setTimeout> | null = null;
+
     try {
       const res = await fetch("/api/scaffold", {
         method: "POST",
@@ -365,6 +378,10 @@ export default function RecipesClient({
 
       setOverlayStep(2);
 
+      serveTimer = setTimeout(() => {
+        setOverlayStep((prev) => (prev < 3 ? 3 : prev));
+      }, 15_000);
+
       const stderr = typeof json.stderr === "string" ? json.stderr : "";
       if (stderr.trim()) setOverlayDetails(stderr.trim());
 
@@ -382,12 +399,15 @@ export default function RecipesClient({
         await waitForKitchenHealthy({ timeoutMs: 60_000 });
       }
 
+      if (serveTimer) clearTimeout(serveTimer);
+
       toast.push({ kind: "success", message: `Created agent: ${a}` });
       setCreateAgentOpen(false);
 
       router.push(`/agents/${encodeURIComponent(a)}`);
       setTimeout(() => setOverlayOpen(false), 500);
     } catch (e: unknown) {
+      if (serveTimer) clearTimeout(serveTimer);
       setOverlayOpen(false);
       const msg = e instanceof Error ? e.message : String(e);
       setCreateAgentError(msg);
