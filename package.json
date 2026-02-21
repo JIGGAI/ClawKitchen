@@ -22,8 +22,17 @@
     "next.config.ts",
     "public/",
     "src/",
-    ".next/standalone/",
-    ".next/static/"
+
+    ".next/BUILD_ID",
+    ".next/server/",
+    ".next/static/",
+    ".next/required-server-files.json",
+    ".next/required-server-files.js",
+    ".next/routes-manifest.json",
+    ".next/prerender-manifest.json",
+    ".next/build-manifest.json",
+    ".next/app-path-routes-manifest.json",
+    ".next/package.json"
   ],
   "dependencies": {
     "next": "16.1.6",
