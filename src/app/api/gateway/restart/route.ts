@@ -3,14 +3,16 @@ import { runOpenClaw } from "@/lib/openclaw";
 
 export async function POST() {
   try {
-    const r = await runOpenClaw(["gateway", "restart"]);
-    if (!r.ok) {
-      return NextResponse.json(
-        { ok: false, error: r.stderr.trim() || `openclaw gateway restart failed (exit=${r.exitCode})` },
-        { status: 500 },
-      );
-    }
-    return NextResponse.json({ ok: true, stdout: String(r.stdout ?? ""), stderr: String(r.stderr ?? "") });
+    // NOTE: Kitchen runs inside the OpenClaw gateway process.
+    // If we synchronously restart the gateway while holding an HTTP request open, the browser
+    // can see a client-side exception / aborted fetch.
+    //
+    // Schedule the restart and respond immediately.
+    setTimeout(() => {
+      void runOpenClaw(["gateway", "restart"]);
+    }, 50);
+
+    return NextResponse.json({ ok: true, scheduled: true });
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, { status: 500 });
   }
