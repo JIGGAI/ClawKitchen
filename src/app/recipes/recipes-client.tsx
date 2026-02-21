@@ -219,73 +219,30 @@ export default function RecipesClient({
     const timeoutMs = opts?.timeoutMs ?? 30_000;
     const started = Date.now();
 
-    let delayMs = 250;
-    let consecutiveNetworkFails = 0;
-
-    async function fetchJsonWithTimeout(url: string, ms: number) {
-      const ctl = new AbortController();
-      const t = setTimeout(() => ctl.abort(), ms);
-      try {
-        const res = await fetch(url, { cache: "no-store", signal: ctl.signal });
-        const json = (await res.json()) as unknown;
-        return { res, json };
-      } finally {
-        clearTimeout(t);
-      }
-    }
-
     while (Date.now() - started < timeoutMs) {
       try {
-        // 1) Check recipes first.
-        const recipesOut = await fetchJsonWithTimeout("/api/recipes", 5_000);
-        const recipesJson = recipesOut.json as { recipes?: Array<{ id?: unknown; kind?: unknown }> };
+        const [recipesRes, metaRes] = await Promise.all([
+          fetch("/api/recipes", { cache: "no-store" }),
+          fetch(`/api/teams/meta?teamId=${encodeURIComponent(teamId)}`, { cache: "no-store" }),
+        ]);
+
+        const recipesJson = (await recipesRes.json()) as { recipes?: Array<{ id?: unknown; kind?: unknown }> };
         const list = Array.isArray(recipesJson.recipes) ? recipesJson.recipes : [];
         const hasRecipe = list.some((r) => String(r.id ?? "") === teamId && String(r.kind ?? "") === "team");
 
-        // If the recipe isn't visible yet, don't hammer meta.
-        if (!hasRecipe) {
-          consecutiveNetworkFails = 0;
-          await new Promise((r) => setTimeout(r, delayMs));
-          delayMs = Math.min(2000, Math.round(delayMs * 1.5));
-          continue;
-        }
+        const metaJson = (await metaRes.json()) as { ok?: boolean; missing?: boolean };
+        const hasMeta = Boolean(metaRes.ok && metaJson.ok && !metaJson.missing);
 
-        // 2) Once recipe exists, try meta (best-effort) with timeout.
-        try {
-          const metaOut = await fetchJsonWithTimeout(`/api/teams/meta?teamId=${encodeURIComponent(teamId)}`, 5_000);
-          const metaJson = metaOut.json as { ok?: boolean; missing?: boolean };
-          const hasMeta = Boolean(metaOut.res.ok && metaJson.ok && !metaJson.missing);
-          if (hasMeta) return true;
-        } catch {
-          // ignore meta failures; we fall back to recipe-only readiness below
-        }
-
-        // Meta can be flaky during restarts; don't block forever.
-        if (Date.now() - started > 3_000) return true;
-
-        consecutiveNetworkFails = 0;
+        if (hasRecipe && hasMeta) return true;
       } catch {
-        // Likely aborted/timeout during restart.
-        consecutiveNetworkFails += 1;
-
-        // If we keep failing, check healthz and back off.
-        if (consecutiveNetworkFails >= 3) {
-          try {
-            await fetchJsonWithTimeout("/healthz", 2_500);
-            consecutiveNetworkFails = 0;
-          } catch {
-            // still down
-          }
-        }
+        // ignore
       }
 
-      await new Promise((r) => setTimeout(r, delayMs));
-      delayMs = Math.min(2000, Math.round(delayMs * 1.5));
+      await new Promise((r) => setTimeout(r, 500));
     }
 
     return false;
   }
-
 
   async function confirmCreateTeam() {
     const recipe = createRecipe;
