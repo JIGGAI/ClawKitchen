@@ -1,6 +1,6 @@
 {
   "name": "@jiggai/kitchen",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": false,
   "openclaw": {
     "extensions": [
