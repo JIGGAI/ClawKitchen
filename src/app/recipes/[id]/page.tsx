@@ -1,6 +1,11 @@
 import Link from "next/link";
+import { unstable_noStore as noStore } from "next/cache";
+
 import { runOpenClaw } from "@/lib/openclaw";
 import RecipeEditor from "./RecipeEditor";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 type RecipeListItem = {
   id: string;
@@ -21,6 +26,8 @@ async function getKind(id: string): Promise<"agent" | "team" | null> {
 }
 
 export default async function RecipePage({ params }: { params: Promise<{ id: string }> }) {
+  noStore();
+
   const { id } = await params;
   const kind = await getKind(id);
 

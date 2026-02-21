@@ -65,7 +65,7 @@ export async function POST(req: Request) {
     templatesRaw && typeof templatesRaw === "object" && !Array.isArray(templatesRaw)
       ? (templatesRaw as Record<string, unknown>)
       : {};
-  let nextTemplates: Record<string, unknown> = { ...templates };
+  const nextTemplates: Record<string, unknown> = { ...templates };
 
   if (op === "remove") {
     const role = normalizeRole(String(body.role ?? ""));

@@ -108,6 +108,10 @@ const kitchenPlugin = {
   description: "Local UI for managing recipes, teams, agents, cron jobs, and skills.",
   configSchema: { type: "object", additionalProperties: true, properties: {} },
   register(api: OpenClawPluginApi) {
+    // Expose the plugin API to the Next.js server runtime (runs in-process with the gateway).
+    // This lets API routes call into OpenClaw runtime helpers without using child_process or env.
+    (globalThis as unknown as { __clawkitchen_api?: OpenClawPluginApi }).__clawkitchen_api = api;
+
     const cfg = (api.pluginConfig || {}) as KitchenConfig;
 
     api.registerCli(

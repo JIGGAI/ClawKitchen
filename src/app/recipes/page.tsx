@@ -1,6 +1,11 @@
 import Link from "next/link";
+import { unstable_noStore as noStore } from "next/cache";
+
 import { runOpenClaw } from "@/lib/openclaw";
 import RecipesClient from "./recipes-client";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 type Recipe = {
   id: string;
@@ -39,6 +44,8 @@ async function getAgents(): Promise<{ agentIds: string[]; error: string | null }
 }
 
 export default async function RecipesPage() {
+  noStore();
+
   const [{ recipes, error }, { agentIds }] = await Promise.all([getRecipes(), getAgents()]);
 
   const builtin = recipes.filter((r) => r.source === "builtin");
