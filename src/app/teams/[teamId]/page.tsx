@@ -1,6 +1,10 @@
 import Link from "next/link";
+import { unstable_noStore as noStore } from "next/cache";
 import { runOpenClaw } from "@/lib/openclaw";
 import TeamEditor from "./team-editor";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 type RecipeListItem = {
   id: string;
@@ -22,6 +26,9 @@ async function getTeamDisplayName(teamId: string) {
 }
 
 export default async function TeamPage({ params }: { params: Promise<{ teamId: string }> }) {
+  // Team pages depend on live OpenClaw state; never serve cached HTML.
+  noStore();
+
   const { teamId } = await params;
   const name = await getTeamDisplayName(teamId);
 
