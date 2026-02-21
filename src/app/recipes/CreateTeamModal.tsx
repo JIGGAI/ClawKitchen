@@ -12,12 +12,6 @@ function slugifyId(input: string) {
     .replace(/--+/g, "-");
 }
 
-type Availability =
-  | { state: "empty" }
-  | { state: "checking" }
-  | { state: "available" }
-  | { state: "taken"; reason?: string };
-
 export function CreateTeamModal({
   open,
   recipeId,
@@ -26,8 +20,6 @@ export function CreateTeamModal({
   setTeamId,
   installCron,
   setInstallCron,
-  existingRecipeIds,
-  existingAgentIds,
   busy,
   error,
   onClose,
@@ -40,8 +32,6 @@ export function CreateTeamModal({
   setTeamId: (v: string) => void;
   installCron: boolean;
   setInstallCron: (v: boolean) => void;
-  existingRecipeIds: string[];
-  existingAgentIds: string[];
   busy?: boolean;
   error?: string | null;
   onClose: () => void;
@@ -49,7 +39,6 @@ export function CreateTeamModal({
 }) {
   const [teamName, setTeamName] = useState("");
   const [idTouched, setIdTouched] = useState(false);
-  const [availability, setAvailability] = useState<Availability>({ state: "empty" });
 
   const derivedId = useMemo(() => slugifyId(teamName), [teamName]);
   const effectiveId = idTouched ? teamId : derivedId;
@@ -66,55 +55,9 @@ export function CreateTeamModal({
     if (!open) return;
     setIdTouched(false);
     setTeamName("");
-    setAvailability({ state: "empty" });
     setTeamId("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
-
-  // Check id availability.
-  // Fast path: local check (recipes list + agent list already in memory).
-  // Slow path: server check for filesystem collisions / edge cases.
-  useEffect(() => {
-    if (!open) return;
-
-    const v = String(effectiveId ?? "").trim();
-    if (!v) {
-      setAvailability({ state: "empty" });
-      return;
-    }
-
-    // Local rules (instant):
-    if (existingRecipeIds.includes(v)) {
-      setAvailability({ state: "taken", reason: "recipe-id-collision" });
-      return;
-    }
-    if (existingAgentIds.some((a) => a.startsWith(`${v}-`))) {
-      setAvailability({ state: "taken", reason: "team-agents-exist" });
-      return;
-    }
-
-    // Looks available locally.
-    setAvailability({ state: "available" });
-
-    // Server confirm (debounced) for filesystem collisions, etc.
-    const t = setTimeout(() => {
-      void (async () => {
-        setAvailability({ state: "checking" });
-        try {
-          const res = await fetch(`/api/ids/check?kind=team&id=${encodeURIComponent(v)}`, { cache: "no-store" });
-          const json = (await res.json()) as { ok?: boolean; available?: boolean; reason?: string };
-          if (!res.ok || !json.ok) throw new Error(String((json as { error?: unknown }).error ?? "Failed to check id"));
-          if (json.available) setAvailability({ state: "available" });
-          else setAvailability({ state: "taken", reason: json.reason });
-        } catch {
-          // Don't block creation if server check fails.
-          setAvailability({ state: "available" });
-        }
-      })();
-    }, 250);
-
-    return () => clearTimeout(t);
-  }, [effectiveId, open, existingRecipeIds, existingAgentIds]);
 
   if (!open) return null;
 
@@ -160,22 +103,10 @@ export function CreateTeamModal({
               <div className="mt-2 text-xs text-[color:var(--ck-text-tertiary)]">
                 This will scaffold ~/.openclaw/workspace-&lt;teamId&gt; and add the team to config.
               </div>
-
-              {availability.state === "checking" ? (
-                <div className="mt-2 text-xs text-[color:var(--ck-text-tertiary)]">Checking availability…</div>
-              ) : availability.state === "taken" ? (
-                <div className="mt-2 text-xs text-red-200">That id is already taken.</div>
-              ) : availability.state === "available" ? (
-                <div className="mt-2 text-xs text-emerald-200">Id available.</div>
-              ) : null}
             </div>
 
             <label className="mt-4 flex items-center gap-2 text-sm text-[color:var(--ck-text-secondary)]">
-              <input
-                type="checkbox"
-                checked={installCron}
-                onChange={(e) => setInstallCron(e.target.checked)}
-              />
+              <input type="checkbox" checked={installCron} onChange={(e) => setInstallCron(e.target.checked)} />
               Install cron jobs from this recipe
             </label>
 
@@ -195,7 +126,7 @@ export function CreateTeamModal({
               </button>
               <button
                 type="button"
-                disabled={busy || !effectiveId.trim() || availability.state === "taken" || availability.state === "checking"}
+                disabled={busy || !effectiveId.trim()}
                 onClick={onConfirm}
                 className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] hover:bg-[var(--ck-accent-red-hover)] disabled:opacity-50"
               >
