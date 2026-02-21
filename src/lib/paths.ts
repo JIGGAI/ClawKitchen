@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 
 type OpenClawConfig = {
@@ -17,7 +18,7 @@ type OpenClawConfig = {
 };
 
 export async function readOpenClawConfig(): Promise<OpenClawConfig> {
-  const p = path.join(process.env.HOME || "", ".openclaw", "openclaw.json");
+  const p = path.join(os.homedir(), ".openclaw", "openclaw.json");
   const text = await fs.readFile(p, "utf8");
   return JSON.parse(text) as OpenClawConfig;
 }
@@ -40,8 +41,8 @@ export async function getWorkspaceGoalsDir() {
 }
 
 export async function getTeamWorkspaceDir(teamId: string) {
-  const home = process.env.HOME || "";
-  if (!home) throw new Error("HOME is not set");
+  const home = os.homedir();
+  if (!home) throw new Error("Could not resolve home directory");
   return path.join(home, ".openclaw", `workspace-${teamId}`);
 }
 

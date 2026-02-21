@@ -1,14 +1,11 @@
-import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { promisify } from "node:util";
 
 import { NextResponse } from "next/server";
 
 import { readGoal, writeGoal } from "@/lib/goals";
 import { getTeamWorkspaceDir, readOpenClawConfig } from "@/lib/paths";
-
-const execFileAsync = promisify(execFile);
+import { runOpenClaw } from "@/lib/openclaw";
 
 function slugifyFilePart(input: string) {
   return input
@@ -122,20 +119,17 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
     } else {
       pingAttempted = true;
       try {
-        await execFileAsync(
-          "openclaw",
-          [
-            "agent",
-            "--agent",
-            targetAgentId,
-            "--message",
-            `New goal promoted to development-team inbox: ${updated.frontmatter.title} (${goalId}). Inbox file: ${inboxPath}`,
-            "--timeout",
-            "60",
-            "--json",
-          ],
-          { timeout: 70000 },
-        );
+        const res = await runOpenClaw([
+          "agent",
+          "--agent",
+          targetAgentId,
+          "--message",
+          `New goal promoted to development-team inbox: ${updated.frontmatter.title} (${goalId}). Inbox file: ${inboxPath}`,
+          "--timeout",
+          "60",
+          "--json",
+        ]);
+        if (!res.ok) throw new Error(res.stderr || `openclaw exit ${res.exitCode}`);
         pingOk = true;
       } catch (e: unknown) {
         pingReason = e instanceof Error ? e.message : String(e);

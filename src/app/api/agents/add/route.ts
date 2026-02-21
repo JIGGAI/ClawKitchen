@@ -1,11 +1,10 @@
-import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
-import { promisify } from "node:util";
 
 import { NextResponse } from "next/server";
 
-const execFileAsync = promisify(execFile);
+import { getKitchenApi } from "@/lib/kitchen-api";
 
 function normalizeAgentId(id: string) {
   const s = id.trim();
@@ -32,9 +31,9 @@ export async function POST(req: Request) {
     const newAgentId = normalizeAgentId(String(body.newAgentId ?? body.agentId ?? ""));
     const overwrite = Boolean(body.overwrite);
 
-    const configPath = path.join(process.env.HOME || "", ".openclaw", "openclaw.json");
-    if (!process.env.HOME) {
-      return NextResponse.json({ ok: false, error: "HOME is not set" }, { status: 500 });
+    const configPath = path.join(os.homedir(), ".openclaw", "openclaw.json");
+    if (!configPath.trim()) {
+      return NextResponse.json({ ok: false, error: "Could not resolve config path" }, { status: 500 });
     }
 
     const raw = await fs.readFile(configPath, "utf8");
@@ -95,7 +94,8 @@ export async function POST(req: Request) {
   await fs.rename(tmpPath, configPath);
 
   // Restart gateway so the new agent is live.
-  await execFileAsync("openclaw", ["gateway", "restart"], { timeout: 120000 });
+  const api = getKitchenApi();
+  await api.runtime.system.runCommandWithTimeout(["openclaw", "gateway", "restart"], { timeoutMs: 120000 });
 
   return NextResponse.json({ ok: true, agentId: newAgentId, workspace: newWorkspace, restarted: true });
   } catch (err) {

@@ -126,7 +126,6 @@ export default function RecipesClient({
 
   const [overlayOpen, setOverlayOpen] = useState(false);
   const [overlayStep, setOverlayStep] = useState<ScaffoldOverlayStep>(1);
-  const [overlayDetails, setOverlayDetails] = useState<string>("");
   const router = useRouter();
 
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -266,7 +265,6 @@ export default function RecipesClient({
 
     setOverlayOpen(true);
     setOverlayStep(1);
-    setOverlayDetails("");
 
     let serveTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -295,7 +293,6 @@ export default function RecipesClient({
       }, 20_000);
 
       const stderr = typeof json.stderr === "string" ? json.stderr : "";
-      if (stderr.trim()) setOverlayDetails(stderr.trim());
 
       // Some CLI failures currently still surface as { ok: true, stderr: "...Error: ..." }.
       // Treat those as hard failures so we don't navigate into a broken team page.
@@ -361,7 +358,6 @@ export default function RecipesClient({
 
     setOverlayOpen(true);
     setOverlayStep(1);
-    setOverlayDetails("");
 
     let serveTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -388,7 +384,6 @@ export default function RecipesClient({
       }, 20_000);
 
       const stderr = typeof json.stderr === "string" ? json.stderr : "";
-      if (stderr.trim()) setOverlayDetails(stderr.trim());
 
       if (/Failed to start CLI:/i.test(stderr) || /\bError: /i.test(stderr)) {
         throw new Error(stderr.trim() || "Scaffold failed");
