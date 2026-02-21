@@ -7,6 +7,7 @@ type OverlayState = {
   open: boolean;
   step: ScaffoldOverlayStep;
   details?: string;
+  startedAt?: number;
 };
 
 type OverlayApi = {
@@ -29,7 +30,13 @@ function safeParse(raw: string | null): OverlayState | null {
     if (v.open !== true) return null;
     const step = v.step;
     if (step !== 1 && step !== 2 && step !== 3) return null;
-    return { open: true, step, details: typeof v.details === "string" ? v.details : undefined };
+    const startedAt = typeof v.startedAt === "number" ? v.startedAt : undefined;
+    return {
+      open: true,
+      step,
+      details: typeof v.details === "string" ? v.details : undefined,
+      startedAt,
+    };
   } catch {
     return null;
   }
@@ -39,9 +46,22 @@ export function ScaffoldOverlayProvider({ children }: { children: React.ReactNod
   const [state, setState] = useState<OverlayState>({ open: false, step: 1, details: "" });
 
   // On first client mount, restore overlay state across navigations/restarts.
+  // But never keep a stale overlay around forever (bad UX if a previous run crashed mid-flight).
   useEffect(() => {
     const restored = safeParse(globalThis?.sessionStorage?.getItem(STORAGE_KEY) ?? null);
-    if (restored) setState(restored);
+    if (!restored) return;
+
+    const ageMs = restored.startedAt ? Date.now() - restored.startedAt : null;
+    if (ageMs !== null && ageMs > 2 * 60_000) {
+      try {
+        sessionStorage.removeItem(STORAGE_KEY);
+      } catch {
+        // ignore
+      }
+      return;
+    }
+
+    setState(restored);
   }, []);
 
   const persist = useCallback((next: OverlayState) => {
@@ -57,7 +77,7 @@ export function ScaffoldOverlayProvider({ children }: { children: React.ReactNod
   const api = useMemo<OverlayApi>(() => {
     return {
       show: ({ step, details }) => {
-        const next: OverlayState = { open: true, step, details };
+        const next: OverlayState = { open: true, step, details, startedAt: Date.now() };
         setState(next);
         persist(next);
       },
@@ -86,7 +106,7 @@ export function ScaffoldOverlayProvider({ children }: { children: React.ReactNod
 
   return (
     <Ctx.Provider value={api}>
-      <ScaffoldOverlay open={state.open} step={state.step} details={state.details} />
+      <ScaffoldOverlay open={state.open} step={state.step} details={state.details} onDismiss={() => api.hide()} />
       {children}
     </Ctx.Provider>
   );

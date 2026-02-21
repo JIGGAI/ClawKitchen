@@ -14,10 +14,12 @@ export function ScaffoldOverlay({
   open,
   step,
   details,
+  onDismiss,
 }: {
   open: boolean;
   step: ScaffoldOverlayStep;
   details?: string;
+  onDismiss?: () => void;
 }) {
   if (!open) return null;
 
@@ -55,14 +57,28 @@ export function ScaffoldOverlay({
             })}
           </div>
 
-          {details ? (
-            <details className="mt-5">
-              <summary className="cursor-pointer select-none text-xs text-[color:var(--ck-text-tertiary)]">Details</summary>
-              <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded-lg border border-white/10 bg-black/30 p-3 text-xs text-[color:var(--ck-text-secondary)]">
-                {details}
-              </pre>
-            </details>
-          ) : null}
+          <div className="mt-8 flex items-center justify-between gap-3">
+            {details ? (
+              <details>
+                <summary className="cursor-pointer select-none text-xs text-[color:var(--ck-text-tertiary)]">Details</summary>
+                <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded-lg border border-white/10 bg-black/30 p-3 text-xs text-[color:var(--ck-text-secondary)]">
+                  {details}
+                </pre>
+              </details>
+            ) : (
+              <div />
+            )}
+
+            {onDismiss ? (
+              <button
+                type="button"
+                onClick={onDismiss}
+                className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
+              >
+                Dismiss
+              </button>
+            ) : null}
+          </div>
         </div>
       </div>
     </div>,
