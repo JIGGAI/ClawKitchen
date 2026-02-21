@@ -1,9 +1,11 @@
 {
   "name": "@jiggai/kitchen",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": false,
   "openclaw": {
-    "extensions": ["./openclaw/index.ts"]
+    "extensions": [
+      "./openclaw/index.ts"
+    ]
   },
   "scripts": {
     "dev": "next dev",
