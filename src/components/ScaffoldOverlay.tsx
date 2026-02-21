@@ -22,9 +22,9 @@ export function ScaffoldOverlay({
   if (!open) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[500]">
+    <div className="fixed inset-0 z-[9999]">
       {/* Solid overlay (no seeing through during restarts/partial renders). */}
-      <div className="fixed inset-0 bg-[color:var(--ck-bg)]" />
+      <div className="fixed inset-0 bg-white dark:bg-black" />
       <div className="fixed inset-0 flex items-center justify-center p-6 sm:p-10">
         <div className="w-full max-w-2xl rounded-2xl border border-white/10 bg-[color:var(--ck-bg-glass-strong)] p-8 sm:p-10 shadow-[var(--ck-shadow-2)]">
           <div className="text-2xl font-semibold text-[color:var(--ck-text-primary)]">Claw Kitchen</div>

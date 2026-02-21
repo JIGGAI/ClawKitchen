@@ -261,6 +261,9 @@ export default function RecipesClient({
     setCreateBusy(true);
     setCreateError(null);
 
+    // Hide the modal immediately so the overlay is the only visible UI during scaffold.
+    setCreateOpen(false);
+
     setOverlayOpen(true);
     setOverlayStep(1);
     setOverlayDetails("");
@@ -289,7 +292,7 @@ export default function RecipesClient({
       // apply/restart phase even if the CLI didn't print the restart hint yet.
       serveTimer = setTimeout(() => {
         setOverlayStep((prev) => (prev < 3 ? 3 : prev));
-      }, 15_000);
+      }, 20_000);
 
       const stderr = typeof json.stderr === "string" ? json.stderr : "";
       if (stderr.trim()) setOverlayDetails(stderr.trim());
@@ -354,6 +357,8 @@ export default function RecipesClient({
     setCreateAgentBusy(true);
     setCreateAgentError(null);
 
+    setCreateAgentOpen(false);
+
     setOverlayOpen(true);
     setOverlayStep(1);
     setOverlayDetails("");
@@ -380,7 +385,7 @@ export default function RecipesClient({
 
       serveTimer = setTimeout(() => {
         setOverlayStep((prev) => (prev < 3 ? 3 : prev));
-      }, 15_000);
+      }, 20_000);
 
       const stderr = typeof json.stderr === "string" ? json.stderr : "";
       if (stderr.trim()) setOverlayDetails(stderr.trim());
