@@ -28,8 +28,16 @@ export async function POST(req: Request) {
 
   const res = await runOpenClaw(args);
   if (!res.ok) {
+    const stdout = res.stdout?.trim();
+    const stderr = res.stderr?.trim();
     return NextResponse.json(
-      { ok: false, error: res.stderr.trim() || `openclaw ${args.join(" ")} failed (exit=${res.exitCode})`, stdout: res.stdout, stderr: res.stderr },
+      {
+        ok: false,
+        error: stderr || stdout || `openclaw ${args.join(" ")} failed (exit=${res.exitCode})`,
+        stdout: res.stdout,
+        stderr: res.stderr,
+        scopeArgs: args,
+      },
       { status: 500 },
     );
   }

@@ -12,10 +12,12 @@ export async function POST(req: Request) {
   const args = ["recipes", "install-skill", skill, "--team-id", teamId, "--yes"];
   const res = await runOpenClaw(args);
   if (!res.ok) {
+    const stdout = res.stdout?.trim();
+    const stderr = res.stderr?.trim();
     return NextResponse.json(
       {
         ok: false,
-        error: res.stderr.trim() || `openclaw ${args.join(" ")} failed (exit=${res.exitCode})`,
+        error: stderr || stdout || `openclaw ${args.join(" ")} failed (exit=${res.exitCode})`,
         stdout: res.stdout,
         stderr: res.stderr,
       },
