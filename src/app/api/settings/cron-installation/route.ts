@@ -11,33 +11,47 @@ function getPath(obj: unknown, p: string): unknown {
 }
 
 export async function GET() {
-  const { raw } = await gatewayConfigGet();
-  const cfg = JSON.parse(raw);
-  const value = String(getPath(cfg, CFG_PATH) ?? "").trim();
-  return NextResponse.json({ ok: true, path: CFG_PATH, value });
+  try {
+    const { raw } = await gatewayConfigGet();
+    const cfg = JSON.parse(raw);
+    const value = String(getPath(cfg, CFG_PATH) ?? "").trim();
+    return NextResponse.json({ ok: true, path: CFG_PATH, value });
+  } catch (e: unknown) {
+    return NextResponse.json(
+      { ok: false, error: e instanceof Error ? e.message : String(e) },
+      { status: 500 },
+    );
+  }
 }
 
 export async function PUT(req: Request) {
-  const body = (await req.json()) as { value?: string };
-  const value = String(body.value ?? "").trim();
-  if (!value || !["off", "prompt", "on"].includes(value)) {
-    return NextResponse.json({ ok: false, error: "value must be one of: off|prompt|on" }, { status: 400 });
-  }
+  try {
+    const body = (await req.json()) as { value?: string };
+    const value = String(body.value ?? "").trim();
+    if (!value || !["off", "prompt", "on"].includes(value)) {
+      return NextResponse.json({ ok: false, error: "value must be one of: off|prompt|on" }, { status: 400 });
+    }
 
-  await gatewayConfigPatch(
-    {
-      plugins: {
-        entries: {
-          recipes: {
-            config: {
-              cronInstallation: value,
+    await gatewayConfigPatch(
+      {
+        plugins: {
+          entries: {
+            recipes: {
+              config: {
+                cronInstallation: value,
+              },
             },
           },
         },
       },
-    },
-    `ClawKitchen: set ${CFG_PATH}=${value}`
-  );
+      `ClawKitchen: set ${CFG_PATH}=${value}`
+    );
 
-  return NextResponse.json({ ok: true, path: CFG_PATH, value, note: "Gateway will restart to apply config." });
+    return NextResponse.json({ ok: true, path: CFG_PATH, value, note: "Gateway will restart to apply config." });
+  } catch (e: unknown) {
+    return NextResponse.json(
+      { ok: false, error: e instanceof Error ? e.message : String(e) },
+      { status: 500 },
+    );
+  }
 }

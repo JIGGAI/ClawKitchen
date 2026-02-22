@@ -16,7 +16,8 @@ export default function SettingsClient() {
       setMsg("");
       try {
         const res = await fetch("/api/settings/cron-installation", { cache: "no-store" });
-        const json = await res.json();
+        const text = await res.text();
+        const json = text ? (JSON.parse(text) as { ok?: boolean; value?: string; error?: string }) : {};
         if (!res.ok) throw new Error(json.error || "Failed to load config");
         const v = String(json.value || "").trim();
         if (v === "off" || v === "prompt" || v === "on") setMode(v);
@@ -38,7 +39,8 @@ export default function SettingsClient() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ value: next }),
       });
-      const json = await res.json();
+      const text = await res.text();
+      const json = text ? (JSON.parse(text) as { ok?: boolean; error?: string }) : {};
       if (!res.ok) throw new Error(json.error || "Save failed");
       setMode(next);
       setMsg("Saved.");
