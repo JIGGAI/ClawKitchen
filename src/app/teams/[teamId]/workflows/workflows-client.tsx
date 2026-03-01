@@ -139,6 +139,24 @@ export default function WorkflowsClient({ teamId }: { teamId: string }) {
     }
   }
 
+  async function onAddTemplate(templateId: string) {
+    if (!confirm(`Add workflow from template “${templateId}”?`)) return;
+    setError("");
+    try {
+      const json = await fetchJson<{ ok?: boolean; workflowId?: string; error?: string }>("/api/teams/workflow-templates", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ teamId, templateId }),
+      });
+      if (!json.ok) throw new Error(json.error || "Failed to apply template");
+      const workflowId = String(json.workflowId ?? "").trim();
+      if (!workflowId) throw new Error("Template applied but workflowId missing");
+      await load({ quiet: true });
+      router.push(`/teams/${encodeURIComponent(teamId)}/workflows/${encodeURIComponent(workflowId)}`);
+    } catch (e: unknown) {
+      setError(errorMessage(e));
+    }
+  }
   const memoryUsedItems = useMemo(() => {
     const run = selectedRun;
     if (!run) return [] as Array<{ ts: string; author: string; type: string; content: string; source?: unknown }>;
@@ -183,6 +201,14 @@ export default function WorkflowsClient({ teamId }: { teamId: string }) {
             Add workflow
           </button>
 
+
+          <button
+            type="button"
+            onClick={() => void onAddTemplate("marketing-cadence-v1")}
+            className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
+          >
+            Add Marketing Cadence template
+          </button>
 
           <button
             type="button"
