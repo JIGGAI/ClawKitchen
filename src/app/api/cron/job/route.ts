@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { toolsInvoke } from "@/lib/gateway";
 import { runOpenClaw } from "@/lib/openclaw";
 
 export async function POST(req: Request) {

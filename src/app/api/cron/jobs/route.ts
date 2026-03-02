@@ -1,12 +1,10 @@
 import path from "node:path";
 import { NextResponse } from "next/server";
-import { toolsInvoke } from "@/lib/gateway";
 import { runOpenClaw } from "@/lib/openclaw";
 import { readOpenClawConfig, getTeamWorkspaceDir } from "@/lib/paths";
 import { errorMessage } from "@/lib/errors";
 import { buildIdToScopeMap, getInstalledIdsForTeam, enrichJobsWithScope } from "../helpers";
 
-type CronToolResult = { content: Array<{ type: string; text?: string }> };
 
 export async function GET(req: Request) {
   try {
