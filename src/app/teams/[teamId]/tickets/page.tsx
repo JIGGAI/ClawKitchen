@@ -11,5 +11,11 @@ export default async function TeamTicketsPage({
   const { teamId } = await params;
   const tickets = await listTickets(teamId);
 
-  return <TicketsBoardClient tickets={tickets} basePath={`/teams/${encodeURIComponent(teamId)}/tickets`} />;
+  return (
+    <TicketsBoardClient
+      tickets={tickets}
+      basePath={`/teams/${encodeURIComponent(teamId)}/tickets`}
+      selectedTeamId={teamId}
+    />
+  );
 }
