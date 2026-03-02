@@ -551,7 +551,9 @@ export async function POST(req: Request) {
             };
 
             if (approvalNodeId) {
-              const { provider, target } = getApprovalSendConfig(wf, approvalNodeId);
+              // Resolve the channel we *intend* to send to so we can record outbound metadata,
+              // even though delivery is best-effort.
+              const { provider, target } = await resolveApprovalChannel({ workflow: wf, approvalNodeId });
 
               if (target) {
                 try {
