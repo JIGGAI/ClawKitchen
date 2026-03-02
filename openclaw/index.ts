@@ -208,7 +208,31 @@ const kitchenPlugin = {
   id: "kitchen",
   name: "ClawKitchen",
   description: "Local UI for managing recipes, teams, agents, cron jobs, and skills.",
-  configSchema: { type: "object", additionalProperties: true, properties: {} },
+  configSchema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      enabled: { type: "boolean", default: true },
+      dev: {
+        type: "boolean",
+        default: false,
+        description: "Run Next.js in dev mode (not recommended for end users).",
+      },
+      host: { type: "string", default: "127.0.0.1" },
+      port: { type: "integer", default: 7777, minimum: 1, maximum: 65535 },
+      authToken: {
+        type: "string",
+        default: "",
+        description: "Required when host is not localhost. Used for HTTP Basic auth (username: kitchen).",
+      },
+      qaToken: {
+        type: "string",
+        default: "",
+        description:
+          "Optional QA-only bypass token. If set, visiting any URL with ?qaToken=<token> sets a short-lived cookie for headless/automated access.",
+      },
+    },
+  },
   register(api: OpenClawPluginApi) {
     // Expose the plugin API to the Next.js server runtime (runs in-process with the gateway).
     // This lets API routes call into OpenClaw runtime helpers without using child_process or env.

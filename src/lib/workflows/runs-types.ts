@@ -14,6 +14,16 @@ export type WorkflowRunApprovalV1 = {
   decidedAt?: string;
   /** Freeform notes from the approver (optional) */
   note?: string;
+  /** Who made the decision (MVP: typically "ClawKitchen UI" or channel metadata) */
+  decidedBy?: string;
+  /** Outbound delivery metadata for the approval request (best-effort) */
+  outbound?: {
+    provider: string;
+    target: string;
+    sentAt?: string;
+    attemptedAt?: string;
+    error?: string;
+  };
 };
 
 export type WorkflowRunFileV1 = {

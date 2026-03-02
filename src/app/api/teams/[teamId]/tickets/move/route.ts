@@ -29,16 +29,13 @@ async function appendDoneAuditComment(teamId: string, ticketIdOrNumber: string) 
   await fs.writeFile(hit.file, next, "utf8");
 }
 
-export async function POST(req: Request) {
+export async function POST(req: Request, ctx: { params: Promise<{ teamId: string }> }) {
   try {
+    const { teamId } = await ctx.params;
     const body = await req.json();
-    const teamId = String(body.teamId ?? "").trim();
     const ticket = String(body.ticket ?? "").trim();
     const to = String(body.to ?? "").trim();
 
-    if (!teamId) {
-      return NextResponse.json({ ok: false, error: "Missing teamId" }, { status: 400 });
-    }
     if (!ticket) {
       return NextResponse.json({ ok: false, error: "Missing ticket" }, { status: 400 });
     }
@@ -46,7 +43,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "Invalid destination stage" }, { status: 400 });
     }
 
-    const args = ["recipes", "move-ticket", "--team-id", teamId, "--ticket", ticket, "--to", to, "--yes"];
+    const args = [
+      "recipes",
+      "move-ticket",
+      "--team-id",
+      teamId,
+      "--ticket",
+      ticket,
+      "--to",
+      to,
+      "--yes",
+    ];
 
     const res = await runOpenClaw(args);
     if (!res.ok) throw new Error(res.stderr || `openclaw exit ${res.exitCode}`);

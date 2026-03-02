@@ -882,6 +882,64 @@ export default function WorkflowsEditorClient({
                         />
                       </label>
 
+                      {node.type === "human_approval" ? (
+                        <div className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-2">
+                          <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">approval config</div>
+
+                          <div className="mt-2 space-y-2">
+                            <label className="block">
+                              <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">provider</div>
+                              <input
+                                value={String((cfg as Record<string, unknown>).provider ?? "")}
+                                onChange={(e) => {
+                                  const v = String(e.target.value || "").trim();
+                                  const nextCfg = { ...cfg, ...(v ? { provider: v } : {}) };
+                                  if (!v) delete (nextCfg as Record<string, unknown>).provider;
+                                  setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
+                                }}
+                                className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                                placeholder="telegram"
+                              />
+                            </label>
+
+                            <label className="block">
+                              <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">target</div>
+                              <input
+                                value={String((cfg as Record<string, unknown>).target ?? "")}
+                                onChange={(e) => {
+                                  const v = String(e.target.value || "").trim();
+                                  const nextCfg = { ...cfg, ...(v ? { target: v } : {}) };
+                                  if (!v) delete (nextCfg as Record<string, unknown>).target;
+                                  setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
+                                }}
+                                className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                                placeholder="(e.g. Telegram chat id)"
+                              />
+                              <div className="mt-1 text-[10px] text-[color:var(--ck-text-tertiary)]">Overrides workflow-level default when set.</div>
+                            </label>
+
+                            <label className="block">
+                              <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">messageTemplate (optional)</div>
+                              <textarea
+                                value={String((cfg as Record<string, unknown>).messageTemplate ?? "")}
+                                onChange={(e) => {
+                                  const v = String(e.target.value || "");
+                                  const nextCfg = { ...cfg, ...(v.trim() ? { messageTemplate: v } : {}) };
+                                  if (!v.trim()) delete (nextCfg as Record<string, unknown>).messageTemplate;
+                                  setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
+                                }}
+                                className="mt-1 h-[70px] w-full resize-none rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-2 font-mono text-[10px] text-[color:var(--ck-text-primary)]"
+                                placeholder="Approval needed for {{workflowName}} (run {{runId}})"
+                                spellCheck={false}
+                              />
+                              <div className="mt-1 text-[10px] text-[color:var(--ck-text-tertiary)]">
+                                Vars: {"{{workflowName}}"}, {"{{workflowId}}"}, {"{{runId}}"}, {"{{nodeId}}"}
+                              </div>
+                            </label>
+                          </div>
+                        </div>
+                      ) : null}
+
                       <label className="block">
                         <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">config (json)</div>
                         <textarea
@@ -920,10 +978,15 @@ export default function WorkflowsEditorClient({
               const approvalProvider = String(meta.approvalProvider ?? "telegram").trim() || "telegram";
               const approvalTarget = String(meta.approvalTarget ?? "").trim();
 
+              // Cron schedule suggestions.
+              // Note: dev-team automation defaults should avoid the 02:00–07:00 America/New_York blackout window.
+              // We keep presets in "safe" hours by default.
               const presets = [
                 { label: "(no preset)", expr: "" },
+                { label: "Weekdays 09:00 local", expr: "0 9 * * 1-5" },
                 { label: "Mon/Wed/Fri 09:00 local", expr: "0 9 * * 1,3,5" },
                 { label: "Daily 08:00 local", expr: "0 8 * * *" },
+                { label: "Daily 12:00 local", expr: "0 12 * * *" },
                 { label: "Mon 09:30 local", expr: "30 9 * * 1" },
               ];
 
@@ -1094,7 +1157,6 @@ export default function WorkflowsEditorClient({
                                       value={presets.some((p) => p.expr === expr) ? expr : ""}
                                       onChange={(e) => {
                                         const nextExpr = e.target.value;
-                                        if (!nextExpr) return;
                                         setWorkflow({
                                           ...wf,
                                           triggers: triggers.map((x, idx) => (idx === i && x.kind === "cron" ? { ...x, expr: nextExpr } : x)),

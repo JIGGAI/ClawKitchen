@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import crypto from "node:crypto";
+import fs from "node:fs/promises";
+import path from "node:path";
 import { jsonOkRest, parseJsonBody } from "@/lib/api-route-helpers";
 import { handleWorkflowRunsGet } from "@/lib/workflows/api-handlers";
 import { errorMessage } from "@/lib/errors";
@@ -7,6 +9,7 @@ import { toolsInvoke } from "@/lib/gateway";
 import { listWorkflowRuns, readWorkflowRun, writeWorkflowRun } from "@/lib/workflows/runs-storage";
 import type { WorkflowRunFileV1, WorkflowRunNodeResultV1 } from "@/lib/workflows/runs-types";
 import { readWorkflow } from "@/lib/workflows/storage";
+import { assertSafeRelativeFileName, getTeamWorkspaceDir } from "@/lib/paths";
 import type { WorkflowFileV1 } from "@/lib/workflows/types";
 
 function nowIso() {
@@ -15,6 +18,102 @@ function nowIso() {
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v);
+}
+
+async function appendTeamFile(teamId: string, relPath: string, content: string) {
+  const safe = assertSafeRelativeFileName(relPath);
+  const teamDir = await getTeamWorkspaceDir(teamId);
+  const full = path.join(teamDir, safe);
+  await fs.mkdir(path.dirname(full), { recursive: true });
+  await fs.appendFile(full, content, "utf8");
+  return { full };
+}
+
+function templateReplace(input: string, vars: Record<string, string>) {
+  let out = input;
+  for (const [k, v] of Object.entries(vars)) {
+    out = out.replaceAll(`{{${k}}}`, v);
+  }
+  return out;
+}
+
+async function maybeExecutePendingNodesAfterApproval({
+  teamId,
+  workflow,
+  run,
+  approvalNodeId,
+  decidedAt,
+}: {
+  teamId: string;
+  workflow: WorkflowFileV1;
+  run: WorkflowRunFileV1;
+  approvalNodeId: string;
+  decidedAt: string;
+}) {
+  const wfNodes = Array.isArray(workflow.nodes) ? workflow.nodes : [];
+  const approvalIdx = wfNodes.findIndex((n) => n.id === approvalNodeId);
+  if (approvalIdx < 0) return run;
+
+  const vars = {
+    date: decidedAt,
+    "run.id": run.id,
+    "workflow.id": workflow.id,
+    "workflow.name": workflow.name || workflow.id,
+  };
+
+  const nextNodes: WorkflowRunNodeResultV1[] = Array.isArray(run.nodes)
+    ? await Promise.all(
+        run.nodes.map(async (n) => {
+          const wfIdx = wfNodes.findIndex((wfn) => wfn.id === n.nodeId);
+          const afterApproval = wfIdx >= 0 && wfIdx > approvalIdx;
+
+          if (!afterApproval || n.status !== "pending") return n;
+
+          const wfNode = wfIdx >= 0 ? wfNodes[wfIdx] : undefined;
+          const startedAt = n.startedAt ?? decidedAt;
+
+          if (wfNode?.type === "tool") {
+            const cfg = wfNode.config && typeof wfNode.config === "object" ? (wfNode.config as Record<string, unknown>) : {};
+            const tool = typeof cfg.tool === "string" && cfg.tool.trim() ? cfg.tool.trim() : "(unknown)";
+
+            if (tool === "fs.append") {
+              const args = cfg.args && typeof cfg.args === "object" ? (cfg.args as Record<string, unknown>) : {};
+              const pVal = typeof args.path === "string" ? args.path : "";
+              const cVal = typeof args.content === "string" ? args.content : "";
+              if (pVal && cVal) {
+                const content = templateReplace(cVal, vars);
+                const { full } = await appendTeamFile(teamId, pVal, content);
+                return {
+                  ...n,
+                  status: "success",
+                  startedAt,
+                  endedAt: decidedAt,
+                  output: { tool, appendedTo: full, bytes: content.length },
+                };
+              }
+            }
+
+            return {
+              ...n,
+              status: "success",
+              startedAt,
+              endedAt: decidedAt,
+              output: { tool, result: "(sample execution after approval)" },
+            };
+          }
+
+          return {
+            ...n,
+            status: "success",
+            startedAt,
+            endedAt: decidedAt,
+            output: n.output ?? { note: "(sample execution after approval)" },
+          };
+        })
+      )
+    : [];
+
+  return { ...run, nodes: nextNodes };
 }
 
 function formatApprovalPacketMessage(workflow: WorkflowFileV1, run: WorkflowRunFileV1, approvalNodeId: string): string {
@@ -57,6 +156,26 @@ function formatApprovalPacketMessage(workflow: WorkflowFileV1, run: WorkflowRunF
   return body;
 }
 
+function applyTemplate(template: string, vars: Record<string, string>) {
+  let out = template;
+  for (const [k, v] of Object.entries(vars)) {
+    out = out.replaceAll(`{{${k}}}`, v);
+  }
+  return out;
+}
+
+function getApprovalSendConfig(workflow: WorkflowFileV1, approvalNodeId: string) {
+  const meta = isRecord(workflow.meta) ? workflow.meta : {};
+  const node = Array.isArray(workflow.nodes) ? workflow.nodes.find((n) => n.id === approvalNodeId) : undefined;
+  const cfg = node && isRecord(node.config) ? node.config : {};
+
+  const provider = String(cfg.provider ?? cfg.channel ?? meta.approvalProvider ?? "telegram").trim() || "telegram";
+  const target = String(cfg.target ?? cfg.chatId ?? meta.approvalTarget ?? "").trim();
+  const messageTemplate = String(cfg.messageTemplate ?? cfg.template ?? "").trim();
+
+  return { provider, target, messageTemplate };
+}
+
 async function maybeSendApprovalRequest({
   teamId,
   workflow,
@@ -68,12 +187,18 @@ async function maybeSendApprovalRequest({
   run: WorkflowRunFileV1;
   approvalNodeId: string;
 }) {
-  const meta = isRecord(workflow.meta) ? workflow.meta : {};
-  const provider = String(meta.approvalProvider ?? "telegram").trim() || "telegram";
-  const target = String(meta.approvalTarget ?? "").trim();
+  const { provider, target, messageTemplate } = getApprovalSendConfig(workflow, approvalNodeId);
   if (!target) return;
 
-  const message = formatApprovalPacketMessage(workflow, run, approvalNodeId);
+  const base = formatApprovalPacketMessage(workflow, run, approvalNodeId);
+  const message = messageTemplate
+    ? `${applyTemplate(messageTemplate, {
+        workflowName: workflow.name || workflow.id,
+        workflowId: workflow.id,
+        runId: run.id,
+        nodeId: approvalNodeId,
+      })}\n\n${base}`
+    : base;
 
   // Best-effort: message delivery failures should not block file-first persistence.
   await toolsInvoke({
@@ -106,6 +231,7 @@ export async function POST(req: Request) {
   const action = String(o.action ?? "").trim();
   const runIdFromBody = String(o.runId ?? "").trim();
   const note = typeof o.note === "string" ? o.note : undefined;
+  const decidedBy = typeof o.decidedBy === "string" ? o.decidedBy : undefined;
 
   if (!teamId) return NextResponse.json({ ok: false, error: "teamId is required" }, { status: 400 });
   if (!workflowId) return NextResponse.json({ ok: false, error: "workflowId is required" }, { status: 400 });
@@ -144,18 +270,8 @@ export async function POST(req: Request) {
                   ...existingOutput,
                   decision: nextState,
                   note,
+                  decidedBy,
                 },
-              };
-            }
-
-            // For approve/cancel, resolve any remaining pending nodes so the run detail view is coherent.
-            if (nextState === "approved" && n.status === "pending") {
-              return {
-                ...n,
-                status: "success",
-                startedAt: n.startedAt ?? decidedAt,
-                endedAt: decidedAt,
-                output: n.output ?? { note: "(execution engine not yet wired)" },
               };
             }
 
@@ -183,11 +299,32 @@ export async function POST(req: Request) {
           requestedAt: run.approval?.requestedAt,
           decidedAt: nextState === "changes_requested" ? undefined : decidedAt,
           note,
+          decidedBy,
         },
         nodes: nextNodes,
       };
 
-      return jsonOkRest({ ...(await writeWorkflowRun(teamId, workflowId, nextRun)), runId: run.id });
+
+      let finalRun: WorkflowRunFileV1 = nextRun;
+
+      // Best-effort: for sample runs, simulate resuming execution after approval by resolving
+      // pending nodes and performing file-first writeback steps (fs.append).
+      if (action === "approve") {
+        try {
+          const wf = (await readWorkflow(teamId, workflowId)).workflow;
+          finalRun = await maybeExecutePendingNodesAfterApproval({
+            teamId,
+            workflow: wf,
+            run: nextRun,
+            approvalNodeId,
+            decidedAt,
+          });
+        } catch {
+          // ignore; keep file-first decision recorded
+        }
+      }
+
+      return jsonOkRest({ ...(await writeWorkflowRun(teamId, workflowId, finalRun)), runId: run.id });
     }
 
     // Create mode
@@ -360,9 +497,7 @@ export async function POST(req: Request) {
             };
 
             if (approvalNodeId) {
-              const meta = isRecord(wf.meta) ? wf.meta : {};
-              const provider = String(meta.approvalProvider ?? "telegram").trim() || "telegram";
-              const target = String(meta.approvalTarget ?? "").trim();
+              const { provider, target } = getApprovalSendConfig(wf, approvalNodeId);
 
               if (target) {
                 try {

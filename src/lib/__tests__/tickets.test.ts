@@ -82,7 +82,7 @@ describe("tickets", () => {
         mtimeMs: new Date("2026-01-15T10:00:00Z").getTime(),
       } as ReturnType<typeof fs.stat> extends Promise<infer T> ? T : never);
 
-      const result = await listTickets({ teamId: "dev" });
+      const result = await listTickets("dev");
       expect(result).toHaveLength(1);
       expect(result[0].number).toBe(33);
       expect(result[0].id).toBe("0033-fix-login");
@@ -98,7 +98,7 @@ describe("tickets", () => {
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([]);
 
-      const result = await listTickets({ teamId: "dev" });
+      const result = await listTickets("dev");
       expect(result).toEqual([]);
     });
 
@@ -115,7 +115,7 @@ describe("tickets", () => {
         mtimeMs: Date.now(),
       } as ReturnType<typeof fs.stat> extends Promise<infer T> ? T : never);
 
-      const result = await listTickets({ teamId: "dev" });
+      const result = await listTickets("dev");
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("0033-a");
     });
@@ -138,21 +138,21 @@ describe("tickets", () => {
     });
 
     it("finds by id and returns markdown", async () => {
-      const result = await getTicketMarkdown("0033-fix", { teamId: "dev" });
+      const result = await getTicketMarkdown("dev", "0033-fix");
       expect(result).not.toBeNull();
       expect(result!.id).toBe("0033-fix");
       expect(result!.markdown).toContain("Fix it");
     });
 
     it("finds by number", async () => {
-      const result = await getTicketMarkdown("33", { teamId: "dev" });
+      const result = await getTicketMarkdown("dev", "33");
       expect(result).not.toBeNull();
       expect(result!.id).toBe("0033-fix");
     });
 
     it("returns null when not found", async () => {
       vi.mocked(fs.readdir).mockReset().mockResolvedValue([]);
-      const result = await getTicketMarkdown("9999", { teamId: "dev" });
+      const result = await getTicketMarkdown("dev", "9999");
       expect(result).toBeNull();
     });
   });

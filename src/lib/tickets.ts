@@ -16,37 +16,41 @@ export interface TicketSummary {
   ageHours: number;
 }
 
-/**
- * Team workspace resolution.
- *
- * - If `teamId` is provided: ~/.openclaw/workspace-<teamId>
- * - Else: CK_TEAM_WORKSPACE_DIR (if set)
- * - Else: CK_TEAM_ID (if set)
- * - Else: ~/.openclaw/workspace-development-team (back-compat)
- */
-export function getTeamWorkspaceDir(teamId?: string): string {
-  const home = os.homedir();
-  if (!home) throw new Error("Could not resolve home directory");
-
-  if (teamId) return path.join(home, ".openclaw", `workspace-${teamId}`);
-
-  const ws = process.env.CK_TEAM_WORKSPACE_DIR;
-  if (ws) return ws;
-
-  const envTeamId = process.env.CK_TEAM_ID;
-  if (envTeamId) return path.join(home, ".openclaw", `workspace-${envTeamId}`);
-
-  return path.join(home, ".openclaw", "workspace-development-team");
+function assertSafeTeamId(teamId: string) {
+  // Conservative: matches OpenClaw team ids like "development-team".
+  if (!/^[a-z0-9][a-z0-9-]{1,63}$/.test(teamId)) {
+    throw new Error(`Invalid teamId "${teamId}"`);
+  }
 }
 
-export function stageDir(stage: TicketStage, teamDir: string = getTeamWorkspaceDir()): string {
+function isPathLike(s: string) {
+  return s.includes("/") || s.includes("\\");
+}
+
+export function teamWorkspace(teamId: string) {
+  assertSafeTeamId(teamId);
+  return path.join(os.homedir(), ".openclaw", `workspace-${teamId}`);
+}
+
+/**
+ * Back-compat helper for older non-team-scoped code paths.
+ * Prefer passing explicit teamId into APIs instead.
+ */
+export function getTeamWorkspaceDir(teamId?: string): string {
+  if (teamId) return teamWorkspace(teamId);
+  return process.env.CK_TEAM_WORKSPACE_DIR ?? teamWorkspace(process.env.CK_TEAM_ID ?? "development-team");
+}
+
+export function stageDir(stage: TicketStage, teamIdOrDir: string = "development-team") {
   const map: Record<TicketStage, string> = {
     backlog: "work/backlog",
     "in-progress": "work/in-progress",
     testing: "work/testing",
     done: "work/done",
   };
-  return path.join(teamDir, map[stage]);
+
+  const base = isPathLike(teamIdOrDir) ? teamIdOrDir : teamWorkspace(teamIdOrDir);
+  return path.join(base, map[stage]);
 }
 
 export function parseTitle(md: string) {
@@ -106,7 +110,7 @@ function teamIdFromTeamDir(teamDir: string): string {
   return base;
 }
 
-async function discoverTeamIds(): Promise<string[]> {
+export async function discoverTeamIds(): Promise<string[]> {
   // Convention: ~/.openclaw/workspace-<teamId>
   const root = path.join(os.homedir(), ".openclaw");
   let entries: string[] = [];
@@ -123,14 +127,20 @@ async function discoverTeamIds(): Promise<string[]> {
     .sort();
 }
 
-async function listTicketsForTeam(teamId: string, teamDir: string): Promise<TicketSummary[]> {
+/**
+ * List tickets for a specific team (recommended).
+ * - listTickets("development-team")
+ * - listTickets(teamWorkspaceDir)
+ */
+export async function listTickets(teamIdOrDir: string = "development-team"): Promise<TicketSummary[]> {
+  const teamId = isPathLike(teamIdOrDir) ? teamIdFromTeamDir(teamIdOrDir) : teamIdOrDir;
   const stages: TicketStage[] = ["backlog", "in-progress", "testing", "done"];
   const all: TicketSummary[] = [];
 
   for (const stage of stages) {
     let files: string[] = [];
     try {
-      files = await fs.readdir(stageDir(stage, teamDir));
+      files = await fs.readdir(stageDir(stage, teamIdOrDir));
     } catch {
       files = [];
     }
@@ -140,7 +150,7 @@ async function listTicketsForTeam(teamId: string, teamDir: string): Promise<Tick
       const number = parseNumberFromFilename(f);
       if (number == null) continue;
 
-      const file = path.join(stageDir(stage, teamDir), f);
+      const file = path.join(stageDir(stage, teamIdOrDir), f);
       const [md, stat] = await Promise.all([fs.readFile(file, "utf8"), fs.stat(file)]);
 
       const title = parseTitle(md);
@@ -162,61 +172,49 @@ async function listTicketsForTeam(teamId: string, teamDir: string): Promise<Tick
     }
   }
 
+  all.sort((a, b) => a.number - b.number);
   return all;
 }
 
-export async function listTickets(arg?: { teamId?: string } | string): Promise<TicketSummary[]> {
-  // Overload #1: listTickets(teamDir)
-  if (typeof arg === "string") {
-    const teamDir = arg;
-    const teamId = teamIdFromTeamDir(teamDir);
-    const tickets = await listTicketsForTeam(teamId, teamDir);
-    tickets.sort((a, b) => a.number - b.number);
-    return tickets;
-  }
-
-  // Overload #2: listTickets({teamId?}) (or listTickets())
-  const teamIds = arg?.teamId ? [arg.teamId] : await discoverTeamIds();
+/**
+ * List tickets across all discovered teams (used for /tickets?team=all).
+ */
+export async function listAllTeamsTickets(): Promise<TicketSummary[]> {
+  const teamIds = await discoverTeamIds();
   const all: TicketSummary[] = [];
 
   for (const teamId of teamIds) {
-    const teamDir = getTeamWorkspaceDir(teamId);
-    all.push(...(await listTicketsForTeam(teamId, teamDir)));
+    all.push(...(await listTickets(teamId)));
   }
 
   all.sort((a, b) => (a.teamId === b.teamId ? a.number - b.number : a.teamId.localeCompare(b.teamId)));
   return all;
 }
 
-export async function getTicketByIdOrNumber(
-  ticketIdOrNumber: string,
-  arg?: { teamId?: string; teamDir?: string } | string,
-): Promise<TicketSummary | null> {
+/**
+ * Back-compat helper used by some API routes.
+ */
+export async function getTicketByIdOrNumber(ticketIdOrNumber: string, teamIdOrDir: string = "development-team") {
+  const tickets = await listTickets(teamIdOrDir);
   const normalized = ticketIdOrNumber.trim();
-
-  let tickets: TicketSummary[] = [];
-  if (typeof arg === "string") {
-    tickets = await listTickets(arg);
-  } else if (arg?.teamDir) {
-    tickets = await listTickets(arg.teamDir);
-  } else if (arg?.teamId) {
-    tickets = await listTickets({ teamId: arg.teamId });
-  } else {
-    // Default: current team workspace dir (usually development-team)
-    tickets = await listTickets(getTeamWorkspaceDir());
-  }
 
   const byNumber = normalized.match(/^\d+$/) ? tickets.find((t) => t.number === Number(normalized)) : null;
   const byId = tickets.find((t) => t.id === normalized);
-
   return byId ?? byNumber ?? null;
 }
 
+export async function resolveTicket(teamId: string, ticketIdOrNumber: string): Promise<TicketSummary | null> {
+  return getTicketByIdOrNumber(ticketIdOrNumber, teamId);
+}
+
+/**
+ * getTicketMarkdown(teamId, ticketIdOrNumber)
+ */
 export async function getTicketMarkdown(
+  teamId: string,
   ticketIdOrNumber: string,
-  arg?: { teamId?: string; teamDir?: string } | string,
 ): Promise<{ teamId: string; id: string; file: string; markdown: string; owner: string | null; stage: TicketStage } | null> {
-  const hit = await getTicketByIdOrNumber(ticketIdOrNumber, arg);
+  const hit = await getTicketByIdOrNumber(ticketIdOrNumber, teamId);
   if (!hit) return null;
 
   return {

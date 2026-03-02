@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 
 import { NextResponse } from "next/server";
@@ -50,11 +51,12 @@ export async function POST(req: Request) {
     const newAgentId = normalizeAgentId(String(body.newAgentId ?? body.agentId ?? ""));
     const overwrite = Boolean(body.overwrite);
 
-    if (!process.env.HOME) {
+    const homeDir = os.homedir();
+    if (!homeDir) {
       return NextResponse.json({ ok: false, error: "HOME is not set" }, { status: 500 });
     }
 
-    const configPath = path.join(process.env.HOME, ".openclaw", "openclaw.json");
+    const configPath = path.join(homeDir, ".openclaw", "openclaw.json");
     const raw = await fs.readFile(configPath, "utf8");
     const cfg = JSON.parse(raw) as {
       agents?: { defaults?: { workspace?: string }; list?: Array<Record<string, unknown>> };

@@ -71,5 +71,22 @@ export function validateWorkflowFileV1(wf: WorkflowFileV1): WorkflowValidationRe
     }
   }
 
+  // Human approval node sanity checks (MVP)
+  const meta = wf.meta && typeof wf.meta === "object" && !Array.isArray(wf.meta) ? (wf.meta as Record<string, unknown>) : {};
+  const defaultTarget = String(meta.approvalTarget ?? "").trim();
+  for (const n of nodes) {
+    if (n.type !== "human_approval") continue;
+    const cfg = n.config && typeof n.config === "object" && !Array.isArray(n.config) ? (n.config as Record<string, unknown>) : {};
+    const target = String(cfg.target ?? cfg.chatId ?? "").trim();
+    const provider = String(cfg.provider ?? cfg.channel ?? "").trim();
+
+    if (!target && !defaultTarget) {
+      warnings.push(`human_approval node ${String(n.id)} has no target (set node.config.target or workflow.meta.approvalTarget)`);
+    }
+    if (target && !provider && !String(meta.approvalProvider ?? "").trim()) {
+      warnings.push(`human_approval node ${String(n.id)} has a target but no provider (set node.config.provider or workflow.meta.approvalProvider)`);
+    }
+  }
+
   return { errors, warnings };
 }
