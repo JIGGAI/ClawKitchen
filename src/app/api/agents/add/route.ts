@@ -53,7 +53,7 @@ export async function POST(req: Request) {
 
     const homeDir = os.homedir();
     if (!homeDir) {
-      return NextResponse.json({ ok: false, error: "Unable to resolve home directory" }, { status: 500 });
+      return NextResponse.json({ ok: false, error: "HOME is not set" }, { status: 500 });
     }
 
     const configPath = path.join(homeDir, ".openclaw", "openclaw.json");
