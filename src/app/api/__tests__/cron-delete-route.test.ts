@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { POST } from "../cron/delete/route";
 
 vi.mock("@/lib/gateway", () => ({ toolsInvoke: vi.fn() }));
+vi.mock("@/lib/openclaw", () => ({ runOpenClaw: vi.fn() }));
 vi.mock("node:fs/promises", () => ({
   default: {
     readdir: vi.fn(),
@@ -12,11 +13,13 @@ vi.mock("node:fs/promises", () => ({
 }));
 
 import { toolsInvoke } from "@/lib/gateway";
+import { runOpenClaw } from "@/lib/openclaw";
 import fs from "node:fs/promises";
 
 describe("api cron delete route", () => {
   beforeEach(() => {
     vi.mocked(toolsInvoke).mockReset();
+    vi.mocked(runOpenClaw).mockReset();
     vi.mocked(fs.readdir).mockReset();
     vi.mocked(fs.stat).mockReset();
     vi.mocked(fs.readFile).mockReset();
@@ -33,7 +36,7 @@ describe("api cron delete route", () => {
   });
 
   it("returns 200 and invokes cron remove", async () => {
-    vi.mocked(toolsInvoke).mockResolvedValue({ ok: true });
+    vi.mocked(runOpenClaw).mockResolvedValue({ ok: true, exitCode: 0, stdout: "{}", stderr: "" });
 
     const res = await POST(
       new Request("https://test", { method: "POST", body: JSON.stringify({ id: "job-1" }) })
@@ -42,11 +45,12 @@ describe("api cron delete route", () => {
     const json = await res.json();
     expect(json.ok).toBe(true);
     expect(json.id).toBe("job-1");
-    expect(toolsInvoke).toHaveBeenCalledWith({ tool: "cron", args: { action: "remove", jobId: "job-1" } });
+    expect(runOpenClaw).toHaveBeenCalledWith(["cron", "rm", "job-1", "--json"]);
   });
 
   it("marks orphaned entries in cron-jobs.json when mapping references job", async () => {
     const baseHome = "/mock/base";
+    vi.mocked(runOpenClaw).mockResolvedValue({ ok: true, exitCode: 0, stdout: "{}", stderr: "" });
     vi.mocked(toolsInvoke)
       .mockResolvedValueOnce({ ok: true })
       .mockResolvedValueOnce({

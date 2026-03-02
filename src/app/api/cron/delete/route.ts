@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { toolsInvoke } from "@/lib/gateway";
+import { runOpenClaw } from "@/lib/openclaw";
 import { getBaseWorkspaceFromGateway, markOrphanedInTeamWorkspaces } from "../helpers";
 
 export async function POST(req: Request) {
@@ -7,7 +8,11 @@ export async function POST(req: Request) {
   const id = String(body.id ?? "").trim();
   if (!id) return NextResponse.json({ ok: false, error: "id is required" }, { status: 400 });
 
-  const result = await toolsInvoke({ tool: "cron", args: { action: "remove", jobId: id } });
+  const result = await runOpenClaw(["cron", "rm", id, "--json"]);
+
+  if (!result.ok) {
+    return NextResponse.json({ ok: false, error: result.stderr || result.stdout }, { status: 500 });
+  }
 
   let orphanedIn: Array<{ teamId: string; mappingPath: string; keys: string[] }> = [];
   try {
