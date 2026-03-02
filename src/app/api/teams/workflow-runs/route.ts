@@ -6,11 +6,10 @@ import { jsonOkRest, parseJsonBody } from "@/lib/api-route-helpers";
 import { handleWorkflowRunsGet } from "@/lib/workflows/api-handlers";
 import { errorMessage } from "@/lib/errors";
 import { toolsInvoke } from "@/lib/gateway";
-import { readOpenClawConfig } from "@/lib/paths";
+import { assertSafeRelativeFileName, getTeamWorkspaceDir, readOpenClawConfig } from "@/lib/paths";
 import { listWorkflowRuns, readWorkflowRun, writeWorkflowRun } from "@/lib/workflows/runs-storage";
 import type { WorkflowRunFileV1, WorkflowRunNodeResultV1 } from "@/lib/workflows/runs-types";
 import { readWorkflow } from "@/lib/workflows/storage";
-import { assertSafeRelativeFileName, getTeamWorkspaceDir } from "@/lib/paths";
 import type { WorkflowFileV1 } from "@/lib/workflows/types";
 
 function nowIso() {
