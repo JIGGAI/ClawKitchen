@@ -9,8 +9,8 @@ function todayUtc() {
   return new Date().toISOString().slice(0, 10);
 }
 
-async function appendDoneAuditComment(ticketIdOrNumber: string) {
-  const hit = await getTicketMarkdown("development-team", ticketIdOrNumber);
+async function appendDoneAuditComment(teamId: string, ticketIdOrNumber: string) {
+  const hit = await getTicketMarkdown(teamId, ticketIdOrNumber);
   if (!hit) return;
 
   const line = `- ${todayUtc()} (ClawKitchen UI): Marked done from ClawKitchen UI.`;
@@ -29,8 +29,9 @@ async function appendDoneAuditComment(ticketIdOrNumber: string) {
   await fs.writeFile(hit.file, next, "utf8");
 }
 
-export async function POST(req: Request) {
+export async function POST(req: Request, ctx: { params: Promise<{ teamId: string }> }) {
   try {
+    const { teamId } = await ctx.params;
     const body = await req.json();
     const ticket = String(body.ticket ?? "").trim();
     const to = String(body.to ?? "").trim();
@@ -46,7 +47,7 @@ export async function POST(req: Request) {
       "recipes",
       "move-ticket",
       "--team-id",
-      "development-team",
+      teamId,
       "--ticket",
       ticket,
       "--to",
@@ -58,7 +59,7 @@ export async function POST(req: Request) {
     if (!res.ok) throw new Error(res.stderr || `openclaw exit ${res.exitCode}`);
 
     if (to === "done") {
-      await appendDoneAuditComment(ticket);
+      await appendDoneAuditComment(teamId, ticket);
     }
 
     return NextResponse.json({ ok: true });

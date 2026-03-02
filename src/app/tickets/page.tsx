@@ -5,6 +5,6 @@ import { TicketsBoardClient } from "@/app/tickets/TicketsBoardClient";
 export const dynamic = "force-dynamic";
 
 export default async function TicketsPage() {
-  const tickets = await listTickets();
-  return <TicketsBoardClient tickets={tickets} />;
+  const tickets = await listTickets("development-team");
+  return <TicketsBoardClient tickets={tickets} basePath="/tickets" />;
 }

@@ -137,21 +137,21 @@ describe("tickets", () => {
     });
 
     it("finds by id and returns markdown", async () => {
-      const result = await getTicketMarkdown("0033-fix");
+      const result = await getTicketMarkdown("development-team", "0033-fix");
       expect(result).not.toBeNull();
       expect(result!.id).toBe("0033-fix");
       expect(result!.markdown).toContain("Fix it");
     });
 
     it("finds by number", async () => {
-      const result = await getTicketMarkdown("33");
+      const result = await getTicketMarkdown("development-team", "33");
       expect(result).not.toBeNull();
       expect(result!.id).toBe("0033-fix");
     });
 
     it("returns null when not found", async () => {
       vi.mocked(fs.readdir).mockReset().mockResolvedValue([]);
-      const result = await getTicketMarkdown("9999");
+      const result = await getTicketMarkdown("development-team", "9999");
       expect(result).toBeNull();
     });
   });

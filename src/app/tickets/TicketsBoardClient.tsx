@@ -1,9 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { errorMessage } from "@/lib/errors";
-import { fetchJson } from "@/lib/fetch-json";
+import { useMemo, useState } from "react";
 import type { TicketStage, TicketSummary } from "@/lib/tickets";
 
 const STAGES: { key: TicketStage; label: string }[] = [
@@ -44,11 +41,13 @@ function formatAge(hours: number) {
   return `${Math.round(hours / 24)}d`;
 }
 
-export function TicketsBoardClient({ tickets }: { tickets: TicketSummary[] }) {
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-  const [confirmMove, setConfirmMove] = useState<{ ticket: TicketSummary; to: TicketStage } | null>(null);
+export function TicketsBoardClient({
+  tickets,
+  basePath,
+}: {
+  tickets: TicketSummary[];
+  basePath: string;
+}) {
   const [dateFilter, setDateFilter] = useState<DateFilter>("30d");
   const [customFrom, setCustomFrom] = useState<string>("");
   const [customTo, setCustomTo] = useState<string>("");
@@ -109,15 +108,6 @@ export function TicketsBoardClient({ tickets }: { tickets: TicketSummary[] }) {
     return map;
   }, [filteredTickets]);
 
-  async function move(ticket: TicketSummary, to: TicketStage) {
-    setError(null);
-    await fetchJson("/api/tickets/move", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ ticket: ticket.id, to }),
-    });
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -161,25 +151,15 @@ export function TicketsBoardClient({ tickets }: { tickets: TicketSummary[] }) {
               </label>
             </div>
           ) : null}
-
-          <div className="text-sm text-[color:var(--ck-text-secondary)]">{isPending ? "Updating…" : ""}</div>
         </div>
       </div>
-
-      {error ? (
-        <div className="ck-glass border border-[color:var(--ck-border-strong)] p-3 text-sm text-[color:var(--ck-text-primary)]">
-          {error}
-        </div>
-      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-4">
         {STAGES.map(({ key, label }) => (
           <section key={key} className="ck-glass p-3">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-sm font-semibold tracking-tight">{label}</h2>
-              <span className="text-xs text-[color:var(--ck-text-tertiary)]">
-                {byStage[key].length}
-              </span>
+              <span className="text-xs text-[color:var(--ck-text-tertiary)]">{byStage[key].length}</span>
             </div>
 
             <div className="space-y-2">
@@ -195,7 +175,7 @@ export function TicketsBoardClient({ tickets }: { tickets: TicketSummary[] }) {
                   className="rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] bg-[color:var(--ck-bg-glass-strong)] p-3"
                 >
                   <a
-                    href={`/tickets/${encodeURIComponent(t.id)}`}
+                    href={`${basePath}/${encodeURIComponent(t.id)}`}
                     className="block text-sm font-medium text-[color:var(--ck-text-primary)] hover:underline"
                   >
                     {String(t.number).padStart(4, "0")} — {t.title}
@@ -205,27 +185,6 @@ export function TicketsBoardClient({ tickets }: { tickets: TicketSummary[] }) {
                     <span>·</span>
                     <span>Age: {formatAge(t.ageHours)}</span>
                   </div>
-
-                  <div className="mt-2 flex items-center justify-between gap-2">
-                    <label className="text-xs text-[color:var(--ck-text-tertiary)]">
-                      Move
-                      <select
-                        className="ml-2 rounded border border-[color:var(--ck-border-subtle)] bg-transparent px-2 py-1 text-xs"
-                        value={t.stage}
-                        onChange={(e) => {
-                          const to = e.target.value as TicketStage;
-                          if (to === t.stage) return;
-                          setConfirmMove({ ticket: t, to });
-                        }}
-                      >
-                        {STAGES.map((s) => (
-                          <option key={s.key} value={s.key}>
-                            {s.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
                 </div>
               ))}
             </div>
@@ -234,62 +193,8 @@ export function TicketsBoardClient({ tickets }: { tickets: TicketSummary[] }) {
       </div>
 
       <p className="text-xs text-[color:var(--ck-text-tertiary)]">
-        Source of truth: development-team markdown tickets (via openclaw recipes move-ticket).
+        Source of truth: ticket markdown files in the team workspace.
       </p>
-
-      {confirmMove ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="ck-glass w-full max-w-lg rounded-[var(--ck-radius-md)] border border-[color:var(--ck-border-strong)] p-4">
-            <div className="text-sm font-semibold text-[color:var(--ck-text-primary)]">Confirm status change</div>
-
-            <div className="mt-2 text-sm text-[color:var(--ck-text-secondary)]">
-              Move <span className="font-medium text-[color:var(--ck-text-primary)]">{String(confirmMove.ticket.number).padStart(4, "0")}</span> to{" "}
-              <span className="font-medium text-[color:var(--ck-text-primary)]">
-                {STAGES.find((s) => s.key === confirmMove.to)?.label ?? confirmMove.to}
-              </span>
-              ?
-            </div>
-
-            <div className="mt-3 rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] bg-[color:var(--ck-bg-glass-strong)] p-3 text-xs text-[color:var(--ck-text-tertiary)]">
-              {confirmMove.to === "done" ? (
-                <>
-                  This will move the ticket file to <code>work/done/</code> and it will stop being selected by automated agent loops.
-                  <br />
-                  ClawKitchen will also append an audit comment under <code>## Comments</code>.
-                </>
-              ) : (
-                <>This will move the ticket file on disk to the selected lane.</>
-              )}
-            </div>
-
-            <div className="mt-4 flex items-center justify-end gap-2">
-              <button
-                className="rounded border border-[color:var(--ck-border-subtle)] px-3 py-1.5 text-xs text-[color:var(--ck-text-secondary)]"
-                onClick={() => setConfirmMove(null)}
-                disabled={isPending}
-              >
-                Cancel
-              </button>
-              <button
-                className="rounded bg-[color:var(--ck-accent)] px-3 py-1.5 text-xs font-medium text-black"
-                onClick={() => {
-                  const payload = confirmMove;
-                  if (!payload) return;
-                  setConfirmMove(null);
-                  startTransition(() => {
-                    move(payload.ticket, payload.to)
-                      .then(() => router.refresh())
-                      .catch((err: unknown) => setError(errorMessage(err)));
-                  });
-                }}
-                disabled={isPending}
-              >
-                Confirm
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

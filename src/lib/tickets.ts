@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 
 export type TicketStage = "backlog" | "in-progress" | "testing" | "done";
@@ -14,31 +15,40 @@ export interface TicketSummary {
   ageHours: number;
 }
 
-import os from "node:os";
-
-/**
- * TEMP/MVP:
- * - Prefer CK_TEAM_WORKSPACE_DIR (no hardcoding).
- * - Fallback to ~/.openclaw/workspace-development-team for backwards compatibility.
- *
- * NOTE(#0116): ticket APIs should become fully team-scoped via global team context.
- */
-export function getTeamWorkspaceDir(): string {
-  const ws = process.env.CK_TEAM_WORKSPACE_DIR;
-  if (ws) return ws;
-
-  const home = os.homedir();
-  return path.join(home, ".openclaw", "workspace-development-team");
+function assertSafeTeamId(teamId: string) {
+  // Conservative: matches OpenClaw team ids like "development-team".
+  if (!/^[a-z0-9][a-z0-9-]{1,63}$/.test(teamId)) {
+    throw new Error(`Invalid teamId "${teamId}"`);
+  }
 }
 
-export function stageDir(stage: TicketStage, teamDir: string = getTeamWorkspaceDir()) {
+function isPathLike(s: string) {
+  return s.includes("/") || s.includes("\\");
+}
+
+export function teamWorkspace(teamId: string) {
+  assertSafeTeamId(teamId);
+  return path.join(os.homedir(), ".openclaw", `workspace-${teamId}`);
+}
+
+/**
+ * Back-compat for older non-team-scoped routes.
+ * Prefer passing explicit teamId into APIs instead.
+ */
+export function getTeamWorkspaceDir(): string {
+  return process.env.CK_TEAM_WORKSPACE_DIR ?? teamWorkspace("development-team");
+}
+
+export function stageDir(stage: TicketStage, teamOrDir: string = "development-team") {
   const map: Record<TicketStage, string> = {
     backlog: "work/backlog",
     "in-progress": "work/in-progress",
     testing: "work/testing",
     done: "work/done",
   };
-  return path.join(teamDir, map[stage]);
+
+  const base = isPathLike(teamOrDir) ? teamOrDir : teamWorkspace(teamOrDir);
+  return path.join(base, map[stage]);
 }
 
 export function parseTitle(md: string) {
@@ -81,7 +91,7 @@ export function parseTitle(md: string) {
 }
 
 function parseField(md: string, field: string): string | null {
-  const re = new RegExp(`^${field}:\s*(.*)$`, "mi");
+  const re = new RegExp(`^${field}:\\s*(.*)$`, "mi");
   const m = md.match(re);
   return m?.[1]?.trim() || null;
 }
@@ -92,14 +102,19 @@ export function parseNumberFromFilename(filename: string): number | null {
   return Number(m[1]);
 }
 
-export async function listTickets(teamDir: string = getTeamWorkspaceDir()): Promise<TicketSummary[]> {
+/**
+ * List tickets.
+ * - Preferred: listTickets("development-team")
+ * - Back-compat: listTickets(getTeamWorkspaceDir())
+ */
+export async function listTickets(teamIdOrDir: string = "development-team"): Promise<TicketSummary[]> {
   const stages: TicketStage[] = ["backlog", "in-progress", "testing", "done"];
   const all: TicketSummary[] = [];
 
   for (const stage of stages) {
     let files: string[] = [];
     try {
-      files = await fs.readdir(stageDir(stage, teamDir));
+      files = await fs.readdir(stageDir(stage, teamIdOrDir));
     } catch {
       files = [];
     }
@@ -109,7 +124,7 @@ export async function listTickets(teamDir: string = getTeamWorkspaceDir()): Prom
       const number = parseNumberFromFilename(f);
       if (number == null) continue;
 
-      const file = path.join(stageDir(stage, teamDir), f);
+      const file = path.join(stageDir(stage, teamIdOrDir), f);
       const [md, stat] = await Promise.all([fs.readFile(file, "utf8"), fs.stat(file)]);
 
       const title = parseTitle(md);
@@ -134,24 +149,37 @@ export async function listTickets(teamDir: string = getTeamWorkspaceDir()): Prom
   return all;
 }
 
-export async function getTicketByIdOrNumber(ticketIdOrNumber: string, teamDir: string = getTeamWorkspaceDir()): Promise<TicketSummary | null> {
-  const tickets = await listTickets(teamDir);
+/**
+ * Back-compat helper used by some API routes.
+ */
+export async function getTicketByIdOrNumber(
+  ticketIdOrNumber: string,
+  teamIdOrDir: string = "development-team",
+): Promise<TicketSummary | null> {
+  const tickets = await listTickets(teamIdOrDir);
   const normalized = ticketIdOrNumber.trim();
 
-  const byNumber = normalized.match(/^\d+$/)
-    ? tickets.find((t) => t.number === Number(normalized))
-    : null;
-
+  const byNumber = normalized.match(/^\d+$/) ? tickets.find((t) => t.number === Number(normalized)) : null;
   const byId = tickets.find((t) => t.id === normalized);
-
   return byId ?? byNumber ?? null;
 }
 
+export async function resolveTicket(teamId: string, ticketIdOrNumber: string): Promise<TicketSummary | null> {
+  return getTicketByIdOrNumber(ticketIdOrNumber, teamId);
+}
+
+/**
+ * getTicketMarkdown(teamId, ticketIdOrNumber) OR getTicketMarkdown(ticketIdOrNumber, teamDir)
+ */
 export async function getTicketMarkdown(
-  ticketIdOrNumber: string,
-  teamDir: string = getTeamWorkspaceDir(),
+  a: string,
+  b: string,
 ): Promise<{ id: string; file: string; markdown: string; owner: string | null; stage: TicketStage } | null> {
-  const hit = await getTicketByIdOrNumber(ticketIdOrNumber, teamDir);
+  // Detect call signature.
+  const ticketIdOrNumber = isPathLike(b) ? a : b;
+  const teamIdOrDir = isPathLike(b) ? b : a;
+
+  const hit = await getTicketByIdOrNumber(ticketIdOrNumber, teamIdOrDir);
   if (!hit) return null;
 
   return {
