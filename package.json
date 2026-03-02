@@ -28,6 +28,8 @@
     "openclaw.plugin.json",
     "README.md",
     "next.config.ts",
+    "next-env.d.ts",
+    "tsconfig.json",
     "public/",
     "src/",
     ".next/BUILD_ID",
