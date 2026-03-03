@@ -70,7 +70,8 @@ export async function DELETE(req: Request) {
       patch: (prev) => {
         const next = { ...prev };
         const prevChannels = isRecord(next.channels) ? (next.channels as Record<string, unknown>) : {};
-        const { [provider]: _removed, ...rest } = prevChannels;
+        const rest = { ...prevChannels };
+        delete (rest as Record<string, unknown>)[provider];
         next.channels = rest;
         return next;
       },
