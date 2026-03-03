@@ -23,24 +23,22 @@ import { TeamMemoryTab } from "./TeamMemoryTab";
 import { OrchestratorPanel } from "../OrchestratorPanel";
 import WorkflowsClient from "../workflows/workflows-client";
 
-function buildTabs(showExperimentalTabs: boolean) {
-  return [
-    { id: "recipe" as const, label: "Recipe" },
-    { id: "agents" as const, label: "Agents" },
-    { id: "skills" as const, label: "Skills" },
-    { id: "cron" as const, label: "Cron" },
-    { id: "files" as const, label: "Files" },
-    { id: "orchestrator" as const, label: "Orchestrator" },
-    ...(showExperimentalTabs
-      ? ([
-          { id: "memory" as const, label: "Memory" },
-          { id: "workflows" as const, label: "Workflows" },
-        ] as const)
-      : []),
-  ];
-}
+const BASE_TABS = [
+  { id: "recipe" as const, label: "Recipe" },
+  { id: "agents" as const, label: "Agents" },
+  { id: "skills" as const, label: "Skills" },
+  { id: "cron" as const, label: "Cron" },
+  { id: "files" as const, label: "Files" },
+  { id: "orchestrator" as const, label: "Orchestrator" },
+] as const;
 
-type TabId = ReturnType<typeof buildTabs>[number]["id"];
+const EXPERIMENTAL_TABS = [
+  { id: "memory" as const, label: "Memory" },
+  { id: "workflows" as const, label: "Workflows" },
+] as const;
+
+
+type TabId = (typeof BASE_TABS | typeof EXPERIMENTAL_TABS)[number]["id"];
 
 export default function TeamEditor({ teamId, initialTab }: { teamId: string; initialTab?: string }) {
   const router = useRouter();
@@ -60,7 +58,7 @@ export default function TeamEditor({ teamId, initialTab }: { teamId: string; ini
     return valid.includes(initialTab as TabId) ? (initialTab as TabId) : "recipe";
   });
   const [showExperimentalTabs, setShowExperimentalTabs] = useState(false);
-  const tabs = useMemo(() => buildTabs(showExperimentalTabs), [showExperimentalTabs]);
+  const tabs = useMemo(() => (showExperimentalTabs ? [...BASE_TABS, ...EXPERIMENTAL_TABS] : [...BASE_TABS]), [showExperimentalTabs]);
 
 
   useEffect(() => {
