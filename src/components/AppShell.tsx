@@ -51,96 +51,35 @@ function SideNavLink({
   );
 }
 
-function safeDecode(v: string) {
-  try {
-    return decodeURIComponent(v);
-  } catch {
-    return v;
-  }
-}
-
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "/";
   const router = useRouter();
-
-  const routeTeamId = useMemo(() => {
+  const teamIdFromPath = useMemo(() => {
     const m = pathname.match(/^\/teams\/([^/]+)(?:\/|$)/);
-    return m ? safeDecode(m[1]) : null;
+    return m ? decodeURIComponent(m[1]) : null;
   }, [pathname]);
 
-  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
-
-  // Initial hydrate from localStorage.
-  useEffect(() => {
+  const [storedTeamId, setStoredTeamId] = useState<string>(() => {
+    if (typeof window === "undefined") return "";
     try {
-      const v = localStorage.getItem("ck-selected-team");
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate from localStorage after mount.
-      if (v) setSelectedTeamId(v);
+      return (localStorage.getItem("ck-selected-team") || "").trim();
     } catch {
-      // ignore
+      return "";
     }
-  }, []);
+  });
 
-  // Query param override (on mount) and route override (whenever team editor page is visited).
+  const selectedTeamId = (teamIdFromPath || storedTeamId).trim();
+
+  // Keep localStorage in sync with the effective selected team (when we can compute it).
   useEffect(() => {
-    let q: string | null = null;
+    if (typeof window === "undefined") return;
     try {
-      const sp = new URLSearchParams(window.location.search);
-      const v = sp.get("team");
-      if (v) q = safeDecode(v);
-    } catch {
-      // ignore
-    }
-
-    const override = q;
-    if (!override) return;
-
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- query deep link should win on first load.
-    setSelectedTeamId((prev) => {
-      if (prev === override) return prev;
-      try {
-        localStorage.setItem("ck-selected-team", override);
-      } catch {
-        // ignore
-      }
-      return override;
-    });
-  }, []);
-
-  useEffect(() => {
-    const override = routeTeamId;
-    if (!override) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- team editor route should sync selection.
-    setSelectedTeamId((prev) => {
-      if (prev === override) return prev;
-      try {
-        localStorage.setItem("ck-selected-team", override);
-      } catch {
-        // ignore
-      }
-      return override;
-    });
-  }, [routeTeamId]);
-
-  function setSelectedTeamIdPersist(next: string | null) {
-    setSelectedTeamId(next);
-    try {
-      if (next) localStorage.setItem("ck-selected-team", next);
+      if (selectedTeamId) localStorage.setItem("ck-selected-team", selectedTeamId);
       else localStorage.removeItem("ck-selected-team");
     } catch {
       // ignore
     }
-
-    // Optional: keep team-scoped pages deep-linkable.
-    if (pathname === "/tickets" || pathname.startsWith("/tickets/")) {
-      const url = next ? `/tickets?team=${encodeURIComponent(next)}` : "/tickets";
-      router.replace(url);
-    }
-    if (pathname === "/goals" || pathname.startsWith("/goals/")) {
-      const url = next ? `/goals?team=${encodeURIComponent(next)}` : "/goals";
-      router.replace(url);
-    }
-  }
+  }, [selectedTeamId]);
 
   const [collapsed, setCollapsed] = useState(false);
 
@@ -155,6 +94,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+
+
   function toggleCollapsed() {
     setCollapsed((v) => {
       const next = !v;
@@ -167,14 +108,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     });
   }
 
-  // Minimal team list (for switcher). We rely on existing /api/agents.
+  // Minimal team list (for switcher). We rely on existing /api/recipes.
   const [teamIds, setTeamIds] = useState<string[]>([]);
   useEffect(() => {
     (async () => {
       try {
         const json = await fetchJson<{ agents?: Array<{ workspace?: string }> }>("/api/agents", { cache: "no-store" });
         const agents = Array.isArray(json.agents)
-          ? (json.agents as Array<{ workspace?: string }>)
+          ? (json.agents as Array<{ workspace?: string }> )
           : [];
 
         const s = new Set<string>();
@@ -193,9 +134,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       }
     })();
   }, []);
-
-  const ticketsHref = selectedTeamId ? `/tickets?team=${encodeURIComponent(selectedTeamId)}` : "/tickets";
-  const goalsHref = selectedTeamId ? `/goals?team=${encodeURIComponent(selectedTeamId)}` : "/goals";
 
   const globalNav = [
     {
@@ -224,7 +162,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       ),
     },
     {
-      href: ticketsHref,
+      href: `/tickets`,
       label: "Tickets",
       icon: (
         <Icon>
@@ -235,7 +173,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       ),
     },
     {
-      href: goalsHref,
+      href: `/goals`,
       label: "Goals",
       icon: (
         <Icon>
@@ -297,7 +235,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 className="w-full rounded-[var(--ck-radius-sm)] bg-white/5 px-2 py-2 text-xs font-medium text-[color:var(--ck-text-secondary)] hover:bg-white/10"
                 title={selectedTeamId ? `Team: ${selectedTeamId}` : "Select team"}
                 onClick={() => {
-                  if (!selectedTeamId && teamIds[0]) setSelectedTeamIdPersist(teamIds[0]);
+                  const id = teamIds[0] || "";
+                  if (!id) return;
+                  setStoredTeamId(id);
+                  try {
+                    localStorage.setItem("ck-selected-team", id);
+                  } catch {
+                    // ignore
+                  }
+
+                  if (pathname === "/tickets") {
+                    router.replace(`/tickets?team=${encodeURIComponent(id)}`);
+                  }
                 }}
               >
                 👥
@@ -310,50 +259,47 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <select
                   value={selectedTeamId ?? ""}
                   onChange={(e) => {
-                    const id = e.target.value;
-                    setSelectedTeamIdPersist(id || null);
+                    const id = (e.target.value || "").trim();
+                    setStoredTeamId(id);
+                    try {
+                      localStorage.setItem("ck-selected-team", id);
+                    } catch {
+                      // ignore
+                    }
+
+                    // Keep the user on the current page; just update page-level filters where supported.
+                    if (pathname === "/tickets") {
+                      if (id) router.replace(`/tickets?team=${encodeURIComponent(id)}`);
+                      else router.replace("/tickets");
+                    }
                   }}
                   className="w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
                 >
-                  <option value="">(all)</option>
+                  <option value="">(select)</option>
                   {teamIds.map((id) => (
                     <option key={id} value={id}>
                       {id}
                     </option>
                   ))}
                 </select>
-
-                <div className="flex items-center justify-between px-2 pt-1 text-xs text-[color:var(--ck-text-tertiary)]">
-                  <span>{routeTeamId ? `Editing: ${routeTeamId}` : selectedTeamId ? `Selected: ${selectedTeamId}` : "Selected: all"}</span>
-                  {selectedTeamId ? (
-                    <Link
-                      href={`/teams/${encodeURIComponent(selectedTeamId)}`}
-                      className="text-[color:var(--ck-text-secondary)] hover:underline"
-                      title="Edit team"
-                    >
-                      Edit team
-                    </Link>
-                  ) : null}
-                </div>
               </div>
             )}
           </div>
 
           <nav className="min-h-0 flex-1 overflow-auto p-2">
-            <div className="mt-2 px-2 pb-2 pt-2">{/* section label intentionally omitted */}</div>
-            {globalNav.map((it) => {
-              const hrefPath = it.href.split("?")[0];
-              return (
-                <SideNavLink
-                  key={it.href}
-                  href={it.href}
-                  label={it.label}
-                  icon={<span aria-hidden>{it.icon}</span>}
-                  collapsed={collapsed}
-                  active={pathname === hrefPath || pathname.startsWith(hrefPath + "/")}
-                />
-              );
-            })}
+            <div className="mt-2 px-2 pb-2 pt-2">
+              {/* section label intentionally omitted */}
+            </div>
+            {globalNav.map((it) => (
+              <SideNavLink
+                key={it.href}
+                href={it.href}
+                label={it.label}
+                icon={<span aria-hidden>{it.icon}</span>}
+                collapsed={collapsed}
+                active={pathname === it.href || pathname.startsWith(it.href + "/")}
+              />
+            ))}
           </nav>
 
           <div className="flex items-center justify-between gap-2 border-t border-[color:var(--ck-border-subtle)] p-2">

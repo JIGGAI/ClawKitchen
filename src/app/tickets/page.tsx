@@ -1,4 +1,4 @@
-import { listAllTeamsTickets, listTickets } from "@/lib/tickets";
+import { listTickets } from "@/lib/tickets";
 import { TicketsBoardClient } from "@/app/tickets/TicketsBoardClient";
 
 // Tickets reflect live filesystem state; do not cache.
@@ -7,14 +7,15 @@ export const dynamic = "force-dynamic";
 export default async function TicketsPage({
   searchParams,
 }: {
-  searchParams?: {
-    team?: string;
-  };
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const rawTeam = typeof searchParams?.team === "string" ? searchParams.team.trim() : "";
-  const teamParam = rawTeam && rawTeam !== "all" ? rawTeam : null;
+  const sp = await searchParams;
+  const team = typeof sp.team === "string" ? sp.team.trim() : "";
 
-  const tickets = teamParam ? await listTickets(teamParam) : await listAllTeamsTickets();
+  // If no team is specified, fall back to legacy behavior.
+  // (AppShell will try to keep /tickets synced with the globally selected team via ?team=.)
+  const teamId = team || "development-team";
 
-  return <TicketsBoardClient tickets={tickets} basePath="/tickets" selectedTeamId={teamParam} />;
+  const tickets = await listTickets(teamId);
+  return <TicketsBoardClient tickets={tickets} basePath="/tickets" />;
 }
