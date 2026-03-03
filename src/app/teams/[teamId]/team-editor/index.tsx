@@ -23,24 +23,24 @@ import { TeamMemoryTab } from "./TeamMemoryTab";
 import { OrchestratorPanel } from "../OrchestratorPanel";
 import WorkflowsClient from "../workflows/workflows-client";
 
-const SHOW_EXPERIMENTAL_TABS = process.env.NEXT_PUBLIC_SHOW_EXPERIMENTAL_TABS === "1";
+function buildTabs(showExperimentalTabs: boolean) {
+  return [
+    { id: "recipe" as const, label: "Recipe" },
+    { id: "agents" as const, label: "Agents" },
+    { id: "skills" as const, label: "Skills" },
+    { id: "cron" as const, label: "Cron" },
+    { id: "files" as const, label: "Files" },
+    { id: "orchestrator" as const, label: "Orchestrator" },
+    ...(showExperimentalTabs
+      ? ([
+          { id: "memory" as const, label: "Memory" },
+          { id: "workflows" as const, label: "Workflows" },
+        ] as const)
+      : []),
+  ];
+}
 
-const TABS = [
-  { id: "recipe" as const, label: "Recipe" },
-  { id: "agents" as const, label: "Agents" },
-  { id: "skills" as const, label: "Skills" },
-  { id: "cron" as const, label: "Cron" },
-  { id: "files" as const, label: "Files" },
-  { id: "orchestrator" as const, label: "Orchestrator" },
-  ...(SHOW_EXPERIMENTAL_TABS
-    ? ([
-        { id: "memory" as const, label: "Memory" },
-        { id: "workflows" as const, label: "Workflows" },
-      ] as const)
-    : []),
-];
-
-type TabId = (typeof TABS)[number]["id"];
+type TabId = ReturnType<typeof buildTabs>[number]["id"];
 
 export default function TeamEditor({ teamId, initialTab }: { teamId: string; initialTab?: string }) {
   const router = useRouter();
@@ -54,11 +54,33 @@ export default function TeamEditor({ teamId, initialTab }: { teamId: string; ini
   const [content, setContent] = useState<string>("");
   const [loadedRecipeHash, setLoadedRecipeHash] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>(() => {
-    const valid: TabId[] = SHOW_EXPERIMENTAL_TABS
+    const valid: TabId[] = showExperimentalTabs
       ? (["recipe", "agents", "skills", "cron", "files", "memory", "orchestrator", "workflows"] as TabId[])
       : (["recipe", "agents", "skills", "cron", "files", "orchestrator"] as TabId[]);
     return valid.includes(initialTab as TabId) ? (initialTab as TabId) : "recipe";
   });
+  const [showExperimentalTabs, setShowExperimentalTabs] = useState(false);
+  const tabs = useMemo(() => buildTabs(showExperimentalTabs), [showExperimentalTabs]);
+
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/settings/experimental-tabs", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j: unknown) => {
+        const obj = j && typeof j === "object" ? (j as Record<string, unknown>) : {};
+        if (cancelled) return;
+        setShowExperimentalTabs(obj.showExperimentalTabs === true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setShowExperimentalTabs(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -146,7 +168,7 @@ export default function TeamEditor({ teamId, initialTab }: { teamId: string; ini
     setTeamMetaRecipeHash(null);
     setPublishOpen(false);
     setDeleteOpen(false);
-    const valid: TabId[] = SHOW_EXPERIMENTAL_TABS
+    const valid: TabId[] = showExperimentalTabs
       ? (["recipe", "agents", "skills", "cron", "files", "memory", "orchestrator", "workflows"] as TabId[])
       : (["recipe", "agents", "skills", "cron", "files", "orchestrator"] as TabId[]);
     if (initialTab && valid.includes(initialTab as TabId)) {
@@ -380,7 +402,7 @@ export default function TeamEditor({ teamId, initialTab }: { teamId: string; ini
 
 
       <div className="mt-6 flex flex-wrap gap-2">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <button
             key={t.id}
             onClick={() => setActiveTab(t.id as TabId)}
@@ -472,13 +494,13 @@ export default function TeamEditor({ teamId, initialTab }: { teamId: string; ini
 
       {activeTab === "orchestrator" && <OrchestratorPanel teamId={teamId} />}
 
-      {SHOW_EXPERIMENTAL_TABS && activeTab === "memory" && (
+      {showExperimentalTabs && activeTab === "memory" && (
         <div className="mt-6">
           <TeamMemoryTab teamId={teamId} />
         </div>
       )}
 
-      {SHOW_EXPERIMENTAL_TABS && activeTab === "workflows" && (
+      {showExperimentalTabs && activeTab === "workflows" && (
         <div className="mt-6">
           <WorkflowsClient teamId={teamId} />
         </div>
