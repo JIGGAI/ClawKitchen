@@ -125,6 +125,15 @@ async function startKitchen(api: OpenClawPluginApi, cfg: KitchenConfig) {
       const shouldProtect = authMode !== "off" && !isLocalhost(host) && authToken.trim();
       const isLocalRequest = isLoopbackRemoteAddress(req.socket.remoteAddress);
 
+      // Some browsers fetch the PWA manifest without preserving Authorization headers,
+      // causing noisy 401s in the console even though the app is working.
+      // The manifest contains no secrets, so allow it unauthenticated.
+      const pathname = new URL(url, `http://${host}:${port}`).pathname;
+      if (pathname === "/manifest.webmanifest") {
+        await handle(req, res);
+        return;
+      }
+
       if (shouldProtect && !(authMode === "local" && isLocalRequest)) {
         // Optional headless QA bypass: safe-by-default (disabled unless cfg.qaToken is set).
         // Flow:
