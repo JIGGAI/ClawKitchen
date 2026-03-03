@@ -1,23 +1,19 @@
 import { NextResponse } from "next/server";
 import { errorMessage } from "@/lib/errors";
-import { gatewayConfigGet, gatewayConfigPatch } from "@/lib/gateway";
-import { safeJsonParse } from "@/lib/json";
-import { readOpenClawConfig } from "@/lib/paths";
+import { readOpenClawConfigRaw, redactChannels, patchOpenClawConfigFile } from "@/lib/openclaw-config";
 import { isRecord } from "@/lib/type-guards";
 
 export async function GET() {
   try {
-    const [{ raw, hash }, openclaw] = await Promise.all([gatewayConfigGet(), readOpenClawConfig()]);
-
-    const parsed = safeJsonParse(raw);
-    const root = isRecord(parsed) ? parsed : {};
+    const cfg = await readOpenClawConfigRaw();
+    const root = isRecord(cfg.json) ? cfg.json : {};
     const channels = isRecord(root.channels) ? root.channels : {};
+    const bindings = Array.isArray(root.bindings) ? root.bindings : [];
 
-    // Channel bindings live in ~/.openclaw/openclaw.json (not the gateway config).
-    // We only surface the bindings list (no secrets) so UI can present a dropdown.
-    const bindings = Array.isArray(openclaw.bindings) ? openclaw.bindings : [];
-
-    return NextResponse.json({ ok: true, hash, channels, bindings });
+    // NOTE: We intentionally avoid calling the Gateway tool (gateway.config.get/patch) here.
+    // Kitchen runs in-process with the gateway, but the /tools/invoke surface is sensitive.
+    // Instead, we read ~/.openclaw/openclaw.json directly and redact secrets.
+    return NextResponse.json({ ok: true, hash: cfg.hash, channels: redactChannels(channels), bindings });
   } catch (e: unknown) {
     const msg = errorMessage(e);
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
@@ -44,7 +40,16 @@ export async function PUT(req: Request) {
       if (!botToken) return NextResponse.json({ ok: false, error: "telegram.botToken is required" }, { status: 400 });
     }
 
-    await gatewayConfigPatch({ channels: { [provider]: cfg } }, `ClawKitchen Channels upsert: ${provider}`);
+    await patchOpenClawConfigFile({
+      note: `ClawKitchen Channels upsert: ${provider}`,
+      patch: (prev) => {
+        const next = { ...prev };
+        const prevChannels = isRecord(next.channels) ? (next.channels as Record<string, unknown>) : {};
+        next.channels = { ...prevChannels, [provider]: cfg };
+        return next;
+      },
+    });
+
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {
     const msg = errorMessage(e);
@@ -60,8 +65,17 @@ export async function DELETE(req: Request) {
     const provider = String(body?.provider ?? "").trim();
     if (!provider) return NextResponse.json({ ok: false, error: "provider is required" }, { status: 400 });
 
-    // Patch semantics: setting a provider to null removes/clears it in the gateway config patcher.
-    await gatewayConfigPatch({ channels: { [provider]: null } }, `ClawKitchen Channels delete: ${provider}`);
+    await patchOpenClawConfigFile({
+      note: `ClawKitchen Channels delete: ${provider}`,
+      patch: (prev) => {
+        const next = { ...prev };
+        const prevChannels = isRecord(next.channels) ? (next.channels as Record<string, unknown>) : {};
+        const { [provider]: _removed, ...rest } = prevChannels;
+        next.channels = rest;
+        return next;
+      },
+    });
+
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {
     const msg = errorMessage(e);
