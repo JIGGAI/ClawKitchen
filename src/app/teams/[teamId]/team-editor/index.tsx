@@ -19,7 +19,11 @@ import { TeamAgentsTab } from "./TeamAgentsTab";
 import { TeamSkillsTab } from "./TeamSkillsTab";
 import { TeamCronTab } from "./TeamCronTab";
 import { TeamFilesTab } from "./TeamFilesTab";
+import { TeamMemoryTab } from "./TeamMemoryTab";
 import { OrchestratorPanel } from "../OrchestratorPanel";
+import WorkflowsClient from "../workflows/workflows-client";
+
+const SHOW_EXPERIMENTAL_TABS = process.env.NEXT_PUBLIC_SHOW_EXPERIMENTAL_TABS === "1";
 
 const TABS = [
   { id: "recipe" as const, label: "Recipe" },
@@ -27,9 +31,13 @@ const TABS = [
   { id: "skills" as const, label: "Skills" },
   { id: "cron" as const, label: "Cron" },
   { id: "files" as const, label: "Files" },
-  // NOTE: Memory tab hidden for public release (not ready).
   { id: "orchestrator" as const, label: "Orchestrator" },
-  // NOTE: Workflows tab hidden for public release (not ready).
+  ...(SHOW_EXPERIMENTAL_TABS
+    ? ([
+        { id: "memory" as const, label: "Memory" },
+        { id: "workflows" as const, label: "Workflows" },
+      ] as const)
+    : []),
 ];
 
 type TabId = (typeof TABS)[number]["id"];
@@ -46,7 +54,9 @@ export default function TeamEditor({ teamId, initialTab }: { teamId: string; ini
   const [content, setContent] = useState<string>("");
   const [loadedRecipeHash, setLoadedRecipeHash] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>(() => {
-    const valid: TabId[] = ["recipe", "agents", "skills", "cron", "files", "orchestrator"];
+    const valid: TabId[] = SHOW_EXPERIMENTAL_TABS
+      ? (["recipe", "agents", "skills", "cron", "files", "memory", "orchestrator", "workflows"] as TabId[])
+      : (["recipe", "agents", "skills", "cron", "files", "orchestrator"] as TabId[]);
     return valid.includes(initialTab as TabId) ? (initialTab as TabId) : "recipe";
   });
   const [loading, setLoading] = useState(true);
@@ -136,7 +146,9 @@ export default function TeamEditor({ teamId, initialTab }: { teamId: string; ini
     setTeamMetaRecipeHash(null);
     setPublishOpen(false);
     setDeleteOpen(false);
-    const valid: TabId[] = ["recipe", "agents", "skills", "cron", "files", "orchestrator"];
+    const valid: TabId[] = SHOW_EXPERIMENTAL_TABS
+      ? (["recipe", "agents", "skills", "cron", "files", "memory", "orchestrator", "workflows"] as TabId[])
+      : (["recipe", "agents", "skills", "cron", "files", "orchestrator"] as TabId[]);
     if (initialTab && valid.includes(initialTab as TabId)) {
       setActiveTab(initialTab as TabId);
     }
@@ -459,6 +471,18 @@ export default function TeamEditor({ teamId, initialTab }: { teamId: string; ini
 
 
       {activeTab === "orchestrator" && <OrchestratorPanel teamId={teamId} />}
+
+      {SHOW_EXPERIMENTAL_TABS && activeTab === "memory" && (
+        <div className="mt-6">
+          <TeamMemoryTab teamId={teamId} />
+        </div>
+      )}
+
+      {SHOW_EXPERIMENTAL_TABS && activeTab === "workflows" && (
+        <div className="mt-6">
+          <WorkflowsClient teamId={teamId} />
+        </div>
+      )}
 
 
       {activeTab === "files" && (
