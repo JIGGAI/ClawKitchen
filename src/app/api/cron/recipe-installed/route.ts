@@ -3,6 +3,7 @@ import path from "node:path";
 import { NextResponse } from "next/server";
 import { cronJobId, type CronJobShape } from "@/lib/cron";
 import { getContentText, toolsInvoke } from "@/lib/gateway";
+import { runOpenClaw } from "@/lib/openclaw";
 import { teamDirFromBaseWorkspace } from "@/lib/paths";
 
 type MappingStateV1 = {
@@ -55,10 +56,11 @@ export async function GET(req: Request) {
       .map((e) => e.installedCronId)
   );
 
-  const parsed = (await toolsInvoke<{ jobs: unknown[] }>({
-    tool: "cron",
-    args: { action: "list", includeDisabled: true },
-  })) as { jobs: unknown[] };
+  const res = await runOpenClaw(["cron", "list", "--all", "--json"]);
+  if (!res.ok) {
+    return NextResponse.json({ ok: false, error: res.stderr || res.stdout }, { status: 500 });
+  }
+  const parsed = JSON.parse(String(res.stdout || "{}")) as { jobs?: unknown[] };
   const jobs = (parsed.jobs ?? []).filter((j) => ids.has(cronJobId(j as CronJobShape)));
 
   return NextResponse.json({ ok: true, teamId, teamDir, mappingPath, jobCount: jobs.length, jobs });

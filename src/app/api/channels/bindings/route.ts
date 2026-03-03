@@ -2,15 +2,22 @@ import { NextResponse } from "next/server";
 import { errorMessage } from "@/lib/errors";
 import { gatewayConfigGet, gatewayConfigPatch } from "@/lib/gateway";
 import { safeJsonParse } from "@/lib/json";
+import { readOpenClawConfig } from "@/lib/paths";
 import { isRecord } from "@/lib/type-guards";
 
 export async function GET() {
   try {
-    const { raw, hash } = await gatewayConfigGet();
+    const [{ raw, hash }, openclaw] = await Promise.all([gatewayConfigGet(), readOpenClawConfig()]);
+
     const parsed = safeJsonParse(raw);
     const root = isRecord(parsed) ? parsed : {};
     const channels = isRecord(root.channels) ? root.channels : {};
-    return NextResponse.json({ ok: true, hash, channels });
+
+    // Channel bindings live in ~/.openclaw/openclaw.json (not the gateway config).
+    // We only surface the bindings list (no secrets) so UI can present a dropdown.
+    const bindings = Array.isArray(openclaw.bindings) ? openclaw.bindings : [];
+
+    return NextResponse.json({ ok: true, hash, channels, bindings });
   } catch (e: unknown) {
     const msg = errorMessage(e);
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });

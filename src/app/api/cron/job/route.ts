@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { toolsInvoke } from "@/lib/gateway";
+import { runOpenClaw } from "@/lib/openclaw";
 
 export async function POST(req: Request) {
   const body = (await req.json()) as { id?: string; action?: string };
@@ -12,11 +12,12 @@ export async function POST(req: Request) {
   }
 
   if (action === "run") {
-    const result = await toolsInvoke({ tool: "cron", args: { action: "run", jobId: id } });
+    const result = await runOpenClaw(["cron", "run", id, "--json"]);
+    if (!result.ok) return NextResponse.json({ ok: false, error: result.stderr || result.stdout }, { status: 500 });
     return NextResponse.json({ ok: true, action, id, result });
   }
 
-  const patch = { enabled: action === "enable" };
-  const result = await toolsInvoke({ tool: "cron", args: { action: "update", jobId: id, patch } });
+  const result = await runOpenClaw(["cron", action, id]);
+  if (!result.ok) return NextResponse.json({ ok: false, error: result.stderr || result.stdout }, { status: 500 });
   return NextResponse.json({ ok: true, action, id, result });
 }

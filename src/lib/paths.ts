@@ -15,6 +15,8 @@ type OpenClawConfig = {
     installs?: { recipes?: { installPath?: string; sourcePath?: string } };
     load?: { paths?: string[] };
   };
+  // OpenClaw message routing bindings (used for HITL approvals, etc.)
+  bindings?: unknown[];
 };
 
 export async function readOpenClawConfig(): Promise<OpenClawConfig> {

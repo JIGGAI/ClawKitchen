@@ -6,10 +6,10 @@ import { jsonOkRest, parseJsonBody } from "@/lib/api-route-helpers";
 import { handleWorkflowRunsGet } from "@/lib/workflows/api-handlers";
 import { errorMessage } from "@/lib/errors";
 import { toolsInvoke } from "@/lib/gateway";
+import { assertSafeRelativeFileName, getTeamWorkspaceDir, readOpenClawConfig } from "@/lib/paths";
 import { listWorkflowRuns, readWorkflowRun, writeWorkflowRun } from "@/lib/workflows/runs-storage";
 import type { WorkflowRunFileV1, WorkflowRunNodeResultV1 } from "@/lib/workflows/runs-types";
 import { readWorkflow } from "@/lib/workflows/storage";
-import { assertSafeRelativeFileName, getTeamWorkspaceDir } from "@/lib/paths";
 import type { WorkflowFileV1 } from "@/lib/workflows/types";
 
 function nowIso() {
@@ -164,16 +164,69 @@ function applyTemplate(template: string, vars: Record<string, string>) {
   return out;
 }
 
-function getApprovalSendConfig(workflow: WorkflowFileV1, approvalNodeId: string) {
+function getApprovalMessageTemplate(workflow: WorkflowFileV1, approvalNodeId: string) {
   const meta = isRecord(workflow.meta) ? workflow.meta : {};
   const node = Array.isArray(workflow.nodes) ? workflow.nodes.find((n) => n.id === approvalNodeId) : undefined;
-  const cfg = node && isRecord(node.config) ? node.config : {};
+  const cfg = isRecord(node?.config) ? node?.config : {};
 
-  const provider = String(cfg.provider ?? cfg.channel ?? meta.approvalProvider ?? "telegram").trim() || "telegram";
-  const target = String(cfg.target ?? cfg.chatId ?? meta.approvalTarget ?? "").trim();
-  const messageTemplate = String(cfg.messageTemplate ?? cfg.template ?? "").trim();
+  // Node overrides workflow meta.
+  return String(cfg.messageTemplate ?? cfg.template ?? meta.approvalMessageTemplate ?? "").trim();
+}
 
-  return { provider, target, messageTemplate };
+function bindingMatchToRef(match: unknown): { id: string; channel: string; target: string } | null {
+  if (!isRecord(match)) return null;
+  const channel = String(match.channel ?? "").trim();
+  if (!channel) return null;
+
+  const accountId = String(match.accountId ?? "").trim();
+  if (accountId) return { id: `${channel}:account:${accountId}`, channel, target: accountId };
+
+  const peer = isRecord(match.peer) ? match.peer : null;
+  const kind = peer ? String(peer.kind ?? "").trim() : "";
+  const peerId = peer ? String(peer.id ?? "").trim() : "";
+  if (kind && peerId) return { id: `${channel}:${kind}:${peerId}`, channel, target: peerId };
+
+  return null;
+}
+
+async function resolveApprovalChannel({
+  workflow,
+  approvalNodeId,
+}: {
+  workflow: WorkflowFileV1;
+  approvalNodeId: string;
+}): Promise<{ provider: string; target: string }> {
+  const meta = isRecord(workflow.meta) ? workflow.meta : {};
+  const wfBindingId = String(meta.approvalBindingId ?? "").trim();
+  const wfProvider = String(meta.approvalProvider ?? "telegram").trim() || "telegram";
+  const wfTarget = String(meta.approvalTarget ?? "").trim();
+
+  const node = Array.isArray(workflow.nodes) ? workflow.nodes.find((n) => n.id === approvalNodeId) : undefined;
+  const nodeCfg = isRecord(node?.config) ? node?.config : {};
+  const nodeBindingId = String(nodeCfg.approvalBindingId ?? "").trim();
+  const nodeProvider = String(nodeCfg.provider ?? "").trim();
+  const nodeTarget = String(nodeCfg.target ?? "").trim();
+
+  const desiredBindingId = nodeBindingId || wfBindingId;
+
+  if (desiredBindingId) {
+    try {
+      const cfg = await readOpenClawConfig();
+      const bindings = Array.isArray(cfg.bindings) ? cfg.bindings : [];
+      for (const b of bindings) {
+        if (!isRecord(b)) continue;
+        const ref = bindingMatchToRef(b.match);
+        if (ref && ref.id === desiredBindingId) return { provider: ref.channel, target: ref.target };
+      }
+    } catch {
+      // fall through to manual fields
+    }
+  }
+
+  // Manual precedence: node overrides workflow meta.
+  const provider = nodeProvider || wfProvider;
+  const target = nodeTarget || wfTarget;
+  return { provider, target };
 }
 
 async function maybeSendApprovalRequest({
@@ -187,7 +240,8 @@ async function maybeSendApprovalRequest({
   run: WorkflowRunFileV1;
   approvalNodeId: string;
 }) {
-  const { provider, target, messageTemplate } = getApprovalSendConfig(workflow, approvalNodeId);
+  const { provider, target } = await resolveApprovalChannel({ workflow, approvalNodeId });
+  const messageTemplate = getApprovalMessageTemplate(workflow, approvalNodeId);
   if (!target) return;
 
   const base = formatApprovalPacketMessage(workflow, run, approvalNodeId);
@@ -497,7 +551,9 @@ export async function POST(req: Request) {
             };
 
             if (approvalNodeId) {
-              const { provider, target } = getApprovalSendConfig(wf, approvalNodeId);
+              // Resolve the channel we *intend* to send to so we can record outbound metadata,
+              // even though delivery is best-effort.
+              const { provider, target } = await resolveApprovalChannel({ workflow: wf, approvalNodeId });
 
               if (target) {
                 try {

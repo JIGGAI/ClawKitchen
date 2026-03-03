@@ -45,6 +45,9 @@ export default function WorkflowsEditorClient({
   const [agents, setAgents] = useState<Array<{ id: string; identityName?: string }>>([]);
   const [agentsError, setAgentsError] = useState<string>("");
 
+  const [approvalBindings, setApprovalBindings] = useState<Array<{ id: string; label: string; channel: string; target: string }>>([]);
+  const [approvalBindingsError, setApprovalBindingsError] = useState<string>("");
+
   // Inspector state (parity with modal)
   const [workflowRuns, setWorkflowRuns] = useState<string[]>([]);
   const [workflowRunsLoading, setWorkflowRunsLoading] = useState(false);
@@ -122,6 +125,55 @@ export default function WorkflowsEditorClient({
       }
     })();
   }, [teamId]);
+
+  function isRecord(v: unknown): v is Record<string, unknown> {
+    return Boolean(v) && typeof v === "object" && !Array.isArray(v);
+  }
+
+  function bindingLabelAndTarget(b: unknown): { id: string; label: string; channel: string; target: string } | null {
+    // Expected OpenClaw binding shape:
+    // { agentId, match: { channel: "telegram", accountId?: string, peer?: { kind: "dm"|"group", id: string } } }
+    if (!isRecord(b)) return null;
+    const match = isRecord(b.match) ? b.match : null;
+    if (!match) return null;
+
+    const channel = String(match.channel ?? "").trim();
+    if (!channel) return null;
+
+    const accountId = String(match.accountId ?? "").trim();
+    if (accountId) {
+      const id = `${channel}:account:${accountId}`;
+      return { id, label: `${channel} · account:${accountId}`, channel, target: accountId };
+    }
+
+    const peer = isRecord(match.peer) ? match.peer : null;
+    const kind = peer ? String(peer.kind ?? "").trim() : "";
+    const peerId = peer ? String(peer.id ?? "").trim() : "";
+    if (kind && peerId) {
+      const id = `${channel}:${kind}:${peerId}`;
+      return { id, label: `${channel} · ${kind}:${peerId}`, channel, target: peerId };
+    }
+
+    return null;
+  }
+
+  useEffect(() => {
+    (async () => {
+      setApprovalBindingsError("");
+      try {
+        const res = await fetch("/api/channels/bindings", { cache: "no-store" });
+        const json = (await res.json()) as { ok?: boolean; bindings?: unknown[]; error?: string };
+        if (!res.ok || json.ok === false) throw new Error(json.error || "Failed to load bindings");
+
+        const list = Array.isArray(json.bindings) ? json.bindings : [];
+        const mapped = list.map(bindingLabelAndTarget).filter(Boolean) as Array<{ id: string; label: string; channel: string; target: string }>;
+        setApprovalBindings(mapped);
+      } catch (e: unknown) {
+        setApprovalBindingsError(e instanceof Error ? e.message : String(e));
+        setApprovalBindings([]);
+      }
+    })();
+  }, []);
 
   const parsed = useMemo(() => {
     if (status.kind !== "ready") return { wf: null as WorkflowFileV1 | null, err: "" };
@@ -975,6 +1027,7 @@ export default function WorkflowsEditorClient({
               const triggers = wf.triggers ?? [];
 
               const meta = wf.meta && typeof wf.meta === "object" && !Array.isArray(wf.meta) ? (wf.meta as Record<string, unknown>) : {};
+              const approvalBindingId = String(meta.approvalBindingId ?? "").trim();
               const approvalProvider = String(meta.approvalProvider ?? "telegram").trim() || "telegram";
               const approvalTarget = String(meta.approvalTarget ?? "").trim();
 
@@ -1014,33 +1067,76 @@ export default function WorkflowsEditorClient({
                     <summary className="cursor-pointer list-none px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)]">Approval Channel</summary>
                     <div className="px-3 pb-3 space-y-2">
                       <label className="block">
-                        <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">provider</div>
-                        <input
-                          value={approvalProvider}
+                        <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">binding (recommended)</div>
+                        <select
+                          value={approvalBindingId}
                           onChange={(e) => {
-                            const nextProvider = String(e.target.value || "").trim() || "telegram";
-                            setWorkflow({ ...wf, meta: { ...meta, approvalProvider: nextProvider } });
-                          }}
-                          className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
-                          placeholder="telegram"
-                        />
-                      </label>
+                            const nextId = String(e.target.value || "").trim();
+                            const selected = approvalBindings.find((b) => b.id === nextId);
 
-                      <label className="block">
-                        <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">target</div>
-                        <input
-                          value={approvalTarget}
-                          onChange={(e) => {
-                            const nextTarget = String(e.target.value || "").trim();
-                            setWorkflow({ ...wf, meta: { ...meta, approvalTarget: nextTarget } });
+                            // Store a stable-ish reference id in the workflow so it's portable.
+                            // We also keep provider/target in sync for backward compatibility.
+                            if (selected) {
+                              setWorkflow({
+                                ...wf,
+                                meta: {
+                                  ...meta,
+                                  approvalBindingId: selected.id,
+                                  approvalProvider: selected.channel,
+                                  approvalTarget: selected.target,
+                                },
+                              });
+                            } else {
+                              setWorkflow({ ...wf, meta: { ...meta, approvalBindingId: "" } });
+                            }
                           }}
                           className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
-                          placeholder="(e.g. Telegram chat id)"
-                        />
+                        >
+                          <option value="">(manual)</option>
+                          {approvalBindings.map((b) => (
+                            <option key={b.id} value={b.id}>
+                              {b.label}
+                            </option>
+                          ))}
+                        </select>
+                        {approvalBindingsError ? (
+                          <div className="mt-1 text-[10px] text-red-200">Failed to load bindings: {approvalBindingsError}</div>
+                        ) : null}
                         <div className="mt-1 text-[10px] text-[color:var(--ck-text-tertiary)]">
-                          If set, runs that reach a human-approval node can send an approval packet via the gateway message tool.
+                          Uses your existing OpenClaw bindings (recommended). Manual provider/target is an advanced override.
                         </div>
                       </label>
+
+                      <details className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/10">
+                        <summary className="cursor-pointer list-none px-2 py-1 text-[11px] font-medium text-[color:var(--ck-text-secondary)]">Advanced: manual override</summary>
+                        <div className="px-2 pb-2 pt-1 space-y-2">
+                          <label className="block">
+                            <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">provider</div>
+                            <input
+                              value={approvalProvider}
+                              onChange={(e) => {
+                                const nextProvider = String(e.target.value || "").trim() || "telegram";
+                                setWorkflow({ ...wf, meta: { ...meta, approvalBindingId: "", approvalProvider: nextProvider } });
+                              }}
+                              className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                              placeholder="telegram"
+                            />
+                          </label>
+
+                          <label className="block">
+                            <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">target</div>
+                            <input
+                              value={approvalTarget}
+                              onChange={(e) => {
+                                const nextTarget = String(e.target.value || "").trim();
+                                setWorkflow({ ...wf, meta: { ...meta, approvalBindingId: "", approvalTarget: nextTarget } });
+                              }}
+                              className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                              placeholder="(e.g. Telegram chat id)"
+                            />
+                          </label>
+                        </div>
+                      </details>
                     </div>
                   </details>
 

@@ -6,8 +6,10 @@ vi.mock("@/lib/gateway", async (importOriginal) => {
   return { ...actual, toolsInvoke: vi.fn() };
 });
 vi.mock("node:fs/promises", () => ({ default: { readFile: vi.fn() } }));
+vi.mock("@/lib/openclaw", () => ({ runOpenClaw: vi.fn() }));
 
 import { toolsInvoke } from "@/lib/gateway";
+import { runOpenClaw } from "@/lib/openclaw";
 import fs from "node:fs/promises";
 
 describe("api cron recipe-installed route", () => {
@@ -30,10 +32,10 @@ describe("api cron recipe-installed route", () => {
   beforeEach(() => {
     vi.mocked(toolsInvoke).mockReset();
     vi.mocked(fs.readFile).mockReset();
+    vi.mocked(runOpenClaw).mockReset();
 
-    vi.mocked(toolsInvoke)
-      .mockResolvedValueOnce(gatewayConfigResponse as never)
-      .mockResolvedValueOnce({ jobs: [] } as never);
+    vi.mocked(toolsInvoke).mockResolvedValueOnce(gatewayConfigResponse as never);
+    vi.mocked(runOpenClaw).mockResolvedValue({ ok: true, exitCode: 0, stdout: JSON.stringify({ jobs: [] }), stderr: "" });
   });
 
   it("returns 400 when teamId missing", async () => {
@@ -80,13 +82,13 @@ describe("api cron recipe-installed route", () => {
     vi.mocked(toolsInvoke)
       .mockReset()
       .mockResolvedValueOnce(gatewayConfigResponse as never)
-      .mockResolvedValueOnce({
-        jobs: [
+      
+    ;
+    vi.mocked(runOpenClaw).mockResolvedValueOnce({ ok: true, exitCode: 0, stdout: JSON.stringify({ jobs: [
           { id: "cron-1", name: "J1" },
           { id: "cron-2", name: "J2" },
           { id: "cron-3", name: "J3" },
-        ],
-      } as never);
+        ] }), stderr: "" });
 
     const res = await GET(
       new Request("https://test?teamId=my-team")

@@ -1,14 +1,14 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { POST } from "../cron/job/route";
 
-vi.mock("@/lib/gateway", () => ({ toolsInvoke: vi.fn() }));
+vi.mock("@/lib/openclaw", () => ({ runOpenClaw: vi.fn() }));
 
-import { toolsInvoke } from "@/lib/gateway";
+import { runOpenClaw } from "@/lib/openclaw";
 
 describe("api cron job route", () => {
   beforeEach(() => {
-    vi.mocked(toolsInvoke).mockReset();
-    vi.mocked(toolsInvoke).mockResolvedValue({ ok: true });
+    vi.mocked(runOpenClaw).mockReset();
+    vi.mocked(runOpenClaw).mockResolvedValue({ ok: true, exitCode: 0, stdout: "{}", stderr: "" });
   });
 
   it("returns 400 when id or action missing", async () => {
@@ -31,7 +31,7 @@ describe("api cron job route", () => {
     expect((await r2.json()).error).toBe("action must be enable|disable|run");
   });
 
-  it("calls toolsInvoke for enable", async () => {
+  it("calls openclaw cron enable", async () => {
     const res = await POST(
       new Request("https://test", {
         method: "POST",
@@ -39,13 +39,10 @@ describe("api cron job route", () => {
       })
     );
     expect(res.status).toBe(200);
-    expect(toolsInvoke).toHaveBeenCalledWith({
-      tool: "cron",
-      args: { action: "update", jobId: "job-1", patch: { enabled: true } },
-    });
+    expect(runOpenClaw).toHaveBeenCalledWith(["cron", "enable", "job-1"]);
   });
 
-  it("calls toolsInvoke for disable", async () => {
+  it("calls openclaw cron disable", async () => {
     const res = await POST(
       new Request("https://test", {
         method: "POST",
@@ -53,14 +50,11 @@ describe("api cron job route", () => {
       })
     );
     expect(res.status).toBe(200);
-    expect(toolsInvoke).toHaveBeenCalledWith({
-      tool: "cron",
-      args: { action: "update", jobId: "job-1", patch: { enabled: false } },
-    });
+    expect(runOpenClaw).toHaveBeenCalledWith(["cron", "disable", "job-1"]);
   });
 
-  it("calls toolsInvoke for run", async () => {
-    vi.mocked(toolsInvoke).mockResolvedValue({ ok: true, result: { ran: true } });
+  it("calls openclaw cron run", async () => {
+    vi.mocked(runOpenClaw).mockResolvedValue({ ok: true, exitCode: 0, stdout: JSON.stringify({ ran: true }), stderr: "" });
     const res = await POST(
       new Request("https://test", {
         method: "POST",
@@ -68,11 +62,8 @@ describe("api cron job route", () => {
       })
     );
     expect(res.status).toBe(200);
-    expect(toolsInvoke).toHaveBeenCalledWith({
-      tool: "cron",
-      args: { action: "run", jobId: "job-1" },
-    });
+    expect(runOpenClaw).toHaveBeenCalledWith(["cron", "run", "job-1", "--json"]);
     const json = await res.json();
-    expect(json.result).toEqual({ ok: true, result: { ran: true } });
+    expect(json.result.ok).toBe(true);
   });
 });

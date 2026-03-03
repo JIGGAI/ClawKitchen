@@ -6,17 +6,24 @@ vi.mock("@/lib/gateway", () => ({
   gatewayConfigPatch: vi.fn(),
 }));
 
+vi.mock("@/lib/paths", () => ({
+  readOpenClawConfig: vi.fn(),
+}));
+
 import { gatewayConfigGet, gatewayConfigPatch } from "@/lib/gateway";
+import { readOpenClawConfig } from "@/lib/paths";
 
 describe("api channels bindings route", () => {
   beforeEach(() => {
     vi.mocked(gatewayConfigGet).mockReset();
     vi.mocked(gatewayConfigPatch).mockReset();
+    vi.mocked(readOpenClawConfig).mockReset();
 
     vi.mocked(gatewayConfigGet).mockResolvedValue({
       raw: JSON.stringify({ channels: { telegram: { botToken: "x" } } }),
       hash: "abc",
     });
+    vi.mocked(readOpenClawConfig).mockResolvedValue({ bindings: [] } as never);
     vi.mocked(gatewayConfigPatch).mockResolvedValue(undefined);
   });
 
@@ -28,6 +35,7 @@ describe("api channels bindings route", () => {
       expect(json.ok).toBe(true);
       expect(json.channels).toEqual({ telegram: { botToken: "x" } });
       expect(json.hash).toBe("abc");
+      expect(json.bindings).toEqual([]);
     });
 
     it("returns empty channels when invalid JSON", async () => {

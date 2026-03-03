@@ -1,0 +1,12 @@
+# Don't ship tests or dev artifacts
+**/__tests__/**
+**/*.test.*
+**/*.spec.*
+
+# Don't ship coverage/reports
+coverage/
+report/
+
+# VCS
+.git/
+.github/

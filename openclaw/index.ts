@@ -12,6 +12,13 @@ type KitchenConfig = {
   host?: string;
   port?: number;
   /**
+   * Auth protection mode.
+   * - on: require authToken for non-localhost binds
+   * - local: allow localhost callers unauthenticated
+   * - off: disable auth entirely (NOT recommended)
+   */
+  authMode?: KitchenAuthMode;
+  /**
    * Enables HTTP Basic auth when binding to a non-localhost host.
    * Username is fixed to "kitchen"; password is this token.
    */
@@ -87,9 +94,9 @@ async function startKitchen(api: OpenClawPluginApi, cfg: KitchenConfig) {
   // Default to production/stable mode unless explicitly enabled.
   // Dev mode (turbopack) can transiently 404 routes until compilation finishes.
   const dev = cfg.dev === true;
-  const authToken = String(cfg.authToken || "");
-  const qaToken = String(cfg.qaToken || "");
-  const authMode = parseAuthMode(process.env.KITCHEN_AUTH_MODE);
+  const authToken = String(cfg.authToken ?? "");
+  const qaToken = String(cfg.qaToken ?? "");
+  const authMode = parseAuthMode(cfg.authMode);
 
   if (authMode !== "off" && !isLocalhost(host) && !authToken.trim()) {
     throw new Error(
@@ -117,6 +124,15 @@ async function startKitchen(api: OpenClawPluginApi, cfg: KitchenConfig) {
 
       const shouldProtect = authMode !== "off" && !isLocalhost(host) && authToken.trim();
       const isLocalRequest = isLoopbackRemoteAddress(req.socket.remoteAddress);
+
+      // Some browsers fetch the PWA manifest without preserving Authorization headers,
+      // causing noisy 401s in the console even though the app is working.
+      // The manifest contains no secrets, so allow it unauthenticated.
+      const pathname = new URL(url, `http://${host}:${port}`).pathname;
+      if (pathname === "/manifest.webmanifest") {
+        await handle(req, res);
+        return;
+      }
 
       if (shouldProtect && !(authMode === "local" && isLocalRequest)) {
         // Optional headless QA bypass: safe-by-default (disabled unless cfg.qaToken is set).
@@ -181,28 +197,6 @@ async function stopKitchen(api: OpenClawPluginApi) {
   api.logger.info("[kitchen] stopped");
 }
 
-function fetchHealthJson(healthUrl: string): Promise<{ ok?: boolean; startedAt?: unknown }> {
-  return new Promise<{ ok?: boolean; startedAt?: unknown }>((resolve, reject) => {
-    const req = http.get(healthUrl, (res) => {
-      const status = res.statusCode || 0;
-      let buf = "";
-      res.setEncoding("utf8");
-      res.on("data", (d) => (buf += d));
-      res.on("end", () => {
-        if (status < 200 || status >= 300) {
-          reject(new Error(`healthz returned HTTP ${status}`));
-          return;
-        }
-        try {
-          resolve(JSON.parse(buf));
-        } catch (e) {
-          reject(e);
-        }
-      });
-    });
-    req.on("error", reject);
-  });
-}
 
 const kitchenPlugin = {
   id: "kitchen",
@@ -220,6 +214,12 @@ const kitchenPlugin = {
       },
       host: { type: "string", default: "127.0.0.1" },
       port: { type: "integer", default: 7777, minimum: 1, maximum: 65535 },
+      authMode: {
+        type: "string",
+        enum: ["on", "local", "off"],
+        default: "on",
+        description: "Auth protection mode (on|local|off).",
+      },
       authToken: {
         type: "string",
         default: "",
@@ -252,10 +252,6 @@ const kitchenPlugin = {
             const port = Number(cfg.port || 7777);
             const url = `http://${host}:${port}`;
 
-            // Do a real health check so status works even when the service is running
-            // in a different process/context than this CLI handler.
-            const healthUrl = `${url}/healthz`;
-
             const result: {
               ok: boolean;
               running: boolean;
@@ -265,10 +261,8 @@ const kitchenPlugin = {
             } = { ok: true, running: false, url, startedAt: null };
 
             try {
-              const json = await fetchHealthJson(healthUrl);
-
-              result.running = Boolean(json.ok);
-              result.startedAt = typeof json.startedAt === "string" ? json.startedAt : null;
+              result.running = Boolean(server);
+              result.startedAt = startedAt;
             } catch (e: unknown) {
               result.running = false;
               result.startedAt = null;

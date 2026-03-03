@@ -13,7 +13,7 @@ vi.mock("@/lib/paths", async (importOriginal) => {
     readOpenClawConfig: vi.fn().mockResolvedValue({ agents: { defaults: { workspace: "/home/test/.openclaw/agents" } } }),
   };
 });
-vi.mock("@/lib/openclaw", () => ({ runOpenClaw: vi.fn().mockResolvedValue({ ok: true, stdout: "[]" }) }));
+vi.mock("@/lib/openclaw", () => ({ runOpenClaw: vi.fn().mockResolvedValue({ ok: true, exitCode: 0, stdout: JSON.stringify({ jobs: [] }), stderr: "" }) }));
 vi.mock("node:fs/promises", () => ({
   default: {
     readFile: vi.fn(),
@@ -23,20 +23,22 @@ vi.mock("node:fs/promises", () => ({
 }));
 
 import { toolsInvoke } from "@/lib/gateway";
+import { runOpenClaw } from "@/lib/openclaw";
 import { getTeamWorkspaceDir } from "@/lib/paths";
 import fs from "node:fs/promises";
 
 describe("api cron jobs route", () => {
   beforeEach(() => {
     vi.mocked(toolsInvoke).mockReset();
+    vi.mocked(runOpenClaw).mockReset();
     vi.mocked(getTeamWorkspaceDir).mockReset();
     vi.mocked(fs.readFile).mockReset();
     vi.mocked(fs.readdir).mockReset();
     vi.mocked(fs.readdir).mockResolvedValue([]);
   });
 
-  it("returns empty jobs when toolsInvoke has no text", async () => {
-    vi.mocked(toolsInvoke).mockResolvedValue({ content: [] });
+  it("returns empty jobs when cron list returns empty jobs", async () => {
+    vi.mocked(runOpenClaw).mockResolvedValue({ ok: true, exitCode: 0, stdout: JSON.stringify({ jobs: [] }), stderr: "" });
 
     const res = await GET(new Request("https://test"));
     expect(res.status).toBe(200);
@@ -47,9 +49,7 @@ describe("api cron jobs route", () => {
 
   it("returns jobs when no teamId", async () => {
     const jobs = [{ id: "j1", name: "Job 1" }];
-    vi.mocked(toolsInvoke).mockResolvedValue({
-      content: [{ type: "text", text: JSON.stringify({ jobs }) }],
-    });
+    vi.mocked(runOpenClaw).mockResolvedValue({ ok: true, exitCode: 0, stdout: JSON.stringify({ jobs }), stderr: "" });
 
     const res = await GET(new Request("https://test"));
     expect(res.status).toBe(200);
@@ -64,9 +64,7 @@ describe("api cron jobs route", () => {
       { id: "j2" },
       { id: "j3" },
     ];
-    vi.mocked(toolsInvoke).mockResolvedValue({
-      content: [{ type: "text", text: JSON.stringify({ jobs: allJobs }) }],
-    });
+    vi.mocked(runOpenClaw).mockResolvedValue({ ok: true, exitCode: 0, stdout: JSON.stringify({ jobs: allJobs }), stderr: "" });
     vi.mocked(getTeamWorkspaceDir).mockResolvedValue("/home/x/.openclaw/workspace-my-team");
     vi.mocked(fs.readFile).mockResolvedValue(
       JSON.stringify({
@@ -90,9 +88,7 @@ describe("api cron jobs route", () => {
   });
 
   it("returns empty filtered jobs when provenance file missing", async () => {
-    vi.mocked(toolsInvoke).mockResolvedValue({
-      content: [{ type: "text", text: JSON.stringify({ jobs: [{ id: "j1" }] }) }],
-    });
+    vi.mocked(runOpenClaw).mockResolvedValue({ ok: true, exitCode: 0, stdout: JSON.stringify({ jobs: [{ id: "j1" }] }), stderr: "" });
     vi.mocked(getTeamWorkspaceDir).mockResolvedValue("/home/x/.openclaw/workspace-t");
     vi.mocked(fs.readFile).mockRejectedValue(new Error("ENOENT"));
 
@@ -105,8 +101,8 @@ describe("api cron jobs route", () => {
     expect(json.installedIds).toEqual([]);
   });
 
-  it("returns 500 when toolsInvoke throws", async () => {
-    vi.mocked(toolsInvoke).mockRejectedValue(new Error("Gateway unavailable"));
+  it("returns 500 when cron list fails", async () => {
+    vi.mocked(runOpenClaw).mockResolvedValue({ ok: false, exitCode: 1, stdout: "", stderr: "Gateway unavailable" });
 
     const res = await GET(new Request("https://test"));
     expect(res.status).toBe(500);
