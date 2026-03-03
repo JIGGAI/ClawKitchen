@@ -19,9 +19,7 @@ import { TeamAgentsTab } from "./TeamAgentsTab";
 import { TeamSkillsTab } from "./TeamSkillsTab";
 import { TeamCronTab } from "./TeamCronTab";
 import { TeamFilesTab } from "./TeamFilesTab";
-import { TeamMemoryTab } from "./TeamMemoryTab";
 import { OrchestratorPanel } from "../OrchestratorPanel";
-import WorkflowsClient from "../workflows/workflows-client";
 
 const TABS = [
   { id: "recipe" as const, label: "Recipe" },
@@ -29,9 +27,9 @@ const TABS = [
   { id: "skills" as const, label: "Skills" },
   { id: "cron" as const, label: "Cron" },
   { id: "files" as const, label: "Files" },
-  { id: "memory" as const, label: "Memory" },
+  // NOTE: Memory tab hidden for public release (not ready).
   { id: "orchestrator" as const, label: "Orchestrator" },
-  { id: "workflows" as const, label: "Workflows" },
+  // NOTE: Workflows tab hidden for public release (not ready).
 ];
 
 type TabId = (typeof TABS)[number]["id"];
@@ -48,7 +46,7 @@ export default function TeamEditor({ teamId, initialTab }: { teamId: string; ini
   const [content, setContent] = useState<string>("");
   const [loadedRecipeHash, setLoadedRecipeHash] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>(() => {
-    const valid: TabId[] = ["recipe", "agents", "skills", "cron", "files", "memory", "orchestrator", "workflows"];
+    const valid: TabId[] = ["recipe", "agents", "skills", "cron", "files", "orchestrator"];
     return valid.includes(initialTab as TabId) ? (initialTab as TabId) : "recipe";
   });
   const [loading, setLoading] = useState(true);
@@ -138,7 +136,7 @@ export default function TeamEditor({ teamId, initialTab }: { teamId: string; ini
     setTeamMetaRecipeHash(null);
     setPublishOpen(false);
     setDeleteOpen(false);
-    const valid: TabId[] = ["recipe", "agents", "skills", "cron", "files", "memory", "orchestrator", "workflows"];
+    const valid: TabId[] = ["recipe", "agents", "skills", "cron", "files", "orchestrator"];
     if (initialTab && valid.includes(initialTab as TabId)) {
       setActiveTab(initialTab as TabId);
     }
@@ -459,19 +457,9 @@ export default function TeamEditor({ teamId, initialTab }: { teamId: string; ini
         />
       )}
 
-      {activeTab === "workflows" && (
-        <div className="mt-6">
-          <WorkflowsClient teamId={teamId} />
-        </div>
-      )}
 
       {activeTab === "orchestrator" && <OrchestratorPanel teamId={teamId} />}
 
-      {activeTab === "memory" && (
-        <div className="mt-6">
-          <TeamMemoryTab teamId={teamId} />
-        </div>
-      )}
 
       {activeTab === "files" && (
         <TeamFilesTab
