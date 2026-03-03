@@ -51,13 +51,17 @@ export default function TeamEditor({ teamId, initialTab }: { teamId: string; ini
   const [toName, setToName] = useState<string>(teamId);
   const [content, setContent] = useState<string>("");
   const [loadedRecipeHash, setLoadedRecipeHash] = useState<string | null>(null);
+
+  // Must be declared BEFORE any hook initializers that reference it.
+  // (Avoids SSR/minifier TDZ issues like "Cannot access before initialization".)
+  const [showExperimentalTabs, setShowExperimentalTabs] = useState(false);
+
   const [activeTab, setActiveTab] = useState<TabId>(() => {
     const valid: TabId[] = showExperimentalTabs
       ? (["recipe", "agents", "skills", "cron", "files", "memory", "orchestrator", "workflows"] as TabId[])
       : (["recipe", "agents", "skills", "cron", "files", "orchestrator"] as TabId[]);
     return valid.includes(initialTab as TabId) ? (initialTab as TabId) : "recipe";
   });
-  const [showExperimentalTabs, setShowExperimentalTabs] = useState(false);
   const tabs = useMemo(() => (showExperimentalTabs ? [...BASE_TABS, ...EXPERIMENTAL_TABS] : [...BASE_TABS]), [showExperimentalTabs]);
 
 
