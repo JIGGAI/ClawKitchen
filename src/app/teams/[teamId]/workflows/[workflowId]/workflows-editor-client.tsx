@@ -48,6 +48,10 @@ export default function WorkflowsEditorClient({
   const [approvalBindings, setApprovalBindings] = useState<Array<{ id: string; label: string; channel: string; target: string }>>([]);
   const [approvalBindingsError, setApprovalBindingsError] = useState<string>("");
 
+  const approvalBindingsNeedsKitchenUpdate = useMemo(() => {
+    return /Tool not available:\s*gateway/i.test(String(approvalBindingsError || ""));
+  }, [approvalBindingsError]);
+
   // Inspector state (parity with modal)
   const [workflowRuns, setWorkflowRuns] = useState<string[]>([]);
   const [workflowRunsLoading, setWorkflowRunsLoading] = useState(false);
@@ -1099,6 +1103,12 @@ export default function WorkflowsEditorClient({
                             </option>
                           ))}
                         </select>
+                        {approvalBindingsNeedsKitchenUpdate ? (
+                          <div className="mt-1 text-[10px] text-yellow-200">
+                            Kitchen looks out of date. Run <code className="font-mono">openclaw plugins update</code> then
+                            <code className="ml-1 font-mono">openclaw gateway restart</code>.
+                          </div>
+                        ) : null}
                         {approvalBindingsError ? (
                           <div className="mt-1 text-[10px] text-red-200">Failed to load bindings: {approvalBindingsError}</div>
                         ) : null}

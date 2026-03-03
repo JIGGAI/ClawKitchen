@@ -46,6 +46,11 @@ export default function ChannelsClient() {
   const [configJson, setConfigJson] = useState<string>("{\n  \"enabled\": true\n}\n");
   const [saving, setSaving] = useState(false);
 
+  const isGatewayToolNotAvailable = useMemo(() => {
+    const msg = String(error ?? "");
+    return /Tool not available:\s*gateway/i.test(msg);
+  }, [error]);
+
   async function fetchBindings(): Promise<{ ok: true; channels: Record<string, unknown> } | { ok: false; error: string }> {
     try {
       const data = await fetchJson<ChannelsResponse>("/api/channels/bindings", { cache: "no-store" });
@@ -180,7 +185,8 @@ export default function ChannelsClient() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Channels</h1>
           <p className="mt-1 text-sm text-[color:var(--ck-text-secondary)]">
-            Source of truth: OpenClaw gateway config (patched via <code className="font-mono">gateway config.patch</code>).
+            Source of truth: <code className="font-mono">~/.openclaw/openclaw.json</code>.
+            This page intentionally avoids calling the Gateway tool.
             Some changes may require a gateway restart depending on provider.
           </p>
         </div>
@@ -193,6 +199,23 @@ export default function ChannelsClient() {
           </Button>
         </div>
       </div>
+
+      {isGatewayToolNotAvailable ? (
+        <div className="ck-glass p-4 text-sm">
+          <div className="font-medium text-yellow-200">Kitchen looks out of date</div>
+          <div className="mt-1 text-[color:var(--ck-text-secondary)]">
+            This endpoint used to go through the Gateway tool and would fail on hardened systems. Update the Kitchen plugin
+            and restart the gateway to pick up the fix.
+          </div>
+          <pre className="mt-3 overflow-x-auto rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] bg-black/20 p-3 text-xs">
+openclaw plugins update
+openclaw gateway restart
+          </pre>
+          <div className="mt-2 text-xs text-[color:var(--ck-text-tertiary)]">
+            Last resort (not recommended): temporarily allow the <code className="font-mono">gateway</code> tool.
+          </div>
+        </div>
+      ) : null}
 
       {error ? <div className="ck-glass p-4 text-sm text-red-300">{error}</div> : null}
 

@@ -71,6 +71,25 @@ openclaw kitchen open
 Then open:
 - http://127.0.0.1:7777
 
+### Troubleshooting: “Tool not available: gateway” on Channels/Bindings
+
+If you see errors like `Tool not available: gateway` while loading **Channels** or workflow approval bindings,
+you are almost certainly running an **older Kitchen plugin build** that still tried to fetch bindings
+via the Gateway tool.
+
+Fix:
+
+```bash
+openclaw plugins update
+openclaw gateway restart
+```
+
+Notes:
+- A gateway restart is required after plugin updates and many config changes.
+- As a *last resort* you can enable the `gateway` tool via `gateway.tools.allow`, but that weakens hardening
+  and should not be required for normal Kitchen usage.
+
+
 ---
 
 ## Tailscale / remote access (recommended)
