@@ -31,7 +31,6 @@ export async function PUT(req: Request) {
     const provider = String(body?.provider ?? "").trim();
     if (!provider) return NextResponse.json({ ok: false, error: "provider is required" }, { status: 400 });
 
-
     const cfg = isRecord(body?.config) ? body.config : null;
     if (!cfg) return NextResponse.json({ ok: false, error: "config must be an object" }, { status: 400 });
 
@@ -66,6 +65,13 @@ export async function DELETE(req: Request) {
     const provider = String(body?.provider ?? "").trim();
     if (!provider) return NextResponse.json({ ok: false, error: "provider is required" }, { status: 400 });
 
+    const confirm = String(body?.confirm ?? "").trim();
+    if (confirm != provider) {
+      return NextResponse.json(
+        { ok: false, error: `Typed confirmation required. Set confirm="${provider}" to delete.` },
+        { status: 400 }
+      );
+    }
 
     await patchOpenClawConfigFile({
       note: `ClawKitchen Channels delete: ${provider}`,
