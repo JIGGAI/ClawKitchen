@@ -28,8 +28,6 @@ type KitchenConfig = {
    * If set, a request may present ?qaToken=... once to receive a short-lived cookie.
    */
   qaToken?: string;
-  /** UI-only: enables unfinished tabs (Memory/Workflows) for local/internal development. */
-  showExperimentalTabs?: boolean;
 };
 
 type KitchenAuthMode = "on" | "local" | "off";
@@ -232,11 +230,6 @@ const kitchenPlugin = {
         default: "",
         description:
           "Optional QA-only bypass token. If set, visiting any URL with ?qaToken=<token> sets a short-lived cookie for headless/automated access.",
-      },
-      showExperimentalTabs: {
-        type: "boolean",
-        default: false,
-        description: "UI-only: show unfinished Team Editor tabs (Memory/Workflows).",
       },
     },
   },

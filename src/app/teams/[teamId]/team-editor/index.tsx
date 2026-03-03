@@ -54,34 +54,12 @@ export default function TeamEditor({ teamId, initialTab }: { teamId: string; ini
 
   // Must be declared BEFORE any hook initializers that reference it.
   // (Avoids SSR/minifier TDZ issues like "Cannot access before initialization".)
-  const [showExperimentalTabs, setShowExperimentalTabs] = useState(false);
 
   const [activeTab, setActiveTab] = useState<TabId>(() => {
-    const valid: TabId[] = showExperimentalTabs
-      ? (["recipe", "agents", "skills", "cron", "files", "memory", "orchestrator", "workflows"] as TabId[])
-      : (["recipe", "agents", "skills", "cron", "files", "orchestrator"] as TabId[]);
+    const valid: TabId[] = ["recipe", "agents", "skills", "cron", "files", "memory", "orchestrator", "workflows"];
     return valid.includes(initialTab as TabId) ? (initialTab as TabId) : "recipe";
   });
-  const tabs = useMemo(() => (showExperimentalTabs ? [...BASE_TABS, ...EXPERIMENTAL_TABS] : [...BASE_TABS]), [showExperimentalTabs]);
-
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/settings/experimental-tabs", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((j: unknown) => {
-        const obj = j && typeof j === "object" ? (j as Record<string, unknown>) : {};
-        if (cancelled) return;
-        setShowExperimentalTabs(obj.showExperimentalTabs === true);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setShowExperimentalTabs(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const tabs = useMemo(() => [...BASE_TABS, ...EXPERIMENTAL_TABS], []);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -170,9 +148,7 @@ export default function TeamEditor({ teamId, initialTab }: { teamId: string; ini
     setTeamMetaRecipeHash(null);
     setPublishOpen(false);
     setDeleteOpen(false);
-    const valid: TabId[] = showExperimentalTabs
-      ? (["recipe", "agents", "skills", "cron", "files", "memory", "orchestrator", "workflows"] as TabId[])
-      : (["recipe", "agents", "skills", "cron", "files", "orchestrator"] as TabId[]);
+    const valid: TabId[] = ["recipe", "agents", "skills", "cron", "files", "memory", "orchestrator", "workflows"];
     if (initialTab && valid.includes(initialTab as TabId)) {
       setActiveTab(initialTab as TabId);
     }
@@ -496,13 +472,13 @@ export default function TeamEditor({ teamId, initialTab }: { teamId: string; ini
 
       {activeTab === "orchestrator" && <OrchestratorPanel teamId={teamId} />}
 
-      {showExperimentalTabs && activeTab === "memory" && (
+      {activeTab === "memory" && (
         <div className="mt-6">
           <TeamMemoryTab teamId={teamId} />
         </div>
       )}
 
-      {showExperimentalTabs && activeTab === "workflows" && (
+      {activeTab === "workflows" && (
         <div className="mt-6">
           <WorkflowsClient teamId={teamId} />
         </div>
