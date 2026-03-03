@@ -46,9 +46,16 @@ async function getAgents(): Promise<{ agentIds: string[]; error: string | null }
 export default async function RecipesPage({
   searchParams,
 }: {
-  searchParams?: Record<string, string | string[] | undefined>;
+  // Next.js versions differ on whether `searchParams` is sync or async.
+  // Some runtimes provide it as a Promise (sync-dynamic-apis) so we must
+  // unwrap before accessing properties.
+  searchParams?:
+    | Record<string, string | string[] | undefined>
+    | Promise<Record<string, string | string[] | undefined>>;
 }) {
   noStore();
+
+  const sp = (await Promise.resolve(searchParams)) ?? {};
 
   const [{ recipes, error }, { agentIds }] = await Promise.all([getRecipes(), getAgents()]);
 
@@ -89,7 +96,7 @@ export default async function RecipesPage({
         customAgentRecipes={customAgentRecipes}
         installedAgentIds={agentIds}
         initialOpenCustomTeam={
-          String(searchParams?.createCustomTeam ?? "") === "1" || String(searchParams?.createCustomTeam ?? "") === "true"
+          String(sp.createCustomTeam ?? "") === "1" || String(sp.createCustomTeam ?? "") === "true"
         }
       />
 
