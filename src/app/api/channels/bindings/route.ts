@@ -50,7 +50,7 @@ export async function PUT(req: Request) {
       },
     });
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, restartRequired: true, restartHint: "Restart OpenClaw Gateway to apply channel config changes." });
   } catch (e: unknown) {
     const msg = errorMessage(e);
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
@@ -77,7 +77,7 @@ export async function DELETE(req: Request) {
       },
     });
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, restartRequired: true, restartHint: "Restart OpenClaw Gateway to apply channel config changes." });
   } catch (e: unknown) {
     const msg = errorMessage(e);
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });

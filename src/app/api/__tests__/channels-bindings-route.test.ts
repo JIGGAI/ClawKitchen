@@ -1,30 +1,34 @@
+// @vitest-environment node
+
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { GET, PUT, DELETE } from "../channels/bindings/route";
 
-vi.mock("@/lib/gateway", () => ({
-  gatewayConfigGet: vi.fn(),
-  gatewayConfigPatch: vi.fn(),
+vi.mock("@/lib/openclaw-config", () => ({
+  readOpenClawConfigRaw: vi.fn(),
+  redactChannels: (channels: unknown) => channels,
+  patchOpenClawConfigFile: vi.fn(),
 }));
 
-vi.mock("@/lib/paths", () => ({
-  readOpenClawConfig: vi.fn(),
-}));
+import { readOpenClawConfigRaw, patchOpenClawConfigFile } from "@/lib/openclaw-config";
 
-import { gatewayConfigGet, gatewayConfigPatch } from "@/lib/gateway";
-import { readOpenClawConfig } from "@/lib/paths";
+type PatchCall = {
+  note?: string;
+  patch: (prev: { channels?: Record<string, unknown> }) => { channels?: Record<string, unknown> };
+};
 
 describe("api channels bindings route", () => {
   beforeEach(() => {
-    vi.mocked(gatewayConfigGet).mockReset();
-    vi.mocked(gatewayConfigPatch).mockReset();
-    vi.mocked(readOpenClawConfig).mockReset();
+    vi.mocked(readOpenClawConfigRaw).mockReset();
+    vi.mocked(patchOpenClawConfigFile).mockReset();
 
-    vi.mocked(gatewayConfigGet).mockResolvedValue({
-      raw: JSON.stringify({ channels: { telegram: { botToken: "x" } } }),
+    vi.mocked(readOpenClawConfigRaw).mockResolvedValue({
+      path: "/home/test/.openclaw/openclaw.json",
+      raw: JSON.stringify({ channels: { telegram: { botToken: "x" } }, bindings: [] }),
       hash: "abc",
-    });
-    vi.mocked(readOpenClawConfig).mockResolvedValue({ bindings: [] } as never);
-    vi.mocked(gatewayConfigPatch).mockResolvedValue(undefined);
+      json: { channels: { telegram: { botToken: "x" } }, bindings: [] },
+    } as never);
+
+    vi.mocked(patchOpenClawConfigFile).mockResolvedValue({ ok: true, path: "/home/test/.openclaw/openclaw.json", hash: "def" } as never);
   });
 
   describe("GET", () => {
@@ -38,19 +42,8 @@ describe("api channels bindings route", () => {
       expect(json.bindings).toEqual([]);
     });
 
-    it("returns empty channels when invalid JSON", async () => {
-      vi.mocked(gatewayConfigGet).mockResolvedValue({
-        raw: "not json",
-        hash: "x",
-      });
-      const res = await GET();
-      expect(res.status).toBe(200);
-      const json = await res.json();
-      expect(json.channels).toEqual({});
-    });
-
-    it("returns 500 when gateway throws", async () => {
-      vi.mocked(gatewayConfigGet).mockRejectedValue(new Error("Gateway error"));
+    it("returns 500 when config read throws", async () => {
+      vi.mocked(readOpenClawConfigRaw).mockRejectedValue(new Error("read error"));
       const res = await GET();
       expect(res.status).toBe(500);
     });
@@ -58,9 +51,7 @@ describe("api channels bindings route", () => {
 
   describe("PUT", () => {
     it("returns 400 when provider or config missing", async () => {
-      const r1 = await PUT(
-        new Request("https://test", { method: "PUT", body: JSON.stringify({}) })
-      );
+      const r1 = await PUT(new Request("https://test", { method: "PUT", body: JSON.stringify({}) }));
       expect(r1.status).toBe(400);
       expect((await r1.json()).error).toBe("provider is required");
 
@@ -96,14 +87,19 @@ describe("api channels bindings route", () => {
         })
       );
       expect(res.status).toBe(200);
-      expect(gatewayConfigPatch).toHaveBeenCalledWith(
-        { channels: { telegram: { botToken: "secret" } } },
-        expect.stringContaining("telegram")
-      );
+      const json = await res.json();
+      expect(json.ok).toBe(true);
+      expect(json.restartRequired).toBe(true);
+
+      expect(patchOpenClawConfigFile).toHaveBeenCalledTimes(1);
+      const call = vi.mocked(patchOpenClawConfigFile).mock.calls[0]![0] as unknown as PatchCall;
+      expect(String(call.note)).toContain("telegram");
+      const next = call.patch({ channels: { slack: { x: 1 } } });
+      expect(next.channels).toEqual({ slack: { x: 1 }, telegram: { botToken: "secret" } });
     });
 
-    it("returns 500 when gatewayConfigPatch throws", async () => {
-      vi.mocked(gatewayConfigPatch).mockRejectedValue(new Error("Gateway error"));
+    it("returns 500 when patchOpenClawConfigFile throws", async () => {
+      vi.mocked(patchOpenClawConfigFile).mockRejectedValue(new Error("patch error"));
       const res = await PUT(
         new Request("https://test", {
           method: "PUT",
@@ -111,19 +107,17 @@ describe("api channels bindings route", () => {
         })
       );
       expect(res.status).toBe(500);
-      expect((await res.json()).error).toBe("Gateway error");
+      expect((await res.json()).error).toBe("patch error");
     });
   });
 
   describe("DELETE", () => {
     it("returns 400 when provider missing", async () => {
-      const res = await DELETE(
-        new Request("https://test", { method: "DELETE", body: JSON.stringify({}) })
-      );
+      const res = await DELETE(new Request("https://test", { method: "DELETE", body: JSON.stringify({}) }));
       expect(res.status).toBe(400);
     });
 
-    it("returns ok and patches provider to null", async () => {
+    it("returns ok and removes provider", async () => {
       const res = await DELETE(
         new Request("https://test", {
           method: "DELETE",
@@ -131,14 +125,18 @@ describe("api channels bindings route", () => {
         })
       );
       expect(res.status).toBe(200);
-      expect(gatewayConfigPatch).toHaveBeenCalledWith(
-        { channels: { telegram: null } },
-        expect.stringContaining("telegram")
-      );
+      const json = await res.json();
+      expect(json.ok).toBe(true);
+      expect(json.restartRequired).toBe(true);
+
+      expect(patchOpenClawConfigFile).toHaveBeenCalledTimes(1);
+      const call = vi.mocked(patchOpenClawConfigFile).mock.calls[0]![0] as unknown as PatchCall;
+      const next = call.patch({ channels: { telegram: { botToken: "x" }, slack: { y: 2 } } });
+      expect(next.channels).toEqual({ slack: { y: 2 } });
     });
 
-    it("returns 500 when gatewayConfigPatch throws", async () => {
-      vi.mocked(gatewayConfigPatch).mockRejectedValue(new Error("Gateway error"));
+    it("returns 500 when patchOpenClawConfigFile throws", async () => {
+      vi.mocked(patchOpenClawConfigFile).mockRejectedValue(new Error("patch error"));
       const res = await DELETE(
         new Request("https://test", {
           method: "DELETE",

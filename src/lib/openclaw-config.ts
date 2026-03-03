@@ -1,7 +1,6 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
+import * as path from "node:path";
 
 export type OpenClawConfigFile = {
   gateway?: unknown;
@@ -12,7 +11,9 @@ export type OpenClawConfigFile = {
 };
 
 function configPath() {
-  return path.join(os.homedir(), ".openclaw", "openclaw.json");
+  const home = process.env.HOME || process.env.USERPROFILE || "";
+  if (!home) throw new Error("Could not resolve home directory (set HOME)");
+  return path.join(home, ".openclaw", "openclaw.json");
 }
 
 export async function readOpenClawConfigRaw(): Promise<{ path: string; raw: string; hash: string; json: OpenClawConfigFile }> {
