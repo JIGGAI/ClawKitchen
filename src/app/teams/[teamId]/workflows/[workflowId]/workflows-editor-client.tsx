@@ -769,7 +769,7 @@ export default function WorkflowsEditorClient({
                     role="button"
                     tabIndex={0}
                     data-wf-node="1"
-                    draggable={activeTool.kind === "select"}
+                    draggable={activeTool.kind === "select" || activeTool.kind === "connect"}
                     onDragStart={(e) => {
                       // allow agent pills to be dropped; do not start a browser drag ghost for nodes.
                       if (activeTool.kind !== "select") return;
@@ -820,7 +820,8 @@ export default function WorkflowsEditorClient({
                       setSelectedNodeId(n.id);
                     }}
                     onPointerDown={(e) => {
-                      if (activeTool.kind !== "select") return;
+                      // Allow dragging nodes even in connect mode (connect is click-to-connect, not drag-to-connect).
+                      if (activeTool.kind === "add-node") return;
                       if (e.button !== 0) return;
                       const el = canvasRef.current;
                       if (!el) return;
