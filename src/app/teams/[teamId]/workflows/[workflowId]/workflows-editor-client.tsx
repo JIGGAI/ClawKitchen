@@ -473,14 +473,13 @@ export default function WorkflowsEditorClient({
               setActiveTool({ kind: "select" });
             }}
           >
-            <div style={{ width: 2200 * zoom, height: 1200 * zoom }}>
-              <div className="relative h-[1200px] w-[2200px]" style={{ transform: `scale(${zoom})`, transformOrigin: "0 0" }}>
-              {/* Tool palette / agent palette */}
+            <div className="relative" style={{ width: 2200 * zoom, height: 1200 * zoom }}>
+              {/* Tool palette / agent palette (not scaled) */}
               <div
                 className={
                   toolsCollapsed
-                    ? "sticky left-3 top-3 z-20 w-[44px] overflow-hidden rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/40 p-2 backdrop-blur"
-                    : "sticky left-3 top-3 z-20 w-[260px] rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/40 p-2 backdrop-blur"
+                    ? "absolute left-3 top-3 z-20 w-[44px] overflow-hidden rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/40 p-2 backdrop-blur"
+                    : "absolute left-3 top-3 z-20 w-[260px] rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/40 p-2 backdrop-blur"
                 }
               >
                 <div className="flex items-center justify-between gap-2">
@@ -493,7 +492,7 @@ export default function WorkflowsEditorClient({
                         className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-[color:var(--ck-text-secondary)] hover:bg-white/10"
                         title="Zoom out (Ctrl/Cmd+wheel)"
                       >
-                        −
+                        -
                       </button>
                       <div className="min-w-[42px] text-center text-[10px] text-[color:var(--ck-text-tertiary)]">{Math.round(zoom * 100)}%</div>
                       <button
@@ -769,6 +768,7 @@ export default function WorkflowsEditorClient({
                 </div>
               </div>
 
+              <div className="relative h-[1200px] w-[2200px]" style={{ transform: `scale(${zoom})`, transformOrigin: "0 0" }}>
               <svg
                 className="pointer-events-none absolute inset-0 -z-10"
                 width={2200}
@@ -1101,7 +1101,7 @@ export default function WorkflowsEditorClient({
               const approvalTarget = String(meta.approvalTarget ?? "").trim();
 
               // Cron schedule suggestions.
-              // Note: dev-team automation defaults should avoid the 02:00–07:00 America/New_York blackout window.
+              // Note: dev-team automation defaults should avoid the 02:00-07:00 America/New_York blackout window.
               // We keep presets in "safe" hours by default.
               const presets = [
                 { label: "(no preset)", expr: "" },
