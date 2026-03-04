@@ -730,7 +730,7 @@ export default function WorkflowsEditorClient({
               </div>
 
               <svg
-                className="pointer-events-none absolute inset-0 z-0"
+                className="pointer-events-none absolute inset-0 -z-10"
                 width={2200}
                 height={1200}
                 style={{ overflow: "visible" }}
@@ -857,8 +857,8 @@ export default function WorkflowsEditorClient({
                     }}
                     className={
                       selected
-                        ? "absolute cursor-grab rounded-[var(--ck-radius-sm)] border border-white/25 bg-white/10 px-3 py-2 text-xs text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)]"
-                        : "absolute cursor-grab rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-xs text-[color:var(--ck-text-secondary)] hover:bg-white/10"
+                        ? "absolute z-10 cursor-grab rounded-[var(--ck-radius-sm)] border border-white/25 bg-white/10 px-3 py-2 text-xs text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)]"
+                        : "absolute z-10 cursor-grab rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-xs text-[color:var(--ck-text-secondary)] hover:bg-white/10"
                     }
                     style={{ left: x, top: y, width: 180 }}
                   >
