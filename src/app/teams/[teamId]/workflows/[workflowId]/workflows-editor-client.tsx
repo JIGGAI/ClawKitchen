@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import type { WorkflowFileV1 } from "@/lib/workflows/types";
 import { validateWorkflowFileV1 } from "@/lib/workflows/validate";
 
@@ -1375,7 +1376,15 @@ export default function WorkflowsEditorClient({
                     <summary className="cursor-pointer list-none px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)]">Runs</summary>
                     <div className="px-3 pb-3">
                     <div className="flex items-center justify-between gap-2">
-                      <div className="text-xs font-medium text-[color:var(--ck-text-secondary)]">Runs (history)</div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-xs font-medium text-[color:var(--ck-text-secondary)]">Runs (history)</div>
+                        <Link
+                          href={`/teams/${encodeURIComponent(teamId)}/runs`}
+                          className="text-[10px] font-medium text-[color:var(--ck-text-tertiary)] hover:text-[color:var(--ck-text-secondary)] hover:underline"
+                        >
+                          View all →
+                        </Link>
+                      </div>
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
@@ -1464,37 +1473,27 @@ export default function WorkflowsEditorClient({
                         <div className="text-xs text-[color:var(--ck-text-secondary)]">Loading runs…</div>
                       ) : workflowRuns.length ? (
                         workflowRuns.slice(0, 8).map((f) => {
+                          const wfId = String(wf.id ?? "").trim();
                           const runId = String(f).replace(/\.run\.json$/i, "");
                           const selected = selectedWorkflowRunId === runId;
+                          const href = wfId
+                            ? `/teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(wfId)}/${encodeURIComponent(runId)}`
+                            : "#";
+
                           return (
-                            <button
+                            <Link
                               key={f}
-                              type="button"
-                              onClick={async () => {
-                                const wfId = String(wf.id ?? "").trim();
-                                if (!wfId) return;
-                                setSelectedWorkflowRunId(runId);
-                                setWorkflowRunsError("");
-                                try {
-                                  const res = await fetch(
-                                    `/api/teams/workflow-runs?teamId=${encodeURIComponent(teamId)}&workflowId=${encodeURIComponent(wfId)}&runId=${encodeURIComponent(runId)}`,
-                                    { cache: "no-store" }
-                                  );
-                                  const json = await res.json();
-                                  if (!res.ok || !json.ok) throw new Error(json.error || "Failed to load run");
-                                  // (run detail rendering not implemented yet; selecting stores runId only)
-                                } catch (e: unknown) {
-                                  setWorkflowRunsError(e instanceof Error ? e.message : String(e));
-                                }
-                              }}
+                              href={href}
+                              onClick={() => setSelectedWorkflowRunId(runId)}
                               className={
                                 selected
-                                  ? "w-full rounded-[var(--ck-radius-sm)] bg-white/10 px-2 py-1 text-left text-[11px] text-[color:var(--ck-text-primary)]"
-                                  : "w-full rounded-[var(--ck-radius-sm)] px-2 py-1 text-left text-[11px] text-[color:var(--ck-text-secondary)] hover:bg-white/5"
+                                  ? "block w-full rounded-[var(--ck-radius-sm)] bg-white/10 px-2 py-1 text-left text-[11px] font-mono text-[color:var(--ck-text-primary)]"
+                                  : "block w-full rounded-[var(--ck-radius-sm)] px-2 py-1 text-left text-[11px] font-mono text-[color:var(--ck-text-secondary)] hover:bg-white/5"
                               }
+                              title="Open run detail"
                             >
                               {runId}
-                            </button>
+                            </Link>
                           );
                         })
                       ) : (

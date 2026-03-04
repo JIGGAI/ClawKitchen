@@ -57,3 +57,69 @@ export async function writeWorkflowRun(teamId: string, workflowId: string, run: 
   await fs.writeFile(p, JSON.stringify(toWrite, null, 2) + "\n", "utf8");
   return { ok: true as const, path: p };
 }
+
+export type WorkflowRunSummary = {
+  workflowId: string;
+  runId: string;
+  status?: WorkflowRunFileV1["status"];
+  startedAt?: string;
+  endedAt?: string;
+  /** ISO timestamp derived from file mtime (best-effort) */
+  updatedAt?: string;
+  /** Absolute path to the run file on disk (server-side only) */
+  path: string;
+};
+
+export async function listAllWorkflowRuns(teamId: string): Promise<{ ok: true; dir: string; runs: WorkflowRunSummary[] }> {
+  const teamDir = await getTeamWorkspaceDir(teamId);
+  const dir = path.join(teamDir, RUNS_DIR);
+
+  // Structure: shared-context/workflow-runs/<workflowId>/*.run.json
+  let wfDirs: string[] = [];
+  try {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    wfDirs = entries.filter((e) => e.isDirectory()).map((e) => e.name).sort();
+  } catch (err: unknown) {
+    if (err && typeof err === "object" && (err as { code?: unknown }).code === "ENOENT") {
+      return { ok: true as const, dir, runs: [] };
+    }
+    throw err;
+  }
+
+  const runs: WorkflowRunSummary[] = [];
+
+  for (const workflowId of wfDirs) {
+    const wfDir = path.join(dir, workflowId);
+    let entries: string[] = [];
+    try {
+      entries = (await fs.readdir(wfDir)).filter((n) => n.endsWith(".run.json")).sort();
+    } catch (err: unknown) {
+      if (err && typeof err === "object" && (err as { code?: unknown }).code === "ENOENT") continue;
+      throw err;
+    }
+
+    for (const fileName of entries) {
+      const runId = fileName.replace(/\.run\.json$/i, "");
+      const full = path.join(wfDir, fileName);
+      try {
+        const [raw, st] = await Promise.all([fs.readFile(full, "utf8"), fs.stat(full)]);
+        const parsed = JSON.parse(raw) as Partial<WorkflowRunFileV1>;
+        runs.push({
+          workflowId,
+          runId,
+          status: parsed.status as WorkflowRunFileV1["status"],
+          startedAt: typeof parsed.startedAt === "string" ? parsed.startedAt : undefined,
+          endedAt: typeof parsed.endedAt === "string" ? parsed.endedAt : undefined,
+          updatedAt: st.mtime ? new Date(st.mtime).toISOString() : undefined,
+          path: full,
+        });
+      } catch {
+        // Ignore malformed/partial run files; don't break the whole page.
+        runs.push({ workflowId, runId, path: full });
+      }
+    }
+  }
+
+  runs.sort((a, b) => String(b.updatedAt ?? b.startedAt ?? "").localeCompare(String(a.updatedAt ?? a.startedAt ?? "")));
+  return { ok: true as const, dir, runs };
+}
