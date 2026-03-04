@@ -30,10 +30,16 @@ export default function WorkflowsEditorClient({
 
   const [toolsCollapsed, setToolsCollapsed] = useState(false);
 
+  // Canvas zoom
+  const [zoom, setZoom] = useState(1);
+  const ZOOM_MIN = 0.5;
+  const ZOOM_MAX = 2.5;
+  const ZOOM_STEP = 0.1;
+
   // Canvas: selection, drag, node/edge creation.
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string>("");
-  const [dragging, setDragging] = useState<null | { nodeId: string; dx: number; dy: number; left: number; top: number }>(null);
+  const [dragging, setDragging] = useState<null | { nodeId: string; dx: number; dy: number }>(null);
 
   const [activeTool, setActiveTool] = useState<
     | { kind: "select" }
@@ -416,6 +422,16 @@ export default function WorkflowsEditorClient({
           <div
             ref={canvasRef}
             className="relative h-full min-h-0 w-full flex-1 overflow-auto bg-black/20"
+            onWheel={(e) => {
+              // Ctrl/Cmd + wheel to zoom (avoid hijacking normal scroll)
+              if (!e.ctrlKey && !e.metaKey) return;
+              e.preventDefault();
+              const dir = e.deltaY > 0 ? -1 : 1;
+              setZoom((z) => {
+                const next = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round((z + dir * ZOOM_STEP) * 10) / 10));
+                return next;
+              });
+            }}
             onClick={(e) => {
               if (activeTool.kind !== "add-node") return;
               const wf = parsed.wf;
@@ -428,8 +444,8 @@ export default function WorkflowsEditorClient({
               if (target && target.closest("[data-wf-node='1']")) return;
 
               const rect = el.getBoundingClientRect();
-              const clickX = e.clientX - rect.left + el.scrollLeft;
-              const clickY = e.clientY - rect.top + el.scrollTop;
+              const clickX = (e.clientX - rect.left + el.scrollLeft) / zoom;
+              const clickY = (e.clientY - rect.top + el.scrollTop) / zoom;
 
               const base = activeTool.nodeType.replace(/[^a-z0-9_\-]/gi, "_");
               const used = new Set(wf.nodes.map((n) => n.id));
@@ -457,7 +473,8 @@ export default function WorkflowsEditorClient({
               setActiveTool({ kind: "select" });
             }}
           >
-            <div className="relative h-[1200px] w-[2200px]">
+            <div style={{ width: 2200 * zoom, height: 1200 * zoom }}>
+              <div className="relative h-[1200px] w-[2200px]" style={{ transform: `scale(${zoom})`, transformOrigin: "0 0" }}>
               {/* Tool palette / agent palette */}
               <div
                 className={
@@ -468,14 +485,36 @@ export default function WorkflowsEditorClient({
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className={toolsCollapsed ? "hidden" : "text-[10px] font-medium uppercase tracking-wide text-[color:var(--ck-text-tertiary)]"}>Tools</div>
-                  <button
-                    type="button"
-                    onClick={() => setToolsCollapsed((v) => !v)}
-                    className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-[color:var(--ck-text-secondary)] hover:bg-white/10"
-                    title={toolsCollapsed ? "Expand" : "Collapse"}
-                  >
-                    {toolsCollapsed ? ">" : "<"}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <div className={toolsCollapsed ? "hidden" : "flex items-center gap-1"}>
+                      <button
+                        type="button"
+                        onClick={() => setZoom((z) => Math.max(ZOOM_MIN, Math.round((z - ZOOM_STEP) * 10) / 10))}
+                        className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-[color:var(--ck-text-secondary)] hover:bg-white/10"
+                        title="Zoom out (Ctrl/Cmd+wheel)"
+                      >
+                        −
+                      </button>
+                      <div className="min-w-[42px] text-center text-[10px] text-[color:var(--ck-text-tertiary)]">{Math.round(zoom * 100)}%</div>
+                      <button
+                        type="button"
+                        onClick={() => setZoom((z) => Math.min(ZOOM_MAX, Math.round((z + ZOOM_STEP) * 10) / 10))}
+                        className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-[color:var(--ck-text-secondary)] hover:bg-white/10"
+                        title="Zoom in (Ctrl/Cmd+wheel)"
+                      >
+                        +
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setToolsCollapsed((v) => !v)}
+                      className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-[color:var(--ck-text-secondary)] hover:bg-white/10"
+                      title={toolsCollapsed ? "Expand" : "Collapse"}
+                    >
+                      {toolsCollapsed ? ">" : "<"}
+                    </button>
+                  </div>
                 </div>
                 {toolsCollapsed ? (
                   <div className="mt-2 flex flex-col items-center gap-2">
@@ -500,7 +539,8 @@ export default function WorkflowsEditorClient({
                           label: "Connect",
                           active: activeTool.kind === "connect",
                           onClick: () => {
-                            setActiveTool({ kind: "connect" });
+                            // Toggle connect tool.
+                            setActiveTool((t) => (t.kind === "connect" ? { kind: "select" } : { kind: "connect" }));
                             setConnectFromNodeId("");
                           },
                           icon: (
@@ -814,6 +854,8 @@ export default function WorkflowsEditorClient({
                         const id = `e${Date.now()}`;
                         const nextEdge: WorkflowFileV1["edges"][number] = { id, from, to };
                         setWorkflow({ ...wf, edges: [...(wf.edges ?? []), nextEdge] });
+                        // After creating an edge, return to Select tool.
+                        setActiveTool({ kind: "select" });
                         return;
                       }
 
@@ -833,7 +875,10 @@ export default function WorkflowsEditorClient({
                         // ignore
                       }
                       e.preventDefault();
-                      setDragging({ nodeId: n.id, dx: e.clientX - rect.left - x, dy: e.clientY - rect.top - y, left: rect.left, top: rect.top });
+
+                      const pointerX = (e.clientX - rect.left + el.scrollLeft) / zoom;
+                      const pointerY = (e.clientY - rect.top + el.scrollTop) / zoom;
+                      setDragging({ nodeId: n.id, dx: pointerX - x, dy: pointerY - y });
                     }}
                     onPointerUp={(e) => {
                       try {
@@ -850,8 +895,11 @@ export default function WorkflowsEditorClient({
                       if (!wf) return;
                       const el = canvasRef.current;
                       if (!el) return;
-                      const nextX = e.clientX - dragging.left - dragging.dx;
-                      const nextY = e.clientY - dragging.top - dragging.dy;
+                      const rect = el.getBoundingClientRect();
+                      const pointerX = (e.clientX - rect.left + el.scrollLeft) / zoom;
+                      const pointerY = (e.clientY - rect.top + el.scrollTop) / zoom;
+                      const nextX = pointerX - dragging.dx;
+                      const nextY = pointerY - dragging.dy;
                       const nextNodes = wf.nodes.map((node) => (node.id === n.id ? { ...node, x: nextX, y: nextY } : node));
                       const next: WorkflowFileV1 = { ...wf, nodes: nextNodes };
                       setStatus({ kind: "ready", jsonText: JSON.stringify(next, null, 2) + "\n" });
@@ -1034,6 +1082,7 @@ export default function WorkflowsEditorClient({
                   </div>
                 );
               })()}
+              </div>
             </div>
           </div>
         )}
