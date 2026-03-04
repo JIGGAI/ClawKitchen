@@ -932,6 +932,110 @@ export async function POST(req: Request) {
           })()
         : await (async () => {
             const wf = (await readWorkflow(teamId, workflowId)).workflow;
+
+            // v2: enqueue for the dedicated workflow runner (cron-driven) instead of executing in Kitchen.
+            if (mode === "execute" || mode === "enqueue") {
+              const teamDir = await getTeamWorkspaceDir(teamId);
+              const runsDir = path.join(teamDir, "shared-context", "workflow-runs");
+              await fs.mkdir(runsDir, { recursive: true });
+
+              // Derive initial lane from the first node that declares one.
+              const firstLane = (() => {
+                const n = Array.isArray(wf.nodes)
+                  ? wf.nodes.find((nn) => nn && typeof nn === "object" && nn.config && typeof nn.config === "object" && "lane" in nn.config)
+                  : null;
+                const raw = n && n.config && typeof n.config === "object" ? String((n.config as Record<string, unknown>).lane ?? "backlog") : "backlog";
+                return ["backlog", "in-progress", "testing", "done"].includes(raw) ? raw : "backlog";
+              })();
+
+              // Compute next ticket number by scanning existing work/ lanes.
+              const workRoot = path.join(teamDir, "work");
+              let maxNum = 0;
+              const stageDirs = [
+                path.join(workRoot, "backlog"),
+                path.join(workRoot, "in-progress"),
+                path.join(workRoot, "testing"),
+                path.join(workRoot, "done"),
+              ];
+              for (const d of stageDirs) {
+                try {
+                  const entries = await fs.readdir(d);
+                  for (const f of entries) {
+                    const m = String(f).match(/^(\d{4})-/);
+                    if (m) maxNum = Math.max(maxNum, Number(m[1]));
+                  }
+                } catch {
+                  // ignore missing dirs
+                }
+              }
+
+              const ticketNum = String(maxNum + 1).padStart(4, "0");
+              const slug = `workflow-run-${String(wf.id ?? workflowId).replace(/[^a-z0-9-]+/gi, "-").toLowerCase()}`;
+              const ticketFile = `${ticketNum}-${slug}.md`;
+              const ticketRel = path.join("work", firstLane, ticketFile);
+              const ticketAbs = path.join(teamDir, ticketRel);
+              await fs.mkdir(path.dirname(ticketAbs), { recursive: true });
+
+              const workflowFile = `${workflowId}.workflow.json`;
+              const runLogPath = path.join(runsDir, `${runId}.run.json`);
+              const createdAt = nowIso();
+
+              const ticketMd = [
+                `# ${ticketNum} — Workflow run: ${wf.name ?? wf.id ?? workflowId}`,
+                ``,
+                `Owner: lead`,
+                `Status: ${firstLane}`,
+                ``,
+                `## Run`,
+                `- workflow: shared-context/workflows/${workflowFile}`,
+                `- run file: ${path.relative(teamDir, runLogPath)}`,
+                `- trigger: manual`,
+                `- runId: ${runId}`,
+                ``,
+                `## Notes`,
+                `- Enqueued by: ClawKitchen (/api/teams/workflow-runs mode=${mode})`,
+                ``,
+              ].join("\n");
+
+              // Runner-friendly run log format (ClawRecipes workflow-runner).
+              const runLog = {
+                runId,
+                createdAt,
+                updatedAt: createdAt,
+                teamId,
+                workflow: { file: workflowFile, id: wf.id ?? null, name: wf.name ?? null },
+                ticket: { file: ticketRel, number: ticketNum, lane: firstLane },
+                trigger: { kind: "manual" },
+                status: "queued",
+                priority: 0,
+                claimedBy: null,
+                claimExpiresAt: null,
+                nextNodeIndex: 0,
+                events: [{ ts: createdAt, type: "run.enqueued", lane: firstLane }],
+                nodeResults: [],
+              };
+
+              await Promise.all([
+                fs.writeFile(ticketAbs, ticketMd, "utf8"),
+                fs.writeFile(runLogPath, JSON.stringify(runLog, null, 2) + "\n", "utf8"),
+              ]);
+
+              // Return a lightweight Kitchen-schema run so the UI can immediately navigate to it.
+              return {
+                schema: "clawkitchen.workflow-run.v1",
+                id: runId,
+                workflowId,
+                teamId,
+                startedAt: createdAt,
+                status: "running",
+                summary: "Queued for workflow runner",
+                nodes: Array.isArray(wf.nodes)
+                  ? wf.nodes.map((n) => ({ nodeId: String(n.id), status: "pending" as const }))
+                  : [],
+              } satisfies WorkflowRunFileV1;
+            }
+
+            // Legacy dev-only: execute inside Kitchen (kept for now for sample/debug).
             return executeWorkflowRunMvp({ teamId, workflow: wf, runId });
           })();
 
