@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { spawn } from "node:child_process";
 import { jsonOkRest, parseJsonBody } from "@/lib/api-route-helpers";
 import { handleWorkflowRunsGet } from "@/lib/workflows/api-handlers";
 import { errorMessage } from "@/lib/errors";
@@ -42,18 +43,73 @@ function asStringArray(v: unknown): string[] {
   return v.map((x) => String(x ?? "").trim()).filter(Boolean);
 }
 
-function parseExecCommandFromArgs(args: Record<string, unknown>): { command: string; bin: string } {
+function parseExecCommandFromArgs(
+  args: Record<string, unknown>
+): { command: string; bin: string; argv?: string[] } {
   const commandArray = Array.isArray(args.commandArray) ? args.commandArray : Array.isArray(args.command) ? args.command : null;
   if (commandArray && commandArray.length) {
     const parts = commandArray.map((x: unknown) => String(x ?? "").trim()).filter(Boolean);
     if (!parts.length) throw new Error("runtime.exec requires a non-empty command");
-    return { command: parts.join(" "), bin: path.basename(parts[0]) };
+    return { command: parts.join(" "), bin: path.basename(parts[0]), argv: parts };
   }
 
   const cmd = String(args.command ?? "").trim();
   if (!cmd) throw new Error("runtime.exec requires args.command");
-  const bin = path.basename(cmd.split(/\s+/)[0] || "");
+  const first = cmd.split(/\s+/)[0] || "";
+  const bin = path.basename(first);
   return { command: cmd, bin };
+}
+
+async function execLocal({
+  command,
+  argv,
+  cwd,
+  timeoutMs,
+}: {
+  command: string;
+  argv?: string[];
+  cwd?: string;
+  timeoutMs: number;
+}): Promise<{ stdout: string; stderr: string; exitCode: number | null; signal: string | null }> {
+  // Keep this intentionally simple + safe:
+  // - default to argv (no shell) when provided
+  // - if only a string is provided, split on whitespace (still no shell)
+  const parts = argv && argv.length ? argv : command.split(/\s+/).filter(Boolean);
+  const file = parts[0];
+  const fileArgs = parts.slice(1);
+
+  return await new Promise((resolve, reject) => {
+    const child = spawn(file, fileArgs, {
+      cwd,
+      shell: false,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    let stdout = "";
+    let stderr = "";
+
+    const maxBytes = 64 * 1024;
+    child.stdout?.on("data", (b: Buffer) => {
+      if (stdout.length < maxBytes) stdout += b.toString("utf8").slice(0, maxBytes - stdout.length);
+    });
+    child.stderr?.on("data", (b: Buffer) => {
+      if (stderr.length < maxBytes) stderr += b.toString("utf8").slice(0, maxBytes - stderr.length);
+    });
+
+    const t = setTimeout(() => {
+      child.kill("SIGKILL");
+    }, Math.max(0, timeoutMs));
+
+    child.on("error", (e) => {
+      clearTimeout(t);
+      reject(e);
+    });
+
+    child.on("close", (code, signal) => {
+      clearTimeout(t);
+      resolve({ stdout, stderr, exitCode: code, signal });
+    });
+  });
 }
 
 function resolveExecPolicy(workflow: WorkflowFileV1, nodeCfg: Record<string, unknown>) {
@@ -122,7 +178,7 @@ async function executeToolNode({
 
   if (tool === "runtime.exec") {
     const pol = resolveExecPolicy(workflow, cfg);
-    const { command, bin } = parseExecCommandFromArgs(args);
+    const { command, bin, argv } = parseExecCommandFromArgs(args);
 
     if (pol.allowCommands.size && !pol.allowCommands.has(command)) {
       throw new Error(`runtime.exec command not allowlisted: ${command}`);
@@ -142,17 +198,38 @@ async function executeToolNode({
       workdir = resolved;
     }
 
-    const result = await toolsInvoke({
-      tool: "exec",
-      args: {
-        command,
-        workdir,
-        timeout: pol.timeout,
-        host: pol.host,
-        security: pol.security,
-        ask: pol.ask,
-      },
-    });
+    const execEnabled = process.env.KITCHEN_ENABLE_WORKFLOW_RUNTIME_EXEC === "1";
+    if (!execEnabled) {
+      throw new Error("Tool not available: exec");
+    }
+
+    const backend = (process.env.KITCHEN_WORKFLOW_EXEC_BACKEND || "gateway-first").trim();
+
+    let result: unknown;
+    if (backend === "local") {
+      result = await execLocal({ command, argv, cwd: workdir, timeoutMs: pol.timeout * 1000 });
+    } else {
+      try {
+        result = await toolsInvoke({
+          tool: "exec",
+          args: {
+            command,
+            workdir,
+            timeout: pol.timeout,
+            host: pol.host,
+            security: pol.security,
+            ask: pol.ask,
+          },
+        });
+      } catch (e: unknown) {
+        // For dev/testing, fall back to local execution if the gateway doesn't expose exec.
+        if (backend === "gateway-first" && /Tool not available:\s*exec/i.test(errorMessage(e))) {
+          result = await execLocal({ command, argv, cwd: workdir, timeoutMs: pol.timeout * 1000 });
+        } else {
+          throw e;
+        }
+      }
+    }
 
     return {
       nodeId,

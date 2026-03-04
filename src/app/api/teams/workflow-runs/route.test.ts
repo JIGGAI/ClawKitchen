@@ -31,6 +31,11 @@ describe("/api/teams/workflow-runs POST (execute)", () => {
   beforeEach(async () => {
     toolsInvokeMock.mockClear();
     TEAM_DIR = await fs.mkdtemp(path.join(os.tmpdir(), "clawkitchen-team-"));
+
+    // Enable runtime.exec for tests (dev-only feature).
+    process.env.KITCHEN_ENABLE_WORKFLOW_RUNTIME_EXEC = "1";
+    process.env.KITCHEN_WORKFLOW_EXEC_BACKEND = "local";
+
     vi.resetModules();
   });
 
@@ -171,6 +176,7 @@ describe("/api/teams/workflow-runs POST (execute)", () => {
     expect(run.nodes[0].status).toBe("success");
     expect(run.nodes[0].output.tool).toBe("runtime.exec");
 
-    expect(toolsInvokeMock).toHaveBeenCalledTimes(1);
+    // We run exec locally in tests for determinism.
+    expect(toolsInvokeMock).not.toHaveBeenCalled();
   });
 });
