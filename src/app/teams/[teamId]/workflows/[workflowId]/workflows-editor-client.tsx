@@ -729,7 +729,12 @@ export default function WorkflowsEditorClient({
                 </div>
               </div>
 
-              <svg className="absolute inset-0" width={2200} height={1200}>
+              <svg
+                className="pointer-events-none absolute inset-0 z-0"
+                width={2200}
+                height={1200}
+                style={{ overflow: "visible" }}
+              >
                 {(parsed.wf?.edges ?? []).map((e) => {
                   const wf = parsed.wf;
                   if (!wf) return null;
@@ -740,7 +745,17 @@ export default function WorkflowsEditorClient({
                   const ay = (typeof a.y === "number" ? a.y : 80) + 24;
                   const bx = (typeof b.x === "number" ? b.x : 80) + 90;
                   const by = (typeof b.y === "number" ? b.y : 80) + 24;
-                  return <line key={e.id} x1={ax} y1={ay} x2={bx} y2={by} stroke="rgba(255,255,255,0.18)" strokeWidth={2} />;
+                  return (
+                    <line
+                      key={e.id}
+                      x1={ax}
+                      y1={ay}
+                      x2={bx}
+                      y2={by}
+                      stroke="rgba(255,255,255,0.35)"
+                      strokeWidth={3}
+                    />
+                  );
                 })}
               </svg>
 
