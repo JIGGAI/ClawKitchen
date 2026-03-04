@@ -123,6 +123,12 @@ export default function HomeClient({
             Tickets
           </Link>
           <Link
+            href="/channels"
+            className="text-sm font-medium text-[color:var(--ck-text-secondary)] transition-colors hover:text-[color:var(--ck-text-primary)]"
+          >
+            Channels / Bindings
+          </Link>
+          <Link
             href="/settings"
             className="text-sm font-medium text-[color:var(--ck-text-secondary)] transition-colors hover:text-[color:var(--ck-text-primary)]"
           >
