@@ -80,7 +80,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   function navHref(href: string): string {
     if (!selectedTeamId) return href;
     // Only carry team context for pages that currently support it.
-    if (href === "/tickets" || href === "/goals" || href === "/cron-jobs") {
+    if (href === "/tickets" || href === "/goals" || href === "/cron-jobs" || href === "/runs") {
       return withTeamQuery(href, selectedTeamId);
     }
     return href;
@@ -91,7 +91,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     // Team editor routes already encode team in the path.
     if (pathname.startsWith("/teams/")) return;
     // Only enforce on pages that support it.
-    if (pathname !== "/tickets" && pathname !== "/goals" && pathname !== "/cron-jobs") return;
+    if (pathname !== "/tickets" && pathname !== "/goals" && pathname !== "/cron-jobs" && pathname !== "/runs") return;
 
     try {
       const url = new URL(window.location.href);
@@ -237,26 +237,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </Icon>
       ),
     },
-    // Team-scoped pages (path-based). Only show if we have a selected team.
-    ...(selectedTeamId
-      ? [
-          {
-            href: `/teams/${encodeURIComponent(selectedTeamId)}/runs`,
-            label: "Runs",
-            icon: (
-              <Icon>
-                <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M4 19h16" />
-                  <path d="M6 16l4-4 3 3 5-7" />
-                  <circle cx="10" cy="12" r="1" />
-                  <circle cx="13" cy="15" r="1" />
-                  <circle cx="18" cy="8" r="1" />
-                </svg>
-              </Icon>
-            ),
-          },
-        ]
-      : []),
+    {
+      href: navHref(`/runs`),
+      label: "Runs",
+      icon: (
+        <Icon>
+          <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M4 19h16" />
+            <path d="M6 16l4-4 3 3 5-7" />
+            <circle cx="10" cy="12" r="1" />
+            <circle cx="13" cy="15" r="1" />
+            <circle cx="18" cy="8" r="1" />
+          </svg>
+        </Icon>
+      ),
+    },
     {
       href: `/settings`,
       label: "Settings",
@@ -361,7 +356,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 label={it.label}
                 icon={<span aria-hidden>{it.icon}</span>}
                 collapsed={collapsed}
-                active={pathname === it.href || pathname.startsWith(it.href + "/")}
+                active={(() => {
+                  const hrefPath = it.href.split("?")[0];
+                  return pathname === hrefPath || pathname.startsWith(hrefPath + "/");
+                })()}
               />
             ))}
           </nav>
