@@ -124,7 +124,11 @@ export default function RunDetailClient({ run }: { run: WorkflowRunFileV1 }) {
 
             <div className="mt-3 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3">
               <div className="text-xs font-semibold text-[color:var(--ck-text-secondary)]">Output</div>
-              <pre className="mt-2 max-h-[60vh] overflow-auto text-xs text-[color:var(--ck-text-primary)]">{asPrettyJson(selectedNode.output ?? null)}</pre>
+              {typeof selectedNode.output === "undefined" || selectedNode.output === null ? (
+                <div className="mt-2 text-xs text-[color:var(--ck-text-tertiary)]">(no output)</div>
+              ) : (
+                <pre className="mt-2 max-h-[60vh] overflow-auto text-xs text-[color:var(--ck-text-primary)]">{asPrettyJson(selectedNode.output)}</pre>
+              )}
             </div>
           </div>
         ) : (
