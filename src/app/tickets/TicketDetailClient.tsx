@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 
 import { useToast } from "@/components/ToastProvider";
 import { errorMessage } from "@/lib/errors";
 import { fetchJson } from "@/lib/fetch-json";
+import { parseTicketComments } from "@/lib/ticket-comments";
 import { TicketAssignControl } from "@/app/tickets/[ticket]/TicketAssignControl";
 
 export function TicketDetailClient(props: {
@@ -22,6 +23,11 @@ export function TicketDetailClient(props: {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<null | { kind: "goals" | "delete" }>(null);
+
+  const comments = useMemo(() => parseTicketComments(props.markdown), [props.markdown]);
+
+  const [commentAuthor, setCommentAuthor] = useState<string>("");
+  const [commentBody, setCommentBody] = useState<string>("");
 
   async function moveToGoals() {
     setError(null);
@@ -39,6 +45,26 @@ export function TicketDetailClient(props: {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ ticket: props.ticketId }),
     });
+  }
+
+  async function submitComment() {
+    setError(null);
+    const body = commentBody.trim();
+    if (!body) throw new Error("Comment cannot be empty.");
+
+    await fetchJson(`/api/teams/${encodeURIComponent(props.teamId)}/tickets/comment`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        ticket: props.ticketId,
+        author: commentAuthor.trim() || undefined,
+        comment: body,
+      }),
+    });
+
+    setCommentBody("");
+    toast.push({ kind: "success", message: "Comment added." });
+    router.refresh();
   }
 
   return (
@@ -80,6 +106,82 @@ export function TicketDetailClient(props: {
       </div>
 
       <div className="ck-glass p-6">
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-sm font-semibold text-[color:var(--ck-text-primary)]">Comments</div>
+          <div className="text-xs text-[color:var(--ck-text-tertiary)]">{comments.length}</div>
+        </div>
+
+        {comments.length ? (
+          <div className="mt-3 space-y-3">
+            {comments.map((c, idx) => (
+              <div
+                key={`${c.timestamp}-${idx}`}
+                className="rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] bg-black/10 p-3"
+              >
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <div className="text-xs font-medium text-[color:var(--ck-text-primary)]">{c.author}</div>
+                  <div className="text-xs text-[color:var(--ck-text-tertiary)]">{c.timestamp}</div>
+                </div>
+                <div className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-[color:var(--ck-text-secondary)]">
+                  {c.body}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-3 text-sm text-[color:var(--ck-text-secondary)]">No comments yet.</div>
+        )}
+
+        <div className="mt-4 border-t border-[color:var(--ck-border-subtle)] pt-4">
+          <div className="text-sm font-semibold text-[color:var(--ck-text-primary)]">Add comment</div>
+
+          <div className="mt-3 grid gap-3">
+            <div className="grid gap-1">
+              <label className="text-xs font-medium text-[color:var(--ck-text-secondary)]" htmlFor="ck-comment-author">
+                Author (optional)
+              </label>
+              <input
+                id="ck-comment-author"
+                value={commentAuthor}
+                onChange={(e) => setCommentAuthor(e.target.value)}
+                placeholder="unknown"
+                className="w-full rounded border border-[color:var(--ck-border-subtle)] bg-black/20 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] outline-none focus:border-[color:var(--ck-border-strong)]"
+                disabled={isPending}
+              />
+            </div>
+
+            <div className="grid gap-1">
+              <label className="text-xs font-medium text-[color:var(--ck-text-secondary)]" htmlFor="ck-comment-body">
+                Comment
+              </label>
+              <textarea
+                id="ck-comment-body"
+                value={commentBody}
+                onChange={(e) => setCommentBody(e.target.value)}
+                rows={4}
+                className="w-full rounded border border-[color:var(--ck-border-subtle)] bg-black/20 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] outline-none focus:border-[color:var(--ck-border-strong)]"
+                disabled={isPending}
+              />
+            </div>
+
+            <div className="flex items-center justify-end">
+              <button
+                className="rounded bg-[color:var(--ck-accent)] px-3 py-1.5 text-xs font-semibold text-black disabled:opacity-50"
+                onClick={() => {
+                  startTransition(() => {
+                    submitComment().catch((e: unknown) => setError(errorMessage(e)));
+                  });
+                }}
+                disabled={isPending || !commentBody.trim()}
+              >
+                Post comment
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="ck-glass p-6">
         <pre className="whitespace-pre-wrap break-words text-sm leading-6 text-[color:var(--ck-text-primary)]">
           {props.markdown}
         </pre>
@@ -94,7 +196,10 @@ export function TicketDetailClient(props: {
 
             <div className="mt-2 text-sm text-[color:var(--ck-text-secondary)]">
               {confirm.kind === "goals" ? (
-                <>This will move the ticket out of the work lanes into <code>work/goals/</code> so it won’t be picked up by automation.</>
+                <>
+                  This will move the ticket out of the work lanes into <code>work/goals/</code> so it won’t be picked up by
+                  automation.
+                </>
               ) : (
                 <>This will permanently remove the ticket markdown file. Assignment stubs (if any) will be archived.</>
               )}
