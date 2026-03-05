@@ -702,7 +702,9 @@ export async function POST(req: Request) {
             const ticketNum = String(maxNum + 1).padStart(4, "0");
             const slug = `workflow-run-${String(wf.id ?? workflowId).replace(/[^a-z0-9-]+/gi, "-").toLowerCase()}`;
             const ticketFile = `${ticketNum}-${slug}.md`;
-            const ticketRel = path.join("work", firstLane, ticketFile);
+            // Workflow runs should NOT clutter the main ticket board.
+            // Store run tickets in a dedicated folder (still file-first + discoverable).
+            const ticketRel = path.join("work", "runs", ticketFile);
             const ticketAbs = path.join(teamDir, ticketRel);
             await fs.mkdir(path.dirname(ticketAbs), { recursive: true });
 
