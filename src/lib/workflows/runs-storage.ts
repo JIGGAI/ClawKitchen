@@ -17,8 +17,11 @@ const LEGACY_PER_WORKFLOW_LAYOUT = true;
 export function assertSafeRunId(runId: string) {
   const id = String(runId ?? "").trim();
   if (!id) throw new Error("run id is required");
-  if (!/^[a-z0-9][a-z0-9-]{0,80}$/.test(id)) {
-    throw new Error("Invalid run id. Use lowercase letters, numbers, and dashes (max 81 chars)."
+
+  // Accept both Kitchen-style run ids (lowercase) and runner ids that include ISO timestamps (T/Z).
+  // We still keep it conservative: only letters/numbers/dashes.
+  if (!/^[A-Za-z0-9][A-Za-z0-9-]{0,120}$/.test(id)) {
+    throw new Error("Invalid run id. Use letters, numbers, and dashes."
     );
   }
   return id;
