@@ -22,12 +22,40 @@ export default async function RunsPage({
   const teamId = String(team ?? "").trim();
 
   if (!teamId) {
+    const { listLocalTeamIds } = await import("@/lib/teams");
+    const AllRunsClient = (await import("@/app/runs/AllRunsClient")).default;
+
+    const teamIds = await listLocalTeamIds();
+
+    const rowsNested = await Promise.all(
+      teamIds.map(async (tId) => {
+        const teamName = await getTeamDisplayName(tId);
+        const { runs } = await listAllWorkflowRuns(tId);
+        return runs.map((r) => ({
+          teamId: tId,
+          teamName,
+          workflowId: r.workflowId,
+          runId: r.runId,
+          status: r.status,
+          startedAt: r.startedAt,
+          endedAt: r.endedAt,
+          updatedAt: r.updatedAt,
+        }));
+      })
+    );
+
+    const rows = rowsNested.flat().sort((a, b) => String(b.updatedAt || b.endedAt || b.startedAt || "").localeCompare(String(a.updatedAt || a.endedAt || a.startedAt || "")));
+
     return (
-      <div className="flex flex-col gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Runs</h1>
-        <div className="text-sm text-[color:var(--ck-text-secondary)]">
-          Select a team from the left sidebar to view workflow runs.
+      <div className="flex flex-col gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Runs</h1>
+          <div className="mt-1 text-sm text-[color:var(--ck-text-secondary)]">
+            Showing workflow runs across all local teams. Use the team dropdown to filter.
+          </div>
         </div>
+
+        <AllRunsClient rows={rows} />
       </div>
     );
   }
