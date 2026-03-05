@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { TicketStage, TicketSummary } from "@/lib/tickets";
 
@@ -181,16 +182,17 @@ export function TicketsBoardClient({
                   key={`${t.teamId}:${t.id}`}
                   className="rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] bg-[color:var(--ck-bg-glass-strong)] p-3"
                 >
-                  <a
+                  <Link
                     href={(() => {
                       const base = `${basePath}/${encodeURIComponent(t.id)}`;
                       if (!selectedTeamId) return base;
                       return `${base}?team=${encodeURIComponent(selectedTeamId)}`;
                     })()}
+                    prefetch={false}
                     className="block text-sm font-medium text-[color:var(--ck-text-primary)] hover:underline"
                   >
                     {String(t.number).padStart(4, "0")} — {t.title}
-                  </a>
+                  </Link>
                   <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[color:var(--ck-text-secondary)]">
                     <span className="rounded bg-white/5 px-1.5 py-0.5">{t.teamId}</span>
                     <span>·</span>
