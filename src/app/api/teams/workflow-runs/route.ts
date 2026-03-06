@@ -363,6 +363,11 @@ export async function POST(req: Request) {
   const note = typeof o.note === "string" ? o.note : undefined;
   const decidedBy = typeof o.decidedBy === "string" ? o.decidedBy : undefined;
 
+  // Canonical execution mode:
+  // - enqueue: create run only
+  // - run_now: create run + kick runner loop
+  // (future) execute/run_now option is handled in the runner, not Kitchen.
+
   if (!teamId) return NextResponse.json({ ok: false, error: "teamId is required" }, { status: 400 });
   if (!workflowId) return NextResponse.json({ ok: false, error: "workflowId is required" }, { status: 400 });
 
@@ -663,6 +668,20 @@ export async function POST(req: Request) {
 
             const wf = (await readWorkflow(teamId, workflowId)).workflow;
 
+            // Preflight: nodes (excluding start/end) must be assigned to an agent.
+            const missing = (Array.isArray(wf.nodes) ? wf.nodes : [])
+              .filter((n) => n && typeof n === "object" && (n as { type?: unknown }).type !== "start" && (n as { type?: unknown }).type !== "end")
+              .filter((n) => {
+                const cfg = (n as { config?: unknown }).config;
+                const o = cfg && typeof cfg === "object" && !Array.isArray(cfg) ? (cfg as Record<string, unknown>) : {};
+                return !String(o.agentId ?? "").trim();
+              })
+              .map((n) => String((n as { id?: unknown }).id ?? ""))
+              .filter(Boolean);
+            if (missing.length) {
+              throw new Error(`All nodes must be assigned to an agent. Missing agentId on: ${missing.join(", ")}`);
+            }
+
             const teamDir = await getTeamWorkspaceDir(teamId);
             const runsDir = path.join(teamDir, "shared-context", "workflow-runs");
             await fs.mkdir(runsDir, { recursive: true });
@@ -769,6 +788,10 @@ export async function POST(req: Request) {
 
     return jsonOkRest({ ...(await writeWorkflowRun(teamId, workflowId, run)), runId });
   } catch (err: unknown) {
-    return NextResponse.json({ ok: false, error: errorMessage(err) }, { status: 500 });
+    const msg = errorMessage(err);
+    if (/^All nodes must be assigned to an agent\./i.test(msg)) {
+      return NextResponse.json({ ok: false, error: msg }, { status: 400 });
+    }
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
 }

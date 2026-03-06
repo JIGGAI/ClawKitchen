@@ -61,6 +61,7 @@ describe("/api/teams/workflow-runs POST (enqueue for runner)", () => {
           config: {
             tool: "fs.append",
             args: { path: "notes/log.txt", content: "hello" },
+            agentId: "development-team-dev",
           },
         },
       ],
@@ -116,6 +117,7 @@ describe("/api/teams/workflow-runs POST (enqueue for runner)", () => {
           config: {
             tool: "runtime.exec",
             args: { command: "echo hi" },
+            agentId: "development-team-dev",
           },
         },
       ],
@@ -159,6 +161,7 @@ describe("/api/teams/workflow-runs POST (enqueue for runner)", () => {
           config: {
             tool: "runtime.exec",
             args: { command: "echo hi" },
+            agentId: "development-team-dev",
           },
         },
       ],

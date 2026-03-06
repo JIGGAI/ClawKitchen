@@ -65,6 +65,11 @@ export default function WorkflowsEditorClient({
   const [workflowRunsError, setWorkflowRunsError] = useState("");
   const [selectedWorkflowRunId, setSelectedWorkflowRunId] = useState<string>("");
 
+  // Run preflight: ensure nodes are assigned + required worker cron exists.
+  const [cronLoading, setCronLoading] = useState(false);
+  const [cronError, setCronError] = useState<string>("");
+  const [agentHasCron, setAgentHasCron] = useState<Record<string, boolean>>({});
+
   const [newNodeId, setNewNodeId] = useState("");
   const [newNodeName, setNewNodeName] = useState("");
   const [newNodeType, setNewNodeType] = useState<WorkflowFileV1["nodes"][number]["type"]>("llm");
@@ -186,6 +191,36 @@ export default function WorkflowsEditorClient({
     })();
   }, []);
 
+  useEffect(() => {
+    (async () => {
+      // Preflight helper: determine whether each agent has any cron job installed/enabled.
+      // (Used to warn/block enqueue when the assigned worker has no cron heartbeat.)
+      setCronError("");
+      setCronLoading(true);
+      try {
+        const res = await fetch("/api/cron/jobs", { cache: "no-store" });
+        const json = (await res.json()) as { ok?: boolean; error?: string; jobs?: unknown[] };
+        if (!res.ok || json.ok === false) throw new Error(json.error || "Failed to load cron jobs");
+        const jobs = Array.isArray(json.jobs) ? json.jobs : [];
+
+        const map: Record<string, boolean> = {};
+        for (const j of jobs) {
+          const job = j as { enabled?: unknown; scope?: { kind?: unknown; id?: unknown } };
+          if (job && Boolean(job.enabled) && job.scope && String(job.scope.kind) === "agent") {
+            const id = String(job.scope.id ?? "").trim();
+            if (id) map[id] = true;
+          }
+        }
+        setAgentHasCron(map);
+      } catch (e: unknown) {
+        setCronError(e instanceof Error ? e.message : String(e));
+        setAgentHasCron({});
+      } finally {
+        setCronLoading(false);
+      }
+    })();
+  }, []);
+
   const parsed = useMemo(() => {
     if (status.kind !== "ready") return { wf: null as WorkflowFileV1 | null, err: "" };
     try {
@@ -200,6 +235,44 @@ export default function WorkflowsEditorClient({
     if (!parsed.wf) return { errors: [], warnings: [] as string[] };
     return validateWorkflowFileV1(parsed.wf);
   }, [parsed.wf]);
+
+  const runPreflight = useMemo(() => {
+    const wf = parsed.wf;
+    if (!wf) {
+      return {
+        missingAgentOnNodeIds: [] as string[],
+        requiredAgentIds: [] as string[],
+        agentIdsMissingCron: [] as string[],
+        ok: true,
+      };
+    }
+
+    const nodesToExecute = (wf.nodes ?? []).filter((n) => n.type !== "start" && n.type !== "end");
+
+    const missingAgentOnNodeIds = nodesToExecute
+      .filter((n) => {
+        const cfg = n.config && typeof n.config === "object" && !Array.isArray(n.config) ? (n.config as Record<string, unknown>) : {};
+        const agentId = String(cfg.agentId ?? "").trim();
+        return !agentId;
+      })
+      .map((n) => n.id);
+
+    const requiredAgentIds = Array.from(
+      new Set(
+        nodesToExecute
+          .map((n) => {
+            const cfg = n.config && typeof n.config === "object" && !Array.isArray(n.config) ? (n.config as Record<string, unknown>) : {};
+            return String(cfg.agentId ?? "").trim();
+          })
+          .filter(Boolean)
+      )
+    );
+
+    const agentIdsMissingCron = requiredAgentIds.filter((id) => !agentHasCron[id]);
+
+    const ok = missingAgentOnNodeIds.length === 0 && agentIdsMissingCron.length === 0;
+    return { missingAgentOnNodeIds, requiredAgentIds, agentIdsMissingCron, ok };
+  }, [parsed.wf, agentHasCron]);
 
   function setWorkflow(next: WorkflowFileV1) {
     const text = JSON.stringify(next, null, 2) + "\n";
@@ -1424,10 +1497,23 @@ export default function WorkflowsEditorClient({
                         </button>
                         <button
                           type="button"
-                          disabled={saving}
+                          disabled={saving || cronLoading || !runPreflight.ok}
                           onClick={async () => {
                             const wfId = String(wf.id ?? "").trim();
                             if (!wfId) return;
+
+                            // Preflight: all nodes must be assigned and cron must be set up for assigned workers.
+                            if (runPreflight.missingAgentOnNodeIds.length) {
+                              setWorkflowRunsError("All nodes must be assigned to an agent.");
+                              return;
+                            }
+                            if (runPreflight.agentIdsMissingCron.length) {
+                              setWorkflowRunsError(
+                                `Cron not set up for: ${runPreflight.agentIdsMissingCron.join(", ")}. (Enable/install the agent worker cron, then retry.)`
+                              );
+                              return;
+                            }
+
                             setWorkflowRunsError("");
                             setWorkflowRunsLoading(true);
                             try {
@@ -1459,8 +1545,23 @@ export default function WorkflowsEditorClient({
                         >
                           + Run (enqueue)
                         </button>
+                        {cronError ? (
+                          <div className="ml-2 text-[10px] text-amber-100/90" title={cronError}>
+                            Cron check unavailable
+                          </div>
+                        ) : null}
                       </div>
                     </div>
+
+                    {runPreflight.missingAgentOnNodeIds.length ? (
+                      <div className="mt-2 rounded-[var(--ck-radius-sm)] border border-red-400/30 bg-red-500/10 p-2 text-xs text-red-100">
+                        All nodes must be assigned to an agent. Missing agentId on: {runPreflight.missingAgentOnNodeIds.join(", ")}
+                      </div>
+                    ) : runPreflight.agentIdsMissingCron.length ? (
+                      <div className="mt-2 rounded-[var(--ck-radius-sm)] border border-amber-400/30 bg-amber-500/10 p-2 text-xs text-amber-50">
+                        Cron not set up for: {runPreflight.agentIdsMissingCron.join(", ")}
+                      </div>
+                    ) : null}
 
                     {workflowRunsError ? (
                       <div className="mt-2 rounded-[var(--ck-radius-sm)] border border-red-400/30 bg-red-500/10 p-2 text-xs text-red-100">
