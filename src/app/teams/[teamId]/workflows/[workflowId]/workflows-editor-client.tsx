@@ -196,7 +196,7 @@ export default function WorkflowsEditorClient({
     })();
   }, []);
 
-  const refreshCronMap = useCallback(async () => {
+  const refreshCronMap = useCallback(async (): Promise<Record<string, boolean>> => {
     // Preflight helper: determine whether each agent has any cron job installed/enabled.
     // (Used to warn/block enqueue when the assigned worker has no cron heartbeat.)
     setCronError("");
@@ -216,9 +216,11 @@ export default function WorkflowsEditorClient({
         }
       }
       setAgentHasCron(map);
+      return map;
     } catch (e: unknown) {
       setCronError(e instanceof Error ? e.message : String(e));
       setAgentHasCron({});
+      return {};
     } finally {
       setCronLoading(false);
     }
@@ -1509,16 +1511,39 @@ export default function WorkflowsEditorClient({
                             const wfId = String(wf.id ?? "").trim();
                             if (!wfId) return;
 
-                            // Preflight: all nodes must be assigned and cron must be set up for assigned workers.
+                            // Preflight: all nodes must be assigned.
                             if (runPreflight.missingAgentOnNodeIds.length) {
                               setWorkflowRunsError("All nodes must be assigned to an agent.");
                               return;
                             }
+
+                            // Cron reconciliation: keep the system clean by disabling orphaned worker crons,
+                            // and install/enable missing worker crons before enqueue.
                             if (runPreflight.agentIdsMissingCron.length) {
-                              setWorkflowRunsError(
-                                `Cron not set up for: ${runPreflight.agentIdsMissingCron.join(", ")}. (Enable/install the agent worker cron, then retry.)`
-                              );
-                              return;
+                              setInstallCronBusy(true);
+                              setInstallCronError("");
+                              try {
+                                const reconcileRes = await fetch("/api/cron/worker", {
+                                  method: "POST",
+                                  headers: { "content-type": "application/json" },
+                                  body: JSON.stringify({ action: "reconcile", teamId }),
+                                });
+                                const reconcileJson = (await reconcileRes.json()) as { ok?: boolean; error?: string };
+                                if (!reconcileRes.ok || reconcileJson.ok === false) {
+                                  throw new Error(reconcileJson.error || "Failed to reconcile worker crons");
+                                }
+                                const map = await refreshCronMap();
+                                const stillMissing = runPreflight.requiredAgentIds.filter((id) => !map[id]);
+                                if (stillMissing.length) {
+                                  setWorkflowRunsError(`Cron not set up for: ${stillMissing.join(", ")}`);
+                                  return;
+                                }
+                              } catch (e: unknown) {
+                                setWorkflowRunsError(e instanceof Error ? e.message : String(e));
+                                return;
+                              } finally {
+                                setInstallCronBusy(false);
+                              }
                             }
 
                             setWorkflowRunsError("");
