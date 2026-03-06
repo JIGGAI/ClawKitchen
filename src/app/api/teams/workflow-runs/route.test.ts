@@ -27,6 +27,14 @@ vi.mock("@/lib/gateway", () => ({
   toolsInvoke: toolsInvokeMock,
 }));
 
+const runOpenClawMock = vi.fn(async () => {
+  return { ok: true, stdout: JSON.stringify({ ok: true, runId: "run-123", runLogPath: "<mock>" }), stderr: "" };
+});
+
+vi.mock("@/lib/openclaw", () => ({
+  runOpenClaw: runOpenClawMock,
+}));
+
 describe("/api/teams/workflow-runs POST (enqueue for runner)", () => {
   beforeEach(async () => {
     toolsInvokeMock.mockClear();
@@ -99,12 +107,8 @@ describe("/api/teams/workflow-runs POST (enqueue for runner)", () => {
     expect(run.nodes[0].status).toBe("pending");
     expect(run.nodes[1].status).toBe("pending");
 
-    // Runner-friendly run log should exist at shared-context/workflow-runs/<runId>.run.json
-    const runnerLogPath = path.join(TEAM_DIR, "shared-context", "workflow-runs", `${json.runId}.run.json`);
-    const runnerRaw = await fs.readFile(runnerLogPath, "utf8");
-    const runnerLog = JSON.parse(runnerRaw) as { status?: string; workflow?: { file?: string } };
-    expect(runnerLog.status).toBe("queued");
-    expect(String(runnerLog.workflow?.file)).toBe(`${workflowId}.workflow.json`);
+    // Runner-friendly run log creation is delegated to ClawRecipes (CLI) now.
+    // We only assert that the API returned a runId and did not execute locally.
 
     // No local side effects (fs.append should not have run).
     await expect(fs.readFile(path.join(TEAM_DIR, "notes", "log.txt"), "utf8")).rejects.toThrow();

@@ -1504,7 +1504,7 @@ export default function WorkflowsEditorClient({
                           }}
                           className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10 disabled:opacity-50"
                         >
-                          + Sample run
+                          + Queue run
                         </button>
                         <button
                           type="button"
@@ -1554,7 +1554,7 @@ export default function WorkflowsEditorClient({
                               const res = await fetch("/api/teams/workflow-runs", {
                                 method: "POST",
                                 headers: { "content-type": "application/json" },
-                                body: JSON.stringify({ teamId, workflowId: wfId, mode: "execute" }),
+                                body: JSON.stringify({ teamId, workflowId: wfId, mode: "run_now" }),
                               });
                               const json = await res.json();
                               if (!res.ok || !json.ok) throw new Error(json.error || "Failed to create run");
@@ -1577,7 +1577,7 @@ export default function WorkflowsEditorClient({
                           className="rounded-[var(--ck-radius-sm)] border border-emerald-400/30 bg-emerald-500/10 px-2 py-1 text-[10px] font-medium text-emerald-50 hover:bg-emerald-500/15 disabled:opacity-50"
                           title="Enqueue a run for the workflow runner (Kitchen does not execute nodes)"
                         >
-                          + Run (enqueue)
+                          + Run now
                         </button>
                         {cronError ? (
                           <div className="ml-2 text-[10px] text-amber-100/90" title={cronError}>

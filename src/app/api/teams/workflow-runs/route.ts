@@ -7,6 +7,7 @@ import { jsonOkRest, parseJsonBody } from "@/lib/api-route-helpers";
 import { handleWorkflowRunsGet } from "@/lib/workflows/api-handlers";
 import { errorMessage } from "@/lib/errors";
 import { toolsInvoke } from "@/lib/gateway";
+import { runOpenClaw } from "@/lib/openclaw";
 import { assertSafeRelativeFileName, getTeamWorkspaceDir } from "@/lib/paths";
 import { listWorkflowRuns, readWorkflowRun, writeWorkflowRun } from "@/lib/workflows/runs-storage";
 import type { WorkflowRunFileV1, WorkflowRunNodeResultV1 } from "@/lib/workflows/runs-types";
@@ -660,9 +661,9 @@ export async function POST(req: Request) {
           })()
         : await (async () => {
 
-            // v2: enqueue for the dedicated workflow runner (cron-driven) instead of executing in Kitchen.
+            // v2: delegate to CLI for enqueue/run-now (Kitchen should not author run artifacts).
             const modeNorm = mode || "enqueue";
-            if (!["execute", "enqueue", "sample"].includes(modeNorm)) {
+            if (!["execute", "enqueue", "run_now", "sample"].includes(modeNorm)) {
               throw new Error(`Unsupported mode: ${modeNorm}`);
             }
 
@@ -688,104 +689,93 @@ export async function POST(req: Request) {
               throw new Error(`All nodes must be assigned to an agent. Missing agentId on: ${missing.join(", ")}`);
             }
 
-            const teamDir = await getTeamWorkspaceDir(teamId);
-            const runsDir = path.join(teamDir, "shared-context", "workflow-runs");
-            await fs.mkdir(runsDir, { recursive: true });
+            const workflowFile = `${workflowId}.workflow.json`;
 
-            const triggerKind = modeNorm === "sample" ? "sample" : "manual";
+            // Delegate enqueue to ClawRecipes (CLI) which owns the canonical run folder/files.
+            const enqueueRes = await runOpenClaw([
+              "recipes",
+              "workflows",
+              "run",
+              "--team-id",
+              teamId,
+              "--workflow-file",
+              workflowFile,
+            ]);
+            if (!enqueueRes.ok) throw new Error(enqueueRes.stderr || enqueueRes.stdout || "Failed to enqueue workflow run");
 
-            // Derive initial lane from the first node that declares one.
-            const firstLane = (() => {
-              const n = Array.isArray(wf.nodes)
-                ? wf.nodes.find((nn) => nn && typeof nn === "object" && nn.config && typeof nn.config === "object" && "lane" in nn.config)
-                : null;
-              const raw = n && n.config && typeof n.config === "object" ? String((n.config as Record<string, unknown>).lane ?? "backlog") : "backlog";
-              return ["backlog", "in-progress", "testing", "done"].includes(raw) ? raw : "backlog";
-            })();
+            const enqueueJson = JSON.parse(String(enqueueRes.stdout ?? "{}")) as {
+              ok?: boolean;
+              runId?: string;
+              runLogPath?: string;
+            };
+            const enqRunId = String(enqueueJson.runId ?? "").trim();
+            if (!enqRunId) throw new Error("Enqueue succeeded but did not return runId");
 
-            // Compute next ticket number by scanning existing work/ lanes.
-            const workRoot = path.join(teamDir, "work");
-            let maxNum = 0;
-            const stageDirs = [
-              path.join(workRoot, "backlog"),
-              path.join(workRoot, "in-progress"),
-              path.join(workRoot, "testing"),
-              path.join(workRoot, "done"),
-            ];
-            for (const d of stageDirs) {
-              try {
-                const entries = await fs.readdir(d);
-                for (const f of entries) {
-                  const m = String(f).match(/^(\d{4})-/);
-                  if (m) maxNum = Math.max(maxNum, Number(m[1]));
-                }
-              } catch {
-                // ignore missing dirs
+            if (modeNorm === "run_now") {
+              // Run now = enqueue + runner + workers.
+              // NOTE: `worker-tick --agent-id` must match a real agent id (queue file name).
+              // If workflow node agentIds are aliases, we fail with a clear message.
+
+              const agentListRes = await runOpenClaw(["agents", "list", "--json"]);
+              if (!agentListRes.ok) throw new Error(agentListRes.stderr || agentListRes.stdout || "Failed to list agents");
+              const agentList = JSON.parse(String(agentListRes.stdout ?? "[]")) as Array<{ id?: unknown }>;
+              const knownAgentIds = new Set(agentList.map((a) => String(a.id ?? "").trim()).filter(Boolean));
+
+              // Kick workers for all required agents referenced by the workflow file.
+              const requiredAgentIds = (Array.isArray(wf.nodes) ? wf.nodes : [])
+                .filter((n) =>
+                  n &&
+                  typeof n === "object" &&
+                  (n as { type?: unknown }).type !== "start" &&
+                  (n as { type?: unknown }).type !== "end" &&
+                  (n as { type?: unknown }).type !== "human_approval"
+                )
+                .map((n) => {
+                  const cfg = (n as { config?: unknown }).config;
+                  const o = cfg && typeof cfg === "object" && !Array.isArray(cfg) ? (cfg as Record<string, unknown>) : {};
+                  return String(o.agentId ?? "").trim();
+                })
+                .filter(Boolean);
+
+              const uniq = Array.from(new Set(requiredAgentIds));
+              const missing = uniq.filter((id) => !knownAgentIds.has(id));
+              if (missing.length) {
+                throw new Error(
+                  `Unknown agentId(s) in workflow node assignments: ${missing.join(", ")}. ` +
+                    `These must match real OpenClaw agent ids (see openclaw agents list).`
+                );
+              }
+
+              const runnerRes = await runOpenClaw(["recipes", "workflows", "runner-once", "--team-id", teamId]);
+              if (!runnerRes.ok) throw new Error(runnerRes.stderr || runnerRes.stdout || "Failed to run runner-once");
+
+              for (const agentId of uniq) {
+                const workerRes = await runOpenClaw([
+                  "recipes",
+                  "workflows",
+                  "worker-tick",
+                  "--team-id",
+                  teamId,
+                  "--agent-id",
+                  agentId,
+                  "--limit",
+                  "5",
+                  "--worker-id",
+                  "kitchen-run-now",
+                ]);
+                if (!workerRes.ok) throw new Error(workerRes.stderr || workerRes.stdout || `Failed worker-tick for ${agentId}`);
               }
             }
-
-            const ticketNum = String(maxNum + 1).padStart(4, "0");
-            const slug = `workflow-run-${String(wf.id ?? workflowId).replace(/[^a-z0-9-]+/gi, "-").toLowerCase()}`;
-            const ticketFile = `${ticketNum}-${slug}.md`;
-            // Workflow runs should NOT clutter the main ticket board.
-            // Store run tickets in a dedicated folder (still file-first + discoverable).
-            const ticketRel = path.join("work", "runs", ticketFile);
-            const ticketAbs = path.join(teamDir, ticketRel);
-            await fs.mkdir(path.dirname(ticketAbs), { recursive: true });
-
-            const workflowFile = `${workflowId}.workflow.json`;
-            const runLogPath = path.join(runsDir, `${runId}.run.json`);
-            const createdAt = nowIso();
-
-            const ticketMd = [
-              `# ${ticketNum} — Workflow run: ${wf.name ?? wf.id ?? workflowId}`,
-              ``,
-              `Owner: lead`,
-              `Status: ${firstLane}`,
-              ``,
-              `## Run`,
-              `- workflow: shared-context/workflows/${workflowFile}`,
-              `- run file: ${path.relative(teamDir, runLogPath)}`,
-              `- trigger: ${triggerKind}`,
-              `- runId: ${runId}`,
-              ``,
-              `## Notes`,
-              `- Enqueued by: ClawKitchen (/api/teams/workflow-runs mode=${modeNorm})`,
-              ``,
-            ].join("\n");
-
-            // Runner-friendly run log format (ClawRecipes workflow-runner).
-            const runLog = {
-              runId,
-              createdAt,
-              updatedAt: createdAt,
-              teamId,
-              workflow: { file: workflowFile, id: wf.id ?? null, name: wf.name ?? null },
-              ticket: { file: ticketRel, number: ticketNum, lane: firstLane },
-              trigger: { kind: triggerKind },
-              status: "queued",
-              priority: 0,
-              claimedBy: null,
-              claimExpiresAt: null,
-              nextNodeIndex: 0,
-              events: [{ ts: createdAt, type: "run.enqueued", lane: firstLane }],
-              nodeResults: [],
-            };
-
-            await Promise.all([
-              fs.writeFile(ticketAbs, ticketMd, "utf8"),
-              fs.writeFile(runLogPath, JSON.stringify(runLog, null, 2) + "\n", "utf8"),
-            ]);
 
             // Return a lightweight Kitchen-schema run so the UI can immediately navigate to it.
             return {
               schema: "clawkitchen.workflow-run.v1",
-              id: runId,
+              id: enqRunId,
               workflowId,
               teamId,
-              startedAt: createdAt,
+              startedAt: nowIso(),
               status: "running",
-              summary: "Queued for workflow runner",
+              summary: modeNorm === "run_now" ? "Queued + kicked runner/workers" : "Queued for workflow runner",
               nodes: Array.isArray(wf.nodes)
                 ? wf.nodes.map((n) => ({ nodeId: String(n.id), status: "pending" as const }))
                 : [],
@@ -795,7 +785,7 @@ export async function POST(req: Request) {
     return jsonOkRest({ ...(await writeWorkflowRun(teamId, workflowId, run)), runId });
   } catch (err: unknown) {
     const msg = errorMessage(err);
-    if (/^All nodes must be assigned to an agent\./i.test(msg)) {
+    if (/^All nodes must be assigned to an agent\./i.test(msg) || /^Unknown agentId\(s\)/i.test(msg)) {
       return NextResponse.json({ ok: false, error: msg }, { status: 400 });
     }
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
