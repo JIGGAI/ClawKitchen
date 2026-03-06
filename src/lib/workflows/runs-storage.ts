@@ -42,45 +42,59 @@ export async function listWorkflowRuns(teamId: string, workflowId: string) {
   const wfId = assertSafeWorkflowId(workflowId);
   const dir = await getWorkflowRunsDir(teamId, wfId);
 
-  // Prefer new runner-owned layout: filter by workflow id inside each run file.
-  const { files } = await readdirFiles(dir, ".run.json", true);
-  const filtered: string[] = [];
+  const runIds: string[] = [];
 
-  for (const f of files) {
-    try {
-      const raw = await fs.readFile(path.join(dir, f), "utf8");
-      const parsed = JSON.parse(raw) as unknown;
-      if (!parsed || typeof parsed !== "object") continue;
+  // Preferred: runner directory-per-run layout: shared-context/workflow-runs/<runId>/run.json
+  try {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    const runDirs = entries.filter((e) => e.isDirectory()).map((e) => e.name).sort();
 
-      // Kitchen schema
-      if ("workflowId" in parsed && String((parsed as { workflowId?: unknown }).workflowId) === wfId) {
-        filtered.push(f);
-        continue;
+    for (const runId of runDirs) {
+      const p = path.join(dir, runId, "run.json");
+      try {
+        const raw = await fs.readFile(p, "utf8");
+        const parsed = JSON.parse(raw) as unknown;
+        const normalized = normalizeRunFile(teamId, wfId, parsed, runId);
+        if (normalized.workflowId === wfId) runIds.push(runId);
+      } catch {
+        // ignore
       }
-
-      // Runner schema (RunLog)
-      if ("workflow" in parsed) {
-        const w = (parsed as { workflow?: { id?: unknown; file?: unknown } }).workflow;
-        const id = w && typeof w === "object" ? (w.id ?? null) : null;
-        const file = w && typeof w === "object" ? (w.file ?? null) : null;
-        const inferred = typeof file === "string" ? path.basename(file).replace(/\.workflow\.json$/i, "") : "";
-        const runnerWfId = typeof id === "string" && id ? id : inferred;
-        if (runnerWfId === wfId) filtered.push(f);
-      }
-    } catch {
-      // ignore parse/read errors
     }
+  } catch {
+    // ignore
   }
 
-  if (filtered.length) return { ok: true as const, dir, files: filtered.sort() };
+  // Legacy: flat *.run.json at root
+  try {
+    const { files } = await readdirFiles(dir, ".run.json", true);
+    for (const f of files) {
+      const runId = f.replace(/\.run\.json$/i, "");
+      try {
+        const raw = await fs.readFile(path.join(dir, f), "utf8");
+        const parsed = JSON.parse(raw) as unknown;
+        const normalized = normalizeRunFile(teamId, wfId, parsed, runId);
+        if (normalized.workflowId === wfId) runIds.push(runId);
+      } catch {
+        // ignore
+      }
+    }
+  } catch {
+    // ignore
+  }
 
   // Back-compat: legacy per-workflow directory.
   if (LEGACY_PER_WORKFLOW_LAYOUT) {
-    const legacyDir = path.join(dir, wfId);
-    return { ok: true as const, dir: legacyDir, files: (await readdirFiles(legacyDir, ".run.json", true)).files };
+    try {
+      const legacyDir = path.join(dir, wfId);
+      const { files } = await readdirFiles(legacyDir, ".run.json", true);
+      for (const f of files) runIds.push(f.replace(/\.run\.json$/i, ""));
+    } catch {
+      // ignore
+    }
   }
 
-  return { ok: true as const, dir, files: [] };
+  const uniq = Array.from(new Set(runIds)).sort().reverse();
+  return { ok: true as const, dir, runIds: uniq };
 }
 
 export async function readWorkflowRun(teamId: string, workflowId: string, runId: string) {
@@ -88,7 +102,57 @@ export async function readWorkflowRun(teamId: string, workflowId: string, runId:
   const rId = assertSafeRunId(runId);
   const dir = await getWorkflowRunsDir(teamId, wfId);
 
-  // New layout: run file at root.
+  // Preferred (runner) layout: shared-context/workflow-runs/<runId>/run.json
+  const pRunner = path.join(dir, rId, "run.json");
+  try {
+    const raw = await fs.readFile(pRunner, "utf8");
+    const parsed = JSON.parse(raw) as unknown;
+    const run = normalizeRunFile(teamId, wfId, parsed, rId);
+
+    // Runner stores rich node outputs as files under:
+    //   workflow-runs/<runId>/node-outputs/*-<nodeId>.json
+    // Normalize by hydrating node.output from those files when missing.
+    if (Array.isArray(run.nodes) && run.nodes.length) {
+      const outputsDir = path.join(dir, rId, "node-outputs");
+      let files: string[] = [];
+      try {
+        files = await fs.readdir(outputsDir);
+      } catch {
+        files = [];
+      }
+
+      const byNodeId = new Map<string, string>();
+      for (const f of files) {
+        const m = f.match(/-([^/]+)\.json$/);
+        if (!m) continue;
+        const nodeId = m[1];
+        if (nodeId) byNodeId.set(nodeId, path.join(outputsDir, f));
+      }
+
+      await Promise.all(
+        run.nodes.map(async (n) => {
+          if (!n || typeof n !== "object") return;
+          // Only hydrate if output is truly missing.
+          if (typeof n.output !== "undefined") return;
+          const p = byNodeId.get(n.nodeId);
+          if (!p) return;
+          try {
+            const outRaw = await fs.readFile(p, "utf8");
+            n.output = JSON.parse(outRaw) as unknown;
+          } catch {
+            // ignore
+          }
+        })
+      );
+    }
+
+    return { ok: true as const, path: pRunner, run };
+  } catch (err: unknown) {
+    // fallthrough
+    if (!(err && typeof err === "object" && (err as { code?: unknown }).code === "ENOENT")) throw err;
+  }
+
+  // Legacy flat layout: shared-context/workflow-runs/<runId>.run.json
   const p0 = path.join(dir, workflowRunFileName(rId));
   try {
     const raw = await fs.readFile(p0, "utf8");
@@ -167,7 +231,35 @@ export async function listAllWorkflowRuns(teamId: string): Promise<{ ok: true; d
 
   const runs: WorkflowRunSummary[] = [];
 
-  // Preferred: root-run layout.
+  // Preferred: runner directory-per-run layout:
+  //   shared-context/workflow-runs/<runId>/run.json
+  try {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    const runDirs = entries.filter((e) => e.isDirectory()).map((e) => e.name).sort();
+
+    for (const runId of runDirs) {
+      const full = path.join(dir, runId, "run.json");
+      try {
+        const [raw, st] = await Promise.all([fs.readFile(full, "utf8"), fs.stat(full)]);
+        const normalized = normalizeRunFile(teamId, "(unknown)", JSON.parse(raw) as unknown, runId);
+        runs.push({
+          workflowId: normalized.workflowId,
+          runId: normalized.id,
+          status: normalized.status,
+          startedAt: normalized.startedAt,
+          endedAt: normalized.endedAt,
+          updatedAt: st.mtime ? new Date(st.mtime).toISOString() : undefined,
+          path: full,
+        });
+      } catch {
+        // ignore missing run.json/parse errors; keep going
+      }
+    }
+  } catch (err: unknown) {
+    if (!(err && typeof err === "object" && (err as { code?: unknown }).code === "ENOENT")) throw err;
+  }
+
+  // Legacy: flat run files at root: shared-context/workflow-runs/<runId>.run.json
   try {
     const entries = (await fs.readdir(dir)).filter((n) => n.endsWith(".run.json")).sort();
     for (const fileName of entries) {

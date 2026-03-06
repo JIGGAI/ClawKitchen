@@ -19,6 +19,16 @@ jobs:
 
       - run: npm ci
 
+      - name: Require tests when src/lib changes
+        if: github.event_name == 'pull_request'
+        env:
+          GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          GITHUB_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_LABELS_JSON: ${{ toJson(github.event.pull_request.labels) }}
+        run: |
+          node -e 'const labels=JSON.parse(process.env.PR_LABELS_JSON||"[]").map(l=>String(l.name||"")); if(labels.includes("no-tests-ok")) { console.log("[require-tests] bypass via label no-tests-ok"); process.exit(0); }'
+          ./scripts/ci/require-tests-for-lib-changes.sh
+
       - run: npm run lint && npm run coverage
 
       - name: Check for code duplication (jscpd)
