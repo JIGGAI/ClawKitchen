@@ -121,12 +121,20 @@ export async function readWorkflowRun(teamId: string, workflowId: string, runId:
         files = [];
       }
 
-      const byNodeId = new Map<string, string>();
-      for (const f of files) {
+      // Multiple output files may exist for the same nodeId when a workflow executes a node
+      // more than once. Preserve ordering by assigning outputs sequentially per nodeId.
+      //
+      // NOTE: Runner output filenames are typically prefixed with a sortable counter (e.g. 001-<nodeId>.json).
+      // We rely on lexicographic order of filenames within node-outputs.
+      const byNodeId = new Map<string, string[]>();
+      for (const f of files.slice().sort()) {
         const m = f.match(/-([^/]+)\.json$/);
         if (!m) continue;
         const nodeId = m[1];
-        if (nodeId) byNodeId.set(nodeId, path.join(outputsDir, f));
+        if (!nodeId) continue;
+        const existing = byNodeId.get(nodeId) ?? [];
+        existing.push(path.join(outputsDir, f));
+        byNodeId.set(nodeId, existing);
       }
 
       await Promise.all(
@@ -134,10 +142,15 @@ export async function readWorkflowRun(teamId: string, workflowId: string, runId:
           if (!n || typeof n !== "object") return;
           // Only hydrate if output is truly missing.
           if (typeof n.output !== "undefined") return;
-          const p = byNodeId.get(n.nodeId);
-          if (!p) return;
+
+          const arr = byNodeId.get(n.nodeId);
+          if (!arr || !arr.length) return;
+
+          const pOut = arr.shift();
+          if (!pOut) return;
+
           try {
-            const outRaw = await fs.readFile(p, "utf8");
+            const outRaw = await fs.readFile(pOut, "utf8");
             n.output = JSON.parse(outRaw) as unknown;
           } catch {
             // ignore

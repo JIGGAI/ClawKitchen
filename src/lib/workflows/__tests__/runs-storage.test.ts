@@ -140,6 +140,44 @@ describe("lib/workflows/runs-storage", () => {
     expect((r.run.nodes?.[0] as { output?: unknown }).output).toEqual({ text: "hello" });
   });
 
+
+
+  it("hydrates repeated node outputs sequentially when nodeId repeats", async () => {
+    vi.mocked(fs.readFile).mockImplementation(async (p: unknown) => {
+      const s = String(p);
+      if (s.endsWith("/run-1/run.json")) {
+        return JSON.stringify({
+          runId: "run-1",
+          createdAt: "2026-03-05T00:00:00.000Z",
+          updatedAt: "2026-03-05T00:01:00.000Z",
+          status: "completed",
+          workflow: { id: "wf-a", file: "/x/wf-a.workflow.json" },
+          nodeResults: [
+            { nodeId: "draft", status: "completed" },
+            { nodeId: "draft", status: "completed" },
+          ],
+        });
+      }
+      if (s.endsWith("/run-1/node-outputs/001-draft.json")) {
+        return JSON.stringify({ text: "first" });
+      }
+      if (s.endsWith("/run-1/node-outputs/002-draft.json")) {
+        return JSON.stringify({ text: "second" });
+      }
+      throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+    });
+
+    vi.mocked(fs.readdir).mockResolvedValueOnce([
+      "001-draft.json",
+      "002-draft.json",
+    ] as unknown as Awaited<ReturnType<typeof fs.readdir>>);
+
+    const r = await readWorkflowRun("team1", "wf-a", "run-1");
+    expect(r.ok).toBe(true);
+    expect(r.run.nodes?.length).toBe(2);
+    expect((r.run.nodes?.[0] as { output?: unknown }).output).toEqual({ text: "first" });
+    expect((r.run.nodes?.[1] as { output?: unknown }).output).toEqual({ text: "second" });
+  });
   it("lists workflow run ids for a workflow", async () => {
     vi.mocked(fs.readdir).mockResolvedValueOnce([
       dirent("run-1"),
