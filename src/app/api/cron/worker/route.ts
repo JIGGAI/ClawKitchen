@@ -117,9 +117,11 @@ async function installWorkerCron(teamId: string, agentId: string): Promise<{
   ]);
   if (!add.ok) throw new Error(add.stderr || add.stdout || "Failed to add cron");
 
-  const parsed = JSON.parse(String(add.stdout ?? "{}")) as { job?: { id?: unknown } };
-  const installedCronId = String(parsed?.job?.id ?? "").trim();
-  if (!installedCronId) throw new Error("Cron add succeeded but did not return job.id");
+  // openclaw cron add --json returns the job object itself (id at top-level).
+  // Older versions may return { job: { id } }.
+  const parsed = JSON.parse(String(add.stdout ?? "{}")) as { id?: unknown; job?: { id?: unknown } };
+  const installedCronId = String(parsed?.id ?? parsed?.job?.id ?? "").trim();
+  if (!installedCronId) throw new Error("Cron add succeeded but did not return id");
 
   mapping.entries[key] = { installedCronId };
   await writeMapping(mappingPath, mapping);
