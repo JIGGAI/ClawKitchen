@@ -21,11 +21,14 @@ function statusColor(status?: string) {
 
 export default function RunDetailClient({ run }: { run: WorkflowRunFileV1 }) {
   const nodes = Array.isArray(run.nodes) ? run.nodes : [];
-  const [selected, setSelected] = useState<string>(nodes[0]?.nodeId || "");
+
+  // nodeId is not unique (a workflow can execute the same node multiple times).
+  // Use timeline index for stable selection.
+  const [selectedIdx, setSelectedIdx] = useState<number>(0);
 
   const selectedNode: WorkflowRunNodeResultV1 | undefined = useMemo(
-    () => nodes.find((n) => n.nodeId === selected) || nodes[0],
-    [nodes, selected]
+    () => (nodes.length ? nodes[Math.min(Math.max(0, selectedIdx), nodes.length - 1)] : undefined),
+    [nodes, selectedIdx]
   );
 
   return (
@@ -54,13 +57,13 @@ export default function RunDetailClient({ run }: { run: WorkflowRunFileV1 }) {
           <div className="text-xs uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">timeline</div>
           <div className="mt-2 space-y-1">
             {nodes.length ? (
-              nodes.map((n) => {
-                const active = n.nodeId === selected;
+              nodes.map((n, idx) => {
+                const active = idx === selectedIdx;
                 return (
                   <button
-                    key={n.nodeId}
+                    key={`${idx}:${n.nodeId}`}
                     type="button"
-                    onClick={() => setSelected(n.nodeId)}
+                    onClick={() => setSelectedIdx(idx)}
                     className={
                       active
                         ? "w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/10 px-2 py-2 text-left"
