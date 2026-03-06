@@ -713,8 +713,13 @@ export async function POST(req: Request) {
 
             if (modeNorm === "run_now") {
               // Run now = enqueue + runner + workers.
-              const runnerRes = await runOpenClaw(["recipes", "workflows", "runner-once", "--team-id", teamId]);
-              if (!runnerRes.ok) throw new Error(runnerRes.stderr || runnerRes.stdout || "Failed to run runner-once");
+              // NOTE: `worker-tick --agent-id` must match a real agent id (queue file name).
+              // If workflow node agentIds are aliases, we fail with a clear message.
+
+              const agentListRes = await runOpenClaw(["agents", "list", "--json"]);
+              if (!agentListRes.ok) throw new Error(agentListRes.stderr || agentListRes.stdout || "Failed to list agents");
+              const agentList = JSON.parse(String(agentListRes.stdout ?? "[]")) as Array<{ id?: unknown }>;
+              const knownAgentIds = new Set(agentList.map((a) => String(a.id ?? "").trim()).filter(Boolean));
 
               // Kick workers for all required agents referenced by the workflow file.
               const requiredAgentIds = (Array.isArray(wf.nodes) ? wf.nodes : [])
@@ -733,6 +738,17 @@ export async function POST(req: Request) {
                 .filter(Boolean);
 
               const uniq = Array.from(new Set(requiredAgentIds));
+              const missing = uniq.filter((id) => !knownAgentIds.has(id));
+              if (missing.length) {
+                throw new Error(
+                  `Unknown agentId(s) in workflow node assignments: ${missing.join(", ")}. ` +
+                    `These must match real OpenClaw agent ids (see openclaw agents list).`
+                );
+              }
+
+              const runnerRes = await runOpenClaw(["recipes", "workflows", "runner-once", "--team-id", teamId]);
+              if (!runnerRes.ok) throw new Error(runnerRes.stderr || runnerRes.stdout || "Failed to run runner-once");
+
               for (const agentId of uniq) {
                 const workerRes = await runOpenClaw([
                   "recipes",
@@ -769,7 +785,7 @@ export async function POST(req: Request) {
     return jsonOkRest({ ...(await writeWorkflowRun(teamId, workflowId, run)), runId });
   } catch (err: unknown) {
     const msg = errorMessage(err);
-    if (/^All nodes must be assigned to an agent\./i.test(msg)) {
+    if (/^All nodes must be assigned to an agent\./i.test(msg) || /^Unknown agentId\(s\)/i.test(msg)) {
       return NextResponse.json({ ok: false, error: msg }, { status: 400 });
     }
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
