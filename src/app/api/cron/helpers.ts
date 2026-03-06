@@ -16,11 +16,30 @@ function addEntriesToScopeMap(
   kind: "team" | "agent",
   idToScope: Map<string, CronScope>
 ): void {
-  for (const v of Object.values(entries)) {
-    if (v && !Boolean(v.orphaned)) {
-      const id = String(v.installedCronId ?? "").trim();
-      if (id) idToScope.set(id, { kind, id: scopeId, label: scopeId, href: hrefForScope({ kind, id: scopeId }) });
+  for (const [k, v] of Object.entries(entries)) {
+    if (!v || Boolean(v.orphaned)) continue;
+    const installedCronId = String(v.installedCronId ?? "").trim();
+    if (!installedCronId) continue;
+
+    // Special case: worker cron provenance keys encode the *team* even though provenance lives
+    // under an agent workspace. We want cron jobs page sorting to group these under the team.
+    if (kind === "agent") {
+      const m = String(k).match(/^workflow-worker:([^:]+):/);
+      if (m) {
+        const teamId = String(m[1] ?? "").trim();
+        if (teamId) {
+          idToScope.set(installedCronId, {
+            kind: "team",
+            id: teamId,
+            label: teamId,
+            href: hrefForScope({ kind: "team", id: teamId }),
+          });
+          continue;
+        }
+      }
     }
+
+    idToScope.set(installedCronId, { kind, id: scopeId, label: scopeId, href: hrefForScope({ kind, id: scopeId }) });
   }
 }
 
