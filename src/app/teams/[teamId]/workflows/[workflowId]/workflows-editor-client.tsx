@@ -209,8 +209,19 @@ export default function WorkflowsEditorClient({
 
       const map: Record<string, boolean> = {};
       for (const j of jobs) {
-        const job = j as { enabled?: unknown; scope?: { kind?: unknown; id?: unknown } };
-        if (job && Boolean(job.enabled) && job.scope && String(job.scope.kind) === "agent") {
+        // openclaw cron list returns `agentId` on the job when scoped to an agent.
+        // We also enrich jobs with `scope`, but that may be team-scoped for worker-cron grouping.
+        const job = j as { enabled?: unknown; agentId?: unknown; scope?: { kind?: unknown; id?: unknown } };
+        if (!job || !Boolean(job.enabled)) continue;
+
+        const agentId = String(job.agentId ?? "").trim();
+        if (agentId) {
+          map[agentId] = true;
+          continue;
+        }
+
+        // Back-compat: if we don't have agentId, fall back to enriched scope.
+        if (job.scope && String(job.scope.kind) === "agent") {
           const id = String(job.scope.id ?? "").trim();
           if (id) map[id] = true;
         }
