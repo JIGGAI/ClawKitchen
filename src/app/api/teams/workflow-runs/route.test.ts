@@ -64,6 +64,15 @@ describe("/api/teams/workflow-runs POST (enqueue for runner)", () => {
             agentId: "development-team-dev",
           },
         },
+        {
+          id: "approval",
+          type: "human_approval",
+          config: {
+            provider: "telegram",
+            target: "(set in UI)",
+            messageTemplate: "Approval needed",
+          },
+        },
       ],
     });
 
@@ -86,8 +95,9 @@ describe("/api/teams/workflow-runs POST (enqueue for runner)", () => {
 
     // Kitchen now enqueues; it does not execute nodes.
     expect(run.status).toBe("running");
-    expect(run.nodes).toHaveLength(1);
+    expect(run.nodes).toHaveLength(2);
     expect(run.nodes[0].status).toBe("pending");
+    expect(run.nodes[1].status).toBe("pending");
 
     // Runner-friendly run log should exist at shared-context/workflow-runs/<runId>.run.json
     const runnerLogPath = path.join(TEAM_DIR, "shared-context", "workflow-runs", `${json.runId}.run.json`);

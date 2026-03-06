@@ -670,7 +670,13 @@ export async function POST(req: Request) {
 
             // Preflight: nodes (excluding start/end) must be assigned to an agent.
             const missing = (Array.isArray(wf.nodes) ? wf.nodes : [])
-              .filter((n) => n && typeof n === "object" && (n as { type?: unknown }).type !== "start" && (n as { type?: unknown }).type !== "end")
+              .filter((n) =>
+                n &&
+                typeof n === "object" &&
+                (n as { type?: unknown }).type !== "start" &&
+                (n as { type?: unknown }).type !== "end" &&
+                (n as { type?: unknown }).type !== "human_approval"
+              )
               .filter((n) => {
                 const cfg = (n as { config?: unknown }).config;
                 const o = cfg && typeof cfg === "object" && !Array.isArray(cfg) ? (cfg as Record<string, unknown>) : {};

@@ -256,7 +256,9 @@ export default function WorkflowsEditorClient({
       };
     }
 
-    const nodesToExecute = (wf.nodes ?? []).filter((n) => n.type !== "start" && n.type !== "end");
+    const nodesToExecute = (wf.nodes ?? []).filter(
+      (n) => n.type !== "start" && n.type !== "end" && n.type !== "human_approval"
+    );
 
     const missingAgentOnNodeIds = nodesToExecute
       .filter((n) => {
