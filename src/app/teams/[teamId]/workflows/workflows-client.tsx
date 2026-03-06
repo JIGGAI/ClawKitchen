@@ -100,15 +100,21 @@ export default function WorkflowsClient({ teamId }: { teamId: string }) {
     setRunsLoading((s) => ({ ...s, [workflowId]: true }));
     setRunError("");
     try {
-      const json = await fetchJson<{ ok?: boolean; files?: string[]; error?: string }>(
+      const json = await fetchJson<{ ok?: boolean; runIds?: string[]; files?: string[]; error?: string }>(
         `/api/teams/workflow-runs?teamId=${encodeURIComponent(teamId)}&workflowId=${encodeURIComponent(workflowId)}`,
         { cache: "no-store" }
       );
       if (!json.ok) throw new Error(json.error || "Failed to load runs");
-      const files = Array.isArray(json.files) ? json.files : [];
-      const runIds = files
-        .map((f) => (typeof f === "string" && f.endsWith(".run.json") ? f.slice(0, -".run.json".length) : null))
-        .filter((x): x is string => Boolean(x));
+
+      // New API: runIds (directory-per-run layout). Back-compat: files[] of *.run.json.
+      const runIds = Array.isArray(json.runIds)
+        ? json.runIds.map((x) => String(x || "").trim()).filter(Boolean)
+        : Array.isArray(json.files)
+          ? json.files
+              .map((f) => (typeof f === "string" && f.endsWith(".run.json") ? f.slice(0, -".run.json".length) : null))
+              .filter((x): x is string => Boolean(x))
+          : [];
+
       setRunsByWorkflow((s) => ({ ...s, [workflowId]: runIds }));
     } catch (e: unknown) {
       setRunError(errorMessage(e));

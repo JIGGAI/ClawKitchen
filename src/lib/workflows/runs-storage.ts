@@ -42,45 +42,59 @@ export async function listWorkflowRuns(teamId: string, workflowId: string) {
   const wfId = assertSafeWorkflowId(workflowId);
   const dir = await getWorkflowRunsDir(teamId, wfId);
 
-  // Prefer new runner-owned layout: filter by workflow id inside each run file.
-  const { files } = await readdirFiles(dir, ".run.json", true);
-  const filtered: string[] = [];
+  const runIds: string[] = [];
 
-  for (const f of files) {
-    try {
-      const raw = await fs.readFile(path.join(dir, f), "utf8");
-      const parsed = JSON.parse(raw) as unknown;
-      if (!parsed || typeof parsed !== "object") continue;
+  // Preferred: runner directory-per-run layout: shared-context/workflow-runs/<runId>/run.json
+  try {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    const runDirs = entries.filter((e) => e.isDirectory()).map((e) => e.name).sort();
 
-      // Kitchen schema
-      if ("workflowId" in parsed && String((parsed as { workflowId?: unknown }).workflowId) === wfId) {
-        filtered.push(f);
-        continue;
+    for (const runId of runDirs) {
+      const p = path.join(dir, runId, "run.json");
+      try {
+        const raw = await fs.readFile(p, "utf8");
+        const parsed = JSON.parse(raw) as unknown;
+        const normalized = normalizeRunFile(teamId, wfId, parsed, runId);
+        if (normalized.workflowId === wfId) runIds.push(runId);
+      } catch {
+        // ignore
       }
-
-      // Runner schema (RunLog)
-      if ("workflow" in parsed) {
-        const w = (parsed as { workflow?: { id?: unknown; file?: unknown } }).workflow;
-        const id = w && typeof w === "object" ? (w.id ?? null) : null;
-        const file = w && typeof w === "object" ? (w.file ?? null) : null;
-        const inferred = typeof file === "string" ? path.basename(file).replace(/\.workflow\.json$/i, "") : "";
-        const runnerWfId = typeof id === "string" && id ? id : inferred;
-        if (runnerWfId === wfId) filtered.push(f);
-      }
-    } catch {
-      // ignore parse/read errors
     }
+  } catch {
+    // ignore
   }
 
-  if (filtered.length) return { ok: true as const, dir, files: filtered.sort() };
+  // Legacy: flat *.run.json at root
+  try {
+    const { files } = await readdirFiles(dir, ".run.json", true);
+    for (const f of files) {
+      const runId = f.replace(/\.run\.json$/i, "");
+      try {
+        const raw = await fs.readFile(path.join(dir, f), "utf8");
+        const parsed = JSON.parse(raw) as unknown;
+        const normalized = normalizeRunFile(teamId, wfId, parsed, runId);
+        if (normalized.workflowId === wfId) runIds.push(runId);
+      } catch {
+        // ignore
+      }
+    }
+  } catch {
+    // ignore
+  }
 
   // Back-compat: legacy per-workflow directory.
   if (LEGACY_PER_WORKFLOW_LAYOUT) {
-    const legacyDir = path.join(dir, wfId);
-    return { ok: true as const, dir: legacyDir, files: (await readdirFiles(legacyDir, ".run.json", true)).files };
+    try {
+      const legacyDir = path.join(dir, wfId);
+      const { files } = await readdirFiles(legacyDir, ".run.json", true);
+      for (const f of files) runIds.push(f.replace(/\.run\.json$/i, ""));
+    } catch {
+      // ignore
+    }
   }
 
-  return { ok: true as const, dir, files: [] };
+  const uniq = Array.from(new Set(runIds)).sort().reverse();
+  return { ok: true as const, dir, runIds: uniq };
 }
 
 export async function readWorkflowRun(teamId: string, workflowId: string, runId: string) {

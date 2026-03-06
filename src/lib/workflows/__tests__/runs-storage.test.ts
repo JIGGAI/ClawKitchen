@@ -55,10 +55,20 @@ describe("lib/workflows/runs-storage", () => {
   });
 
   it("lists runner directory-per-run layout", async () => {
-    vi.mocked(fs.readdir).mockResolvedValueOnce([
-      dirent("run-1"),
-      dirent("run-2"),
-    ] as unknown as Awaited<ReturnType<typeof fs.readdir>>);
+    // listAllWorkflowRuns() calls fs.readdir multiple times:
+    // - withFileTypes:true for runner dir-per-run layout
+    // - plain readdir() for legacy flat *.run.json scan
+    // - (optional) withFileTypes:true for legacy per-workflow layout
+    let usedRunnerDirList = false;
+    vi.mocked(fs.readdir).mockImplementation(async (_p: unknown, opts?: unknown) => {
+      const withFileTypes = !!(opts && typeof opts === "object" && (opts as { withFileTypes?: unknown }).withFileTypes);
+      if (withFileTypes && !usedRunnerDirList) {
+        usedRunnerDirList = true;
+        return [dirent("run-1"), dirent("run-2")] as unknown as Awaited<ReturnType<typeof fs.readdir>>;
+      }
+      // Everything else returns empty (no legacy runs).
+      return [] as unknown as Awaited<ReturnType<typeof fs.readdir>>;
+    });
 
     vi.mocked(fs.readFile).mockImplementation(async (p: unknown) => {
       const s = String(p);
