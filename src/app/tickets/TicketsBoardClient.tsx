@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { TicketStage, TicketSummary } from "@/lib/tickets";
 
 const STAGES: { key: TicketStage; label: string }[] = [
