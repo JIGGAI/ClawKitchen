@@ -3,7 +3,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { CreateModalShell } from "./CreateModalShell";
 import { fetchJsonWithStatus } from "@/lib/fetch-json";
-import type { AgentListItem } from "@/lib/agents";
+
+type LocalAgentCatalogItem =
+  | {
+      kind: "team-role";
+      recipeId: string;
+      recipeName?: string;
+      roleId: string;
+      roleName?: string;
+    }
+  | {
+      kind: "single-agent";
+      recipeId: string;
+      recipeName?: string;
+      description?: string;
+    };
 
 type SelectedRole = { agentId: string; roleId: string; displayName: string };
 
@@ -48,8 +62,9 @@ export function CreateCustomTeamModal({
   onConfirm: () => void;
   onRolesChange: (roles: SelectedRole[]) => void;
 }) {
-  const [agents, setAgents] = useState<AgentListItem[]>([]);
-  const [agentsError, setAgentsError] = useState<string | null>(null);
+  const [catalog, setCatalog] = useState<LocalAgentCatalogItem[]>([]);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [catalogQuery, setCatalogQuery] = useState<string>("");
   const [selected, setSelected] = useState<Record<string, SelectedRole>>({});
 
   const [previewMd, setPreviewMd] = useState<string | null>(null);
@@ -59,17 +74,16 @@ export function CreateCustomTeamModal({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const res = await fetchJsonWithStatus<{ agents?: AgentListItem[]; error?: string; message?: string }>(
-        "/api/agents",
+      const res = await fetchJsonWithStatus<{ ok?: boolean; items?: LocalAgentCatalogItem[]; error?: string }>(
+        "/api/recipes/local-agent-catalog",
         { cache: "no-store" },
       );
       if (cancelled) return;
-      if (!res.ok) {
-        setAgentsError(res.error);
+      if (!res.ok || !res.data.ok) {
+        setCatalogError(res.error || res.data.error || "Failed to load local agent catalog");
         return;
       }
-      const list = Array.isArray(res.data.agents) ? res.data.agents : [];
-      setAgents(list);
+      setCatalog(Array.isArray(res.data.items) ? res.data.items : []);
     })();
 
     return () => {
@@ -85,15 +99,41 @@ export function CreateCustomTeamModal({
   >({ state: "unknown" });
 
   const agentChoices = useMemo(() => {
-    return agents
+    const needle = catalogQuery.trim().toLowerCase();
+
+    const list = catalog.map((it) => {
+      if (it.kind === "team-role") {
+        const key = `team:${it.recipeId}:${it.roleId}`;
+        const recipeLabel = it.recipeName || it.recipeId;
+        const roleLabel = it.roleName ? `${it.roleName} (${it.roleId})` : it.roleId;
+        return {
+          id: key,
+          label: `${recipeLabel} → ${roleLabel}`,
+          roleId: it.roleId,
+          displayName: it.roleName || `${recipeLabel} ${it.roleId}`,
+          haystack: `${it.recipeId} ${it.recipeName || ""} ${it.roleId} ${it.roleName || ""}`.toLowerCase(),
+        };
+      }
+
+      const key = `agent:${it.recipeId}`;
+      const recipeLabel = it.recipeName || it.recipeId;
+      const descriptionSuffix = it.description ? ` — ${it.description}` : "";
+      return {
+        id: key,
+        label: `${recipeLabel} (agent recipe: ${it.recipeId})${descriptionSuffix}`,
+        roleId: defaultRoleIdFromAgentId(it.recipeId),
+        displayName: recipeLabel,
+        haystack: `${it.recipeId} ${it.recipeName || ""} ${it.description || ""}`.toLowerCase(),
+      };
+    });
+
+    const filtered = needle ? list.filter((x) => x.haystack.includes(needle)) : list;
+
+    return filtered
       .slice()
-      .sort((a, b) => String(a.id ?? "").localeCompare(String(b.id ?? "")))
-      .map((a) => ({
-        id: String(a.id ?? ""),
-        label: a.identityName ? `${a.identityName} (${a.id})` : String(a.id ?? ""),
-      }))
-      .filter((a) => a.id);
-  }, [agents]);
+      .sort((a, b) => a.label.localeCompare(b.label))
+      .map(({ haystack: _unusedHaystack, ...rest }) => rest);
+  }, [catalog, catalogQuery]);
 
   const roles = useMemo(() => Object.values(selected), [selected]);
 
@@ -272,38 +312,49 @@ export function CreateCustomTeamModal({
           resulting team recipe later.
         </div>
 
-        <div className="mt-3 max-h-[220px] overflow-auto rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 p-3">
-          {agentChoices.length === 0 ? (
-            <div className="text-sm text-[color:var(--ck-text-secondary)]">No installed agents found.</div>
-          ) : (
-            <div className="space-y-2">
-              {agentChoices.map((a) => {
-                const checked = !!selected[a.id];
-                return (
-                  <label key={a.id} className="flex items-start gap-2 text-sm text-[color:var(--ck-text-secondary)]">
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={(e) => {
-                        const next = { ...selected };
-                        if (e.target.checked) {
-                          next[a.id] = {
-                            agentId: a.id,
-                            roleId: defaultRoleIdFromAgentId(a.id),
-                            displayName: a.label,
-                          };
-                        } else {
-                          delete next[a.id];
-                        }
-                        setSelected(next);
-                      }}
-                    />
-                    <span className="min-w-0 break-words">{a.label}</span>
-                  </label>
-                );
-              })}
-            </div>
-          )}
+        <div className="mt-3">
+          <input
+            value={catalogQuery}
+            onChange={(e) => setCatalogQuery(e.target.value)}
+            placeholder="Search local roles/agents (recipe id, name, role)"
+            className="w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] placeholder:text-[color:var(--ck-text-tertiary)]"
+          />
+
+          <div className="mt-3 max-h-[220px] overflow-auto rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 p-3">
+            {catalogError ? <div className="text-sm text-red-300">{catalogError}</div> : null}
+            {!catalogError && agentChoices.length === 0 ? (
+              <div className="text-sm text-[color:var(--ck-text-secondary)]">No local roles/agents found.</div>
+            ) : null}
+            {!catalogError && agentChoices.length ? (
+              <div className="space-y-2">
+                {agentChoices.map((a) => {
+                  const checked = !!selected[a.id];
+                  return (
+                    <label key={a.id} className="flex items-start gap-2 text-sm text-[color:var(--ck-text-secondary)]">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          const next = { ...selected };
+                          if (e.target.checked) {
+                            next[a.id] = {
+                              agentId: a.id,
+                              roleId: a.roleId,
+                              displayName: a.displayName,
+                            };
+                          } else {
+                            delete next[a.id];
+                          }
+                          setSelected(next);
+                        }}
+                      />
+                      <span className="min-w-0 break-words">{a.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
 
