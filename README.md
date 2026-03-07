@@ -63,6 +63,21 @@ openclaw gateway restart
 
 ### 3) Confirm Kitchen is running
 
+---
+
+## Workflows: experimental + LLM task note
+
+- **Workflows are experimental** and the schema/runner behavior may change. If you rely on workflows in production, pin versions and expect breaking changes.
+- **OpenClaw upstream note:** some installs have an upstream issue affecting the `llm-task` tool (used by workflow LLM nodes). Fix PR: https://github.com/openclaw/openclaw/pull/36591
+  - If you hit `Tool not available: llm-task` / LLM nodes not executing, you may need the temporary bridge plugin:
+
+```bash
+openclaw plugins install llm-task-fixed
+openclaw plugins enable llm-task-fixed
+openclaw gateway restart
+```
+
+
 ```bash
 openclaw kitchen status
 openclaw kitchen open
