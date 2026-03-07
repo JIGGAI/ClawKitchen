@@ -51,7 +51,19 @@ export function TicketsBoardClient({
   basePath: string;
   selectedTeamId: string | null;
 }) {
-  const [dateFilter, setDateFilter] = useState<DateFilter>("30d");
+  const storageKey = selectedTeamId ? `ck-tickets-date-filter:${selectedTeamId}` : "ck-tickets-date-filter:all";
+
+  const [dateFilter, setDateFilter] = useState<DateFilter>(() => {
+    if (typeof window === "undefined") return "30d";
+    try {
+      const raw = (localStorage.getItem(storageKey) || "").trim();
+      if (raw === "all" || raw === "today" || raw === "yesterday" || raw === "7d" || raw === "30d" || raw === "custom") return raw;
+      return "30d";
+    } catch {
+      return "30d";
+    }
+  });
+
   const [customFrom, setCustomFrom] = useState<string>("");
   const [customTo, setCustomTo] = useState<string>("");
 
@@ -110,6 +122,15 @@ export function TicketsBoardClient({
     }
     return map;
   }, [filteredTickets]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem(storageKey, dateFilter);
+    } catch {
+      // ignore
+    }
+  }, [dateFilter, storageKey]);
 
   return (
     <div className="space-y-4">
