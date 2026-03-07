@@ -59,6 +59,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return m ? decodeURIComponent(m[1]) : null;
   }, [pathname]);
 
+  const isTeamEditorRoute = useMemo(() => pathname.startsWith("/teams/"), [pathname]);
+
   const [storedTeamId, setStoredTeamId] = useState<string>(() => {
     if (typeof window === "undefined") return "";
     try {
@@ -333,6 +335,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </div>
                 <select
                   value={selectedTeamId ?? ""}
+                  disabled={isTeamEditorRoute}
                   onChange={(e) => {
                     const id = (e.target.value || "").trim();
                     setStoredTeamId(id);
@@ -345,7 +348,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
                     syncTeamToCurrentUrl(id);
                   }}
-                  className="w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                  className={
+                    "w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]" +
+                    (isTeamEditorRoute ? " cursor-not-allowed opacity-60" : "")
+                  }
                 >
                   <option value="">All teams</option>
                   {teamIds.map((id) => (
