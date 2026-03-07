@@ -105,19 +105,80 @@ function extractCatalogItems(recipeId: string, md: string): LocalAgentCatalogIte
   return out;
 }
 
-function dedupeItems(items: LocalAgentCatalogItem[]): LocalAgentCatalogItem[] {
-  const seen = new Set<string>();
-  const out: LocalAgentCatalogItem[] = [];
+async function listActiveRecipeIds(): Promise<Set<string>> {
+  // Active teams are the ones with an actual workspace-<teamId>/team.json.
+  // We'll prefer their recipeId when multiple recipe files define the same roleId.
+  const workspaceRoot = path.resolve(await getWorkspaceRecipesDir(), "..");
+  let entries: Array<{ name: string; isDirectory: () => boolean }> = [];
+  try {
+    entries = await fs.readdir(workspaceRoot, { withFileTypes: true });
+  } catch {
+    return new Set<string>();
+  }
+
+  const active = new Set<string>();
+
+  for (const ent of entries) {
+    if (!ent.isDirectory()) continue;
+    if (!ent.name.startsWith("workspace-")) continue;
+    const teamDir = path.join(workspaceRoot, ent.name);
+    const metaPath = path.join(teamDir, "team.json");
+    try {
+      const raw = await fs.readFile(metaPath, "utf8");
+      const meta = JSON.parse(raw) as { recipeId?: string };
+      const recipeId = String(meta?.recipeId ?? "").trim();
+      if (recipeId) active.add(recipeId);
+    } catch {
+      // ignore
+    }
+  }
+
+  return active;
+}
+
+function dedupeItems(items: LocalAgentCatalogItem[], activeRecipeIds: Set<string>): LocalAgentCatalogItem[] {
+  const seenAgents = new Set<string>();
+  const bestRoleByRoleId = new Map<string, LocalAgentCatalogItem>();
 
   for (const it of items) {
-    const key =
-      it.kind === "team-role"
-        ? `team-role:${it.recipeId}:${it.roleId}`
-        : `single-agent:${it.recipeId}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(it);
+    if (it.kind === "single-agent") {
+      const key = it.recipeId;
+      if (seenAgents.has(key)) continue;
+      seenAgents.add(key);
+      continue;
+    }
+
+    // Team role: dedupe by roleId across all recipes.
+    const existing = bestRoleByRoleId.get(it.roleId);
+    if (!existing) {
+      bestRoleByRoleId.set(it.roleId, it);
+      continue;
+    }
+
+    // Prefer an item whose recipeId is active.
+    const existingActive = activeRecipeIds.has(existing.recipeId);
+    const itActive = activeRecipeIds.has(it.recipeId);
+    if (existingActive && !itActive) continue;
+    if (!existingActive && itActive) {
+      bestRoleByRoleId.set(it.roleId, it);
+      continue;
+    }
+
+    // Otherwise, keep the first (stable)
   }
+
+  const out: LocalAgentCatalogItem[] = [];
+  for (const it of items) {
+    if (it.kind === "single-agent") {
+      if (!seenAgents.has(it.recipeId)) continue;
+      // ensure only first occurrence
+      seenAgents.delete(it.recipeId);
+      out.push(it);
+      continue;
+    }
+  }
+
+  for (const v of bestRoleByRoleId.values()) out.push(v);
 
   return out;
 }
@@ -141,7 +202,8 @@ export async function GET() {
     itemsRaw.push(...extractCatalogItems(r.id, md));
   }
 
-  const items = dedupeItems(itemsRaw);
+  const activeRecipeIds = await listActiveRecipeIds();
+  const items = dedupeItems(itemsRaw, activeRecipeIds);
 
   // Stable ordering: team roles first, then agents.
   items.sort((a, b) => {
