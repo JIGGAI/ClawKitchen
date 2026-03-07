@@ -79,8 +79,12 @@ export function CreateCustomTeamModal({
         { cache: "no-store" },
       );
       if (cancelled) return;
-      if (!res.ok || !res.data.ok) {
-        setCatalogError(res.error || res.data.error || "Failed to load local agent catalog");
+      if (!res.ok) {
+        setCatalogError(res.error || "Failed to load local agent catalog");
+        return;
+      }
+      if (!res.data.ok) {
+        setCatalogError(res.data.error || "Failed to load local agent catalog");
         return;
       }
       setCatalog(Array.isArray(res.data.items) ? res.data.items : []);
@@ -276,7 +280,7 @@ export function CreateCustomTeamModal({
       title="Create custom team"
       recipeId={"(new recipe)"}
       recipeName={"Custom Team"}
-      error={error || agentsError}
+      error={error || catalogError}
       busy={busy}
       canConfirm={canConfirm}
       onClose={onClose}
