@@ -1,5 +1,9 @@
 # Claw Kitchen
 
+<p align="center">
+  <img src="https://github.com/JIGGAI/ClawRecipes/blob/main/clawcipes_cook.jpg" alt="ClawRecipes logo" width="240" />
+</p>
+
 Local-first UI companion for **ClawRecipes** (OpenClaw Recipes plugin).
 
 ## Prerequisites
