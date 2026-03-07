@@ -106,11 +106,6 @@ export function TicketDetailClient(props: {
       </div>
 
       <div className="ck-glass p-6">
-        <pre className="whitespace-pre-wrap break-words text-sm leading-6 text-[color:var(--ck-text-primary)]">
-          {props.markdown}
-        </pre>
-
-      <div className="ck-glass p-6">
         <div className="flex items-center justify-between gap-3">
           <div className="text-sm font-semibold text-[color:var(--ck-text-primary)]">Comments</div>
           <div className="text-xs text-[color:var(--ck-text-tertiary)]">{comments.length}</div>
@@ -186,6 +181,10 @@ export function TicketDetailClient(props: {
         </div>
       </div>
 
+      <div className="ck-glass p-6">
+        <pre className="whitespace-pre-wrap break-words text-sm leading-6 text-[color:var(--ck-text-primary)]">
+          {props.markdown}
+        </pre>
       </div>
 
       {confirm ? (
