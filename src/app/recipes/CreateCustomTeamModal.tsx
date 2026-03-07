@@ -303,10 +303,6 @@ export function CreateCustomTeamModal({
             {availability.state === "available" ? "Available." : null}
           </div>
         ) : null}
-        <div className="mt-2 text-xs text-[color:var(--ck-text-tertiary)]">
-          This creates a new team recipe under <code>~/.openclaw/workspace/recipes</code> and scaffolds
-          <code className="ml-1">~/.openclaw/workspace-&lt;teamId&gt;</code>.
-        </div>
       </div>
 
       <div className="mt-6">

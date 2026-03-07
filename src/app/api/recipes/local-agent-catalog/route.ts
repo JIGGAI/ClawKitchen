@@ -22,7 +22,12 @@ export type LocalAgentCatalogItem =
     };
 
 function parseRecipeFrontmatter(md: string): unknown {
-  const { yamlText } = splitRecipeFrontmatter(md);
+  // openclaw CLI (or plugin runner) can sometimes prepend banners/warnings.
+  // Find the first frontmatter marker and parse from there.
+  const start = md.indexOf("---\n");
+  if (start === -1) throw new Error("Recipe markdown must include YAML frontmatter (---)");
+  const sliced = md.slice(start);
+  const { yamlText } = splitRecipeFrontmatter(sliced);
   return YAML.parse(yamlText) as unknown;
 }
 
