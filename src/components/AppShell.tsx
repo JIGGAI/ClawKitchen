@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { dispatchSelectedTeamChanged } from "@/lib/selected-team";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { fetchJson } from "@/lib/fetch-json";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -346,6 +347,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       // ignore
                     }
 
+                    dispatchSelectedTeamChanged();
                     syncTeamToCurrentUrl(id);
                   }}
                   className={

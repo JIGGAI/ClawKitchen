@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
+import { useSelectedTeamId } from "@/lib/selected-team";
 import type { AgentListItem } from "@/lib/agents";
 
 function inferTeamIdFromWorkspace(workspace: string | undefined) {
@@ -28,15 +29,7 @@ export default function HomeClient({
   teamNames: Record<string, string>;
 }) {
 
-  const selectedTeamId = useMemo(() => {
-    if (typeof window === "undefined") return "";
-    try {
-      return (localStorage.getItem("ck-selected-team") || "").trim();
-    } catch {
-      return "";
-    }
-  }, []);
-
+  const selectedTeamId = useSelectedTeamId();
   const teamFilter = selectedTeamId || "all";
 
   const grouped = useMemo(() => {
