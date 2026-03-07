@@ -27,14 +27,6 @@ export default function HomeClient({
   agents: AgentListItem[];
   teamNames: Record<string, string>;
 }) {
-  const teamIds = useMemo(() => {
-    const s = new Set<string>();
-    for (const a of agents) {
-      const t = inferTeamIdFromWorkspace(a.workspace);
-      if (t) s.add(t);
-    }
-    return Array.from(s).sort();
-  }, [agents]);
 
   const selectedTeamId = useMemo(() => {
     if (typeof window === "undefined") return "";
