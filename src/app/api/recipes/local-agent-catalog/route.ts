@@ -161,7 +161,6 @@ function dedupeItems(items: LocalAgentCatalogItem[], activeRecipeIds: Set<string
     if (existingActive && !itActive) continue;
     if (!existingActive && itActive) {
       bestRoleByRoleId.set(it.roleId, it);
-      continue;
     }
 
     // Otherwise, keep the first (stable)
@@ -174,7 +173,6 @@ function dedupeItems(items: LocalAgentCatalogItem[], activeRecipeIds: Set<string
       // ensure only first occurrence
       seenAgents.delete(it.recipeId);
       out.push(it);
-      continue;
     }
   }
 
