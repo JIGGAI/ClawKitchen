@@ -1,10 +1,14 @@
+import fs from "node:fs/promises";
+import path from "node:path";
 import { NextResponse } from "next/server";
 import YAML from "yaml";
-import { runOpenClaw } from "@/lib/openclaw";
-import type { RecipeListItem } from "@/lib/recipes";
+import { getBuiltinRecipesDir, getWorkspaceRecipesDir } from "@/lib/paths";
 import { splitRecipeFrontmatter } from "@/lib/recipe-team-agents";
 
 export const dynamic = "force-dynamic";
+
+const CACHE_TTL_MS = 5 * 60 * 1000;
+let cache: { ts: number; items: LocalAgentCatalogItem[] } | null = null;
 
 export type LocalAgentCatalogItem =
   | {
@@ -31,66 +35,113 @@ function parseRecipeFrontmatter(md: string): unknown {
   return YAML.parse(yamlText) as unknown;
 }
 
-export async function GET() {
-  const listRes = await runOpenClaw(["recipes", "list"]);
-  if (!listRes.ok) {
-    return NextResponse.json({ ok: false, error: listRes.stderr || "Failed to list recipes" }, { status: 500 });
-  }
+async function listLocalRecipeFiles(): Promise<Array<{ id: string; filePath: string }>> {
+  const workspaceDir = await getWorkspaceRecipesDir();
+  const builtinDir = await getBuiltinRecipesDir();
 
-  let recipes: RecipeListItem[] = [];
-  try {
-    recipes = JSON.parse(listRes.stdout) as RecipeListItem[];
-  } catch {
-    return NextResponse.json({ ok: false, error: "Failed to parse recipes list" }, { status: 500 });
-  }
-
-  const items: LocalAgentCatalogItem[] = [];
-
-  // Only locally available recipes (builtin + workspace) are included by definition.
-  for (const r of recipes) {
-    if (!r?.id || (r.kind !== "team" && r.kind !== "agent")) continue;
-
-    const showRes = await runOpenClaw(["recipes", "show", r.id]);
-    if (!showRes.ok) continue;
-
-    let fmRaw: unknown;
+  async function readDir(dir: string): Promise<string[]> {
     try {
-      fmRaw = parseRecipeFrontmatter(showRes.stdout);
+      const ents = await fs.readdir(dir, { withFileTypes: true });
+      return ents.filter((e) => e.isFile() && e.name.endsWith(".md")).map((e) => e.name);
     } catch {
-      continue;
+      return [];
     }
+  }
 
-    const fm = (fmRaw && typeof fmRaw === "object") ? (fmRaw as Record<string, unknown>) : {};
+  const workspaceFiles = await readDir(workspaceDir);
+  const builtinFiles = await readDir(builtinDir);
 
-    const recipeName = String(fm["name"] ?? r.name ?? r.id).trim() || r.id;
+  // Prefer workspace overrides over builtin (same id).
+  const byId = new Map<string, string>();
+  for (const f of builtinFiles) byId.set(path.basename(f, ".md"), path.join(builtinDir, f));
+  for (const f of workspaceFiles) byId.set(path.basename(f, ".md"), path.join(workspaceDir, f));
 
-    if (r.kind === "team") {
-      const agents = Array.isArray(fm["agents"]) ? (fm["agents"] as unknown[]) : [];
-      for (const aRaw of agents) {
-        const a = (aRaw && typeof aRaw === "object") ? (aRaw as Record<string, unknown>) : {};
-        const roleId = String(a["role"] ?? "").trim();
-        if (!roleId) continue;
-        const roleName = a["name"] ? String(a["name"]).trim() : "";
-        items.push({
-          kind: "team-role",
-          recipeId: r.id,
-          recipeName,
-          roleId,
-          roleName: roleName || undefined,
-        });
-      }
-    }
+  return Array.from(byId.entries())
+    .map(([id, filePath]) => ({ id, filePath }))
+    .sort((a, b) => a.id.localeCompare(b.id));
+}
 
-    if (r.kind === "agent") {
-      const description = fm["description"] ? String(fm["description"]).trim() : "";
-      items.push({
-        kind: "single-agent",
-        recipeId: r.id,
+function extractCatalogItems(recipeId: string, md: string): LocalAgentCatalogItem[] {
+  let fmRaw: unknown;
+  try {
+    fmRaw = parseRecipeFrontmatter(md);
+  } catch {
+    return [];
+  }
+
+  const fm = (fmRaw && typeof fmRaw === "object") ? (fmRaw as Record<string, unknown>) : {};
+  const kind = String(fm["kind"] ?? "").trim();
+  const recipeName = String(fm["name"] ?? recipeId).trim() || recipeId;
+
+  const out: LocalAgentCatalogItem[] = [];
+
+  if (kind === "team") {
+    const agents = Array.isArray(fm["agents"]) ? (fm["agents"] as unknown[]) : [];
+    for (const aRaw of agents) {
+      const a = (aRaw && typeof aRaw === "object") ? (aRaw as Record<string, unknown>) : {};
+      const roleId = String(a["role"] ?? "").trim();
+      if (!roleId) continue;
+      const roleName = a["name"] ? String(a["name"]).trim() : "";
+      out.push({
+        kind: "team-role",
+        recipeId,
         recipeName,
-        description: description || undefined,
+        roleId,
+        roleName: roleName || undefined,
       });
     }
   }
+
+  if (kind === "agent") {
+    const description = fm["description"] ? String(fm["description"]).trim() : "";
+    out.push({
+      kind: "single-agent",
+      recipeId,
+      recipeName,
+      description: description || undefined,
+    });
+  }
+
+  return out;
+}
+
+function dedupeItems(items: LocalAgentCatalogItem[]): LocalAgentCatalogItem[] {
+  const seen = new Set<string>();
+  const out: LocalAgentCatalogItem[] = [];
+
+  for (const it of items) {
+    const key =
+      it.kind === "team-role"
+        ? `team-role:${it.recipeId}:${it.roleId}`
+        : `single-agent:${it.recipeId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(it);
+  }
+
+  return out;
+}
+
+export async function GET() {
+  const now = Date.now();
+  if (cache && now - cache.ts < CACHE_TTL_MS) {
+    return NextResponse.json({ ok: true, items: cache.items, cached: true });
+  }
+
+  const files = await listLocalRecipeFiles();
+
+  const itemsRaw: LocalAgentCatalogItem[] = [];
+  for (const r of files) {
+    let md = "";
+    try {
+      md = await fs.readFile(r.filePath, "utf8");
+    } catch {
+      continue;
+    }
+    itemsRaw.push(...extractCatalogItems(r.id, md));
+  }
+
+  const items = dedupeItems(itemsRaw);
 
   // Stable ordering: team roles first, then agents.
   items.sort((a, b) => {
@@ -101,5 +152,6 @@ export async function GET() {
     return 0;
   });
 
-  return NextResponse.json({ ok: true, items });
+  cache = { ts: now, items };
+  return NextResponse.json({ ok: true, items, cached: false });
 }
