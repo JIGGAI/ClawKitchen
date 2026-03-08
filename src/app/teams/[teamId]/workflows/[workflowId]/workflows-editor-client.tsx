@@ -1493,10 +1493,11 @@ export default function WorkflowsEditorClient({
                               const res = await fetch("/api/teams/workflow-runs", {
                                 method: "POST",
                                 headers: { "content-type": "application/json" },
-                                body: JSON.stringify({ teamId, workflowId: wfId, mode: "sample" }),
+                                // Enqueue a canonical file-first run via the CLI (Kitchen should not author run artifacts).
+                                body: JSON.stringify({ teamId, workflowId: wfId, mode: "enqueue" }),
                               });
                               const json = await res.json();
-                              if (!res.ok || !json.ok) throw new Error(json.error || "Failed to create sample run");
+                              if (!res.ok || !json.ok) throw new Error(json.error || "Failed to queue run");
 
                               const listRes = await fetch(
                                 `/api/teams/workflow-runs?teamId=${encodeURIComponent(teamId)}&workflowId=${encodeURIComponent(wfId)}`,
