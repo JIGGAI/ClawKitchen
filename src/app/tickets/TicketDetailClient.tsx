@@ -10,6 +10,10 @@ import { fetchJson } from "@/lib/fetch-json";
 import { parseTicketComments } from "@/lib/ticket-comments";
 import { TicketAssignControl } from "@/app/tickets/[ticket]/TicketAssignControl";
 
+export function isPostCommentDisabled(commentBody: string, isPending: boolean) {
+  return isPending || commentBody.trim().length == 0;
+}
+
 export function TicketDetailClient(props: {
   teamId: string;
   ticketId: string;
@@ -166,15 +170,22 @@ export function TicketDetailClient(props: {
 
             <div className="flex items-center justify-end">
               <button
-                className="rounded bg-[color:var(--ck-accent)] px-3 py-1.5 text-xs font-semibold text-black disabled:opacity-50"
+                type="button"
+                aria-busy={isPending}
+                className={
+                  "rounded-[var(--ck-radius-sm)] bg-[color:var(--ck-accent)] px-3 py-2 text-xs font-semibold text-black transition " +
+                  "hover:brightness-110 active:brightness-95 " +
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ck-border-strong)] focus-visible:ring-offset-2 focus-visible:ring-offset-black/30 " +
+                  "disabled:cursor-not-allowed disabled:border disabled:border-[color:var(--ck-border-subtle)] disabled:bg-[color:var(--ck-bg-glass)] disabled:text-[color:var(--ck-text-tertiary)]"
+                }
                 onClick={() => {
                   startTransition(() => {
                     submitComment().catch((e: unknown) => setError(errorMessage(e)));
                   });
                 }}
-                disabled={isPending || !commentBody.trim()}
+                disabled={isPostCommentDisabled(commentBody, isPending)}
               >
-                Post comment
+                {isPending ? "Posting…" : "Post comment"}
               </button>
             </div>
           </div>
