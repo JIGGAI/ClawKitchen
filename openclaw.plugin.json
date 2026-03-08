@@ -2,7 +2,7 @@
   "id": "kitchen",
   "name": "ClawKitchen",
   "description": "Local UI for managing OpenClaw recipes, teams, agents, cron jobs, and skills.",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
