@@ -146,6 +146,17 @@ export function TeamMemoryTab({ teamId }: { teamId: string }) {
             <div className="mt-1 text-xs text-[color:var(--ck-text-tertiary)]">
               Stored in <span className="font-mono">shared-context/memory/*.jsonl</span>. Items must be attributable.
             </div>
+            <div className="mt-2 text-xs text-[color:var(--ck-text-secondary)]">
+              Canonical memory model doc:{" "}
+              <a
+                className="underline decoration-white/20 underline-offset-4 hover:decoration-white/40"
+                href="https://github.com/JIGGAI/ClawRecipes/blob/main/docs/MEMORY_MODEL.md"
+                target="_blank"
+                rel="noreferrer"
+              >
+                ClawRecipes/docs/MEMORY_MODEL.md
+              </a>
+            </div>
           </div>
           <button
             type="button"
