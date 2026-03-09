@@ -339,8 +339,34 @@ export async function listAllWorkflowRuns(teamId: string): Promise<{ ok: true; d
     }
   }
 
-  runs.sort((a, b) => String(b.updatedAt ?? b.startedAt ?? "").localeCompare(String(a.updatedAt ?? a.startedAt ?? "")));
-  return { ok: true as const, dir, runs };
+  // Deduplicate across layouts. It's possible for the same logical run to appear in multiple places
+  // (runner dir-per-run + legacy flat/per-workflow layouts). Prefer the richest record.
+  const byKey = new Map<string, WorkflowRunSummary>();
+  for (const r of runs) {
+    const key = `${r.workflowId}:${r.runId}`;
+    const prev = byKey.get(key);
+    if (!prev) {
+      byKey.set(key, r);
+      continue;
+    }
+
+    const score = (x: WorkflowRunSummary) => {
+      let s = 0;
+      if (x.status) s += 2;
+      if (x.startedAt) s += 1;
+      if (x.endedAt) s += 1;
+      if (x.updatedAt) s += 1;
+      // Prefer runner dir-per-run run.json over legacy .run.json files.
+      if (x.path.endsWith(`${path.sep}run.json`)) s += 2;
+      return s;
+    };
+
+    if (score(r) >= score(prev)) byKey.set(key, r);
+  }
+
+  const deduped = Array.from(byKey.values());
+  deduped.sort((a, b) => String(b.updatedAt ?? b.startedAt ?? "").localeCompare(String(a.updatedAt ?? a.startedAt ?? "")));
+  return { ok: true as const, dir, runs: deduped };
 }
 
 function normalizeRunFile(teamId: string, workflowId: string, parsed: unknown, runIdFallback: string): WorkflowRunFileV1 {
