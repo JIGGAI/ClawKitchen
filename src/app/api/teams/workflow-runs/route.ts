@@ -468,12 +468,12 @@ export async function POST(req: Request) {
     }
 
     // Create mode
-    const runId = `run-${nowIso().replace(/[:.]/g, "-")}-${crypto.randomBytes(3).toString("hex")}`.toLowerCase();
-
     const run: WorkflowRunFileV1 =
       mode === "sample"
         ? await (async () => {
             const wf = (await readWorkflow(teamId, workflowId)).workflow;
+
+            const runId = `run-${nowIso().replace(/[:.]/g, "-")}-${crypto.randomBytes(3).toString("hex")}`.toLowerCase();
             const t0 = Date.now();
 
             const templateId =
@@ -822,10 +822,11 @@ export async function POST(req: Request) {
     // So: return the canonical runId + expected path and let the UI follow up by
     // reading from the canonical location.
     if (mode === "enqueue" || mode === "run_now") {
+      const canonicalRunId = run.id;
       return jsonOkRest({
         ok: true,
-        runId: run.id,
-        path: `shared-context/workflow-runs/${run.id}/run.json`,
+        runId: canonicalRunId,
+        path: `shared-context/workflow-runs/${canonicalRunId}/run.json`,
       });
     }
 

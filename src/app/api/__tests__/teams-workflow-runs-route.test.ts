@@ -14,7 +14,9 @@ vi.mock("@/lib/openclaw", () => ({
   runOpenClaw: vi.fn(),
 }));
 
-import { listWorkflowRuns, readWorkflowRun } from "@/lib/workflows/runs-storage";
+import { listWorkflowRuns, readWorkflowRun, writeWorkflowRun } from "@/lib/workflows/runs-storage";
+import { readWorkflow } from "@/lib/workflows/storage";
+import { runOpenClaw } from "@/lib/openclaw";
 
 describe("api teams workflow-runs route", () => {
   beforeEach(() => {
@@ -88,7 +90,7 @@ describe("api teams workflow-runs route", () => {
     expect(res.status).toBe(400);
     const json = await res.json();
     expect(json.error).toBe("workflowId is required");
-  
+  });
 
   it("POST enqueue returns canonical runId and does not write run artifacts", async () => {
     vi.mocked(readWorkflow).mockResolvedValue({
@@ -109,7 +111,7 @@ describe("api teams workflow-runs route", () => {
       stdout: JSON.stringify({ ok: true, runId: "2026-03-09t14-46-37-557z-27027444" }),
       stderr: "",
       exitCode: 0,
-    } as unknown as { ok: true; path: string; workflow: { id: string; nodes: Array<{ id: string; type: string; config?: { agentId?: string } }> } });
+    } as unknown as { ok: true; stdout: string; stderr: string; exitCode: number });
 
     const res = await POST(
       new Request("https://test", {
@@ -127,5 +129,4 @@ describe("api teams workflow-runs route", () => {
 
     expect(writeWorkflowRun).not.toHaveBeenCalled();
   });
-});
 });
