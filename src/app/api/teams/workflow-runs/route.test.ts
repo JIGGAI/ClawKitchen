@@ -96,7 +96,7 @@ describe("/api/teams/workflow-runs POST (enqueue for runner)", () => {
     expect(res.status).toBe(200);
     const json = (await res.json()) as { ok: boolean; path: string; runId: string };
     expect(json.ok).toBe(true);
-    expect(json.runId).toMatch(/^run-/);
+    expect(json.runId).toBe("run-123");
 
     const runRaw = await fs.readFile(json.path, "utf8");
     const run = JSON.parse(runRaw) as import("@/lib/workflows/runs-types").WorkflowRunFileV1;

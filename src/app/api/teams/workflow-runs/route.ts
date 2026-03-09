@@ -814,7 +814,10 @@ export async function POST(req: Request) {
             } satisfies WorkflowRunFileV1;
           })();
 
-    return jsonOkRest({ ...(await writeWorkflowRun(teamId, workflowId, run)), runId });
+    // IMPORTANT: when Kitchen delegates run creation to the CLI (enqueue/run_now),
+    // the canonical run id comes from the CLI. Ensure we return *that* id so the UI
+    // can link to the canonical run folder: shared-context/workflow-runs/<runId>/run.json
+    return jsonOkRest({ ...(await writeWorkflowRun(teamId, workflowId, run)), runId: run.id });
   } catch (err: unknown) {
     const msg = errorMessage(err);
     if (/^All nodes must be assigned to an agent\./i.test(msg) || /^Unknown agentId\(s\)/i.test(msg)) {
