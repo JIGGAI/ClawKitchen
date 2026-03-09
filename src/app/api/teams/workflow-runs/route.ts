@@ -360,6 +360,7 @@ export async function POST(req: Request) {
   const workflowId = String(o.workflowId ?? "").trim();
   const mode = String(o.mode ?? "").trim();
   const action = String(o.action ?? "").trim();
+  const modeNorm = mode || "enqueue";
   const runIdFromBody = String(o.runId ?? "").trim();
   const note = typeof o.note === "string" ? o.note : undefined;
   const decidedBy = typeof o.decidedBy === "string" ? o.decidedBy : undefined;
@@ -469,7 +470,7 @@ export async function POST(req: Request) {
 
     // Create mode
     const run: WorkflowRunFileV1 =
-      mode === "sample"
+      modeNorm === "sample"
         ? await (async () => {
             const wf = (await readWorkflow(teamId, workflowId)).workflow;
 
@@ -662,7 +663,6 @@ export async function POST(req: Request) {
         : await (async () => {
 
             // v2: delegate to CLI for enqueue/run-now (Kitchen should not author run artifacts).
-            const modeNorm = mode || "enqueue";
             if (!["execute", "enqueue", "run_now", "sample"].includes(modeNorm)) {
               throw new Error(`Unsupported mode: ${modeNorm}`);
             }
@@ -821,7 +821,7 @@ export async function POST(req: Request) {
     //   shared-context/workflow-runs/<runId>/run.json
     // So: return the canonical runId + expected path and let the UI follow up by
     // reading from the canonical location.
-    if (mode === "enqueue" || mode === "run_now") {
+    if (modeNorm === "enqueue" || modeNorm === "run_now") {
       const canonicalRunId = run.id;
       return jsonOkRest({
         ok: true,
