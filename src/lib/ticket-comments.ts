@@ -1,6 +1,8 @@
 export type TicketComment = {
   timestamp: string;
-  author: string;
+  authorName: string;
+  authorRole?: string;
+  authorRaw: string;
   body: string;
 };
 
@@ -16,6 +18,39 @@ function findCommentsSection(md: string): { start: number; end: number } | null 
   const nextHeading = rest.search(/^##\s+/m);
   const end = nextHeading === -1 ? md.length : start + nextHeading;
   return { start, end };
+}
+
+const ROLE_HINTS = new Set(["lead", "dev", "qa", "tester", "agent", "system"]);
+
+function parseAuthor(rawAuthor: string): { name: string; role?: string; raw: string } {
+  const raw = rawAuthor?.trim() || "";
+  const normalized = raw || "unknown";
+
+  // Pattern: "RJ (lead)"
+  const paren = normalized.match(/^(.*?)\s*\((.*?)\)\s*$/);
+  if (paren) {
+    const name = paren[1].trim() || "unknown";
+    const role = paren[2].trim();
+    return { name, role: role && role.toLowerCase() != name.toLowerCase() ? role : undefined, raw: normalized };
+  }
+
+  // Pattern: "lead — RJ" / "RJ — lead" / "lead | RJ" / "RJ | lead"
+  for (const sep of [" — ", " - ", " | "] as const) {
+    if (!normalized.includes(sep)) continue;
+    const [a, b] = normalized.split(sep).map((s) => s.trim()).filter(Boolean);
+    if (!a || !b) break;
+
+    const aIsRole = ROLE_HINTS.has(a.toLowerCase());
+    const bIsRole = ROLE_HINTS.has(b.toLowerCase());
+
+    if (aIsRole && !bIsRole) return { name: b, role: a, raw: normalized };
+    if (bIsRole && !aIsRole) return { name: a, role: b, raw: normalized };
+
+    // Otherwise, treat the left as the primary author label and right as secondary detail.
+    return { name: a, role: b, raw: normalized };
+  }
+
+  return { name: normalized, raw: normalized };
 }
 
 export function parseTicketComments(md: string): TicketComment[] {
@@ -39,9 +74,16 @@ export function parseTicketComments(md: string): TicketComment[] {
       const rest = m[2].trim();
       // Support either "author: first line" or just "author".
       const colonIdx = rest.indexOf(":");
-      const author = (colonIdx >= 0 ? rest.slice(0, colonIdx) : rest).trim() || "unknown";
+      const authorRaw = (colonIdx >= 0 ? rest.slice(0, colonIdx) : rest).trim() || "unknown";
       const firstBody = colonIdx >= 0 ? rest.slice(colonIdx + 1).trimStart() : "";
-      current = { timestamp, author, body: firstBody ? firstBody + "\n" : "" };
+      const author = parseAuthor(authorRaw);
+      current = {
+        timestamp,
+        authorName: author.name,
+        authorRole: author.role,
+        authorRaw: author.raw,
+        body: firstBody ? firstBody + "\n" : "",
+      };
       continue;
     }
 
@@ -55,11 +97,7 @@ export function parseTicketComments(md: string): TicketComment[] {
   return out;
 }
 
-export function formatTicketCommentMarkdown(args: {
-  timestamp: string;
-  author: string;
-  body: string;
-}): string {
+export function formatTicketCommentMarkdown(args: { timestamp: string; author: string; body: string }): string {
   const body = args.body.trim().replace(/\r\n/g, "\n");
   const indented = body
     .split("\n")
