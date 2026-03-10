@@ -28,6 +28,7 @@ export default async function TeamTicketDetailPage({
       ticketId={data.id}
       file={data.file}
       markdown={data.markdown}
+      stage={data.stage}
       backHref={`/teams/${encodeURIComponent(teamId)}/tickets`}
       currentOwner={data.owner}
     />

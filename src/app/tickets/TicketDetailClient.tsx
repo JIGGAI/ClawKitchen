@@ -7,6 +7,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useToast } from "@/components/ToastProvider";
 import { errorMessage } from "@/lib/errors";
 import { fetchJson } from "@/lib/fetch-json";
+import type { TicketStage } from "@/lib/tickets";
 import { parseTicketComments } from "@/lib/ticket-comments";
 import { TicketAssignControl } from "@/app/tickets/[ticket]/TicketAssignControl";
 
@@ -19,6 +20,7 @@ export function TicketDetailClient(props: {
   ticketId: string;
   file: string;
   markdown: string;
+  stage: TicketStage;
   backHref?: string;
   currentOwner?: string | null;
 }) {
@@ -48,6 +50,15 @@ export function TicketDetailClient(props: {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ ticket: props.ticketId }),
+    });
+  }
+
+  async function moveTicket(to: TicketStage) {
+    setError(null);
+    await fetchJson(`/api/teams/${encodeURIComponent(props.teamId)}/tickets/move`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ticket: props.ticketId, to }),
     });
   }
 
@@ -86,107 +97,146 @@ export function TicketDetailClient(props: {
         </div>
       ) : null}
 
-      {props.currentOwner !== undefined ? (
-        <TicketAssignControl teamId={props.teamId} ticket={props.ticketId} currentOwner={props.currentOwner ?? null} />
-      ) : null}
-
-      <div className="ck-glass p-4">
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <button
-            className="rounded border border-[color:var(--ck-border-subtle)] px-3 py-1.5 text-xs font-medium text-[color:var(--ck-text-secondary)] hover:border-[color:var(--ck-border-strong)]"
-            onClick={() => setConfirm({ kind: "goals" })}
-            disabled={isPending}
-          >
-            Move to Goals
-          </button>
-          <button
-            className="rounded border border-[color:var(--ck-accent-red)] bg-[color:var(--ck-accent-red-soft)] px-3 py-1.5 text-xs font-medium text-[color:var(--ck-accent-red)] hover:bg-[color:var(--ck-accent-red-soft-strong)]"
-            onClick={() => setConfirm({ kind: "delete" })}
-            disabled={isPending}
-          >
-            Delete Ticket
-          </button>
-        </div>
-      </div>
-
       <div className="ck-glass p-6">
-        <div className="flex items-center justify-between gap-3">
-          <div className="text-sm font-semibold text-[color:var(--ck-text-primary)]">Comments</div>
-          <div className="text-xs text-[color:var(--ck-text-tertiary)]">{comments.length}</div>
-        </div>
-
-        {comments.length ? (
-          <div className="mt-3 space-y-3">
-            {comments.map((c, idx) => (
-              <div
-                key={`${c.timestamp}-${idx}`}
-                className="rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] bg-black/10 p-3"
-              >
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <div className="text-xs font-medium text-[color:var(--ck-text-primary)]">{c.author}</div>
-                  <div className="text-xs text-[color:var(--ck-text-tertiary)]">{c.timestamp}</div>
-                </div>
-                <div className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-[color:var(--ck-text-secondary)]">
-                  {c.body}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="mt-3 text-sm text-[color:var(--ck-text-secondary)]">No comments yet.</div>
-        )}
-
-        <div className="mt-4 border-t border-[color:var(--ck-border-subtle)] pt-4">
-          <div className="text-sm font-semibold text-[color:var(--ck-text-primary)]">Add comment</div>
-
-          <div className="mt-3 grid gap-3">
-            <div className="grid gap-1">
-              <label className="text-xs font-medium text-[color:var(--ck-text-secondary)]" htmlFor="ck-comment-author">
-                Author (optional)
-              </label>
-              <input
-                id="ck-comment-author"
-                value={commentAuthor}
-                onChange={(e) => setCommentAuthor(e.target.value)}
-                placeholder="unknown"
-                className="w-full rounded border border-[color:var(--ck-border-subtle)] bg-black/20 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] outline-none focus:border-[color:var(--ck-border-strong)]"
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="text-sm font-semibold text-[color:var(--ck-text-primary)]">Ticket</div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <label className="flex items-center gap-2 text-xs text-[color:var(--ck-text-secondary)]">
+              <span>Status</span>
+              <select
+                className="rounded border border-[color:var(--ck-border-subtle)] bg-black/20 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                 disabled={isPending}
-              />
-            </div>
+                value={props.stage}
+                onChange={(e) => {
+                  const next = e.target.value as TicketStage;
+                  if (next === props.stage) return;
 
-            <div className="grid gap-1">
-              <label className="text-xs font-medium text-[color:var(--ck-text-secondary)]" htmlFor="ck-comment-body">
-                Comment
-              </label>
-              <textarea
-                id="ck-comment-body"
-                value={commentBody}
-                onChange={(e) => setCommentBody(e.target.value)}
-                rows={4}
-                className="w-full rounded border border-[color:var(--ck-border-subtle)] bg-black/20 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] outline-none focus:border-[color:var(--ck-border-strong)]"
-                disabled={isPending}
-              />
-            </div>
+                  if (next === "done") {
+                    const ok = window.confirm(
+                      "Mark this ticket done? This will move the file to work/done and add an audit comment.",
+                    );
+                    if (!ok) return;
+                  }
 
-            <div className="flex items-center justify-end">
-              <button
-                type="button"
-                aria-busy={isPending}
-                className={
-                  "rounded-[var(--ck-radius-sm)] bg-[color:var(--ck-accent)] px-3 py-2 text-xs font-semibold text-black transition " +
-                  "hover:brightness-110 active:brightness-95 " +
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ck-border-strong)] focus-visible:ring-offset-2 focus-visible:ring-offset-black/30 " +
-                  "disabled:cursor-not-allowed disabled:border disabled:border-[color:var(--ck-border-subtle)] disabled:bg-[color:var(--ck-bg-glass)] disabled:text-[color:var(--ck-text-tertiary)]"
-                }
-                onClick={() => {
                   startTransition(() => {
-                    submitComment().catch((e: unknown) => setError(errorMessage(e)));
+                    moveTicket(next)
+                      .then(() => {
+                        toast.push({ kind: "success", message: `Status updated to ${next}.` });
+                        router.refresh();
+                      })
+                      .catch((err: unknown) => setError(errorMessage(err)));
                   });
                 }}
-                disabled={isPostCommentDisabled(commentBody, isPending)}
               >
-                {isPending ? "Posting…" : "Post comment"}
-              </button>
+                <option value="backlog">backlog</option>
+                <option value="in-progress">in-progress</option>
+                <option value="testing">testing</option>
+                <option value="done">done</option>
+              </select>
+            </label>
+
+            <button
+              className="rounded border border-[color:var(--ck-border-subtle)] px-3 py-1.5 text-xs font-medium text-[color:var(--ck-text-secondary)] hover:border-[color:var(--ck-border-strong)]"
+              onClick={() => setConfirm({ kind: "goals" })}
+              disabled={isPending}
+            >
+              Move to Goals
+            </button>
+            <button
+              className="rounded border border-[color:var(--ck-accent-red)] bg-[color:var(--ck-accent-red-soft)] px-3 py-1.5 text-xs font-medium text-[color:var(--ck-accent-red)] hover:bg-[color:var(--ck-accent-red-soft-strong)]"
+              onClick={() => setConfirm({ kind: "delete" })}
+              disabled={isPending}
+            >
+              Delete Ticket
+            </button>
+          </div>
+        </div>
+
+        {props.currentOwner !== undefined ? (
+          <div className="mt-4">
+            <TicketAssignControl teamId={props.teamId} ticket={props.ticketId} currentOwner={props.currentOwner ?? null} />
+          </div>
+        ) : null}
+
+        <div className="mt-6 border-t border-[color:var(--ck-border-subtle)] pt-6">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-sm font-semibold text-[color:var(--ck-text-primary)]">Comments</div>
+            <div className="text-xs text-[color:var(--ck-text-tertiary)]">{comments.length}</div>
+          </div>
+
+          {comments.length ? (
+            <div className="mt-3 space-y-3">
+              {comments.map((c, idx) => (
+                <div
+                  key={`${c.timestamp}-${idx}`}
+                  className="rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] bg-black/10 p-3"
+                >
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <div className="text-xs font-medium text-[color:var(--ck-text-primary)]">{c.author}</div>
+                    <div className="text-xs text-[color:var(--ck-text-tertiary)]">{c.timestamp}</div>
+                  </div>
+                  <div className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-[color:var(--ck-text-secondary)]">
+                    {c.body}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-3 text-sm text-[color:var(--ck-text-secondary)]">No comments yet.</div>
+          )}
+
+          <div className="mt-4 border-t border-[color:var(--ck-border-subtle)] pt-4">
+            <div className="text-sm font-semibold text-[color:var(--ck-text-primary)]">Add comment</div>
+
+            <div className="mt-3 grid gap-3">
+              <div className="grid gap-1">
+                <label className="text-xs font-medium text-[color:var(--ck-text-secondary)]" htmlFor="ck-comment-author">
+                  Author (optional)
+                </label>
+                <input
+                  id="ck-comment-author"
+                  value={commentAuthor}
+                  onChange={(e) => setCommentAuthor(e.target.value)}
+                  placeholder="unknown"
+                  className="w-full rounded border border-[color:var(--ck-border-subtle)] bg-black/20 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] outline-none focus:border-[color:var(--ck-border-strong)]"
+                  disabled={isPending}
+                />
+              </div>
+
+              <div className="grid gap-1">
+                <label className="text-xs font-medium text-[color:var(--ck-text-secondary)]" htmlFor="ck-comment-body">
+                  Comment
+                </label>
+                <textarea
+                  id="ck-comment-body"
+                  value={commentBody}
+                  onChange={(e) => setCommentBody(e.target.value)}
+                  rows={4}
+                  className="w-full rounded border border-[color:var(--ck-border-subtle)] bg-black/20 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] outline-none focus:border-[color:var(--ck-border-strong)]"
+                  disabled={isPending}
+                />
+              </div>
+
+              <div className="flex items-center justify-end">
+                <button
+                  type="button"
+                  aria-busy={isPending}
+                  className={
+                    "rounded-[var(--ck-radius-sm)] bg-[color:var(--ck-accent)] px-3 py-2 text-xs font-semibold text-black transition " +
+                    "hover:brightness-110 active:brightness-95 " +
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ck-border-strong)] focus-visible:ring-offset-2 focus-visible:ring-offset-black/30 " +
+                    "disabled:cursor-not-allowed disabled:border disabled:border-[color:var(--ck-border-subtle)] disabled:bg-[color:var(--ck-bg-glass)] disabled:text-[color:var(--ck-text-tertiary)]"
+                  }
+                  onClick={() => {
+                    startTransition(() => {
+                      submitComment().catch((e: unknown) => setError(errorMessage(e)));
+                    });
+                  }}
+                  disabled={isPostCommentDisabled(commentBody, isPending)}
+                >
+                  {isPending ? "Posting…" : "Post comment"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
