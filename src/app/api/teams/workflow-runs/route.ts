@@ -709,6 +709,7 @@ export async function POST(req: Request) {
               runLogPath?: string;
             };
             const enqRunId = String(enqueueJson.runId ?? "").trim();
+            const runLogPath = String(enqueueJson.runLogPath ?? "").trim();
             if (!enqRunId) throw new Error("Enqueue succeeded but did not return runId");
 
             if (modeNorm === "run_now") {
@@ -811,6 +812,10 @@ export async function POST(req: Request) {
               nodes: Array.isArray(wf.nodes)
                 ? wf.nodes.map((n) => ({ nodeId: String(n.id), status: "pending" as const }))
                 : [],
+              meta: {
+                canonicalRunId: enqRunId,
+                ...(runLogPath ? { runLogPath } : {}),
+              },
             } satisfies WorkflowRunFileV1;
           })();
 
@@ -822,7 +827,7 @@ export async function POST(req: Request) {
     // So: return the canonical runId + expected path and let the UI follow up by
     // reading from the canonical location.
     if (modeNorm === "enqueue" || modeNorm === "run_now") {
-      const canonicalRunId = run.id;
+      const canonicalRunId = String((run.meta as Record<string, unknown> | undefined)?.canonicalRunId ?? run.id);
       return jsonOkRest({
         ok: true,
         runId: canonicalRunId,
