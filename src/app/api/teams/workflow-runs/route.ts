@@ -468,6 +468,122 @@ export async function POST(req: Request) {
       return jsonOkRest({ ...(await writeWorkflowRun(teamId, workflowId, finalRun)), runId: run.id });
     }
 
+
+
+    // Enqueue / run_now (canonical): delegate run creation to the CLI and return the canonical runId.
+    // Kitchen must not author any run artifacts in these modes.
+    if (modeNorm === "enqueue" || modeNorm === "run_now") {
+      const wf = (await readWorkflow(teamId, workflowId)).workflow;
+
+      // Preflight: nodes (excluding start/end/approval) must be assigned to an agent.
+      const missing = (Array.isArray(wf.nodes) ? wf.nodes : [])
+        .filter((n) =>
+          n &&
+          typeof n === "object" &&
+          (n as { type?: unknown }).type !== "start" &&
+          (n as { type?: unknown }).type !== "end" &&
+          (n as { type?: unknown }).type !== "human_approval"
+        )
+        .filter((n) => {
+          const cfg = (n as { config?: unknown }).config;
+          const o = cfg && typeof cfg === "object" && !Array.isArray(cfg) ? (cfg as Record<string, unknown>) : {};
+          return !String(o.agentId ?? "").trim();
+        })
+        .map((n) => String((n as { id?: unknown }).id ?? ""))
+        .filter(Boolean);
+      if (missing.length) {
+        throw new Error(`All nodes must be assigned to an agent. Missing agentId on: ${missing.join(", ")}`);
+      }
+
+      const workflowFile = `${workflowId}.workflow.json`;
+
+      const enqueueRes = await runOpenClaw([
+        "recipes",
+        "workflows",
+        "run",
+        "--team-id",
+        teamId,
+        "--workflow-file",
+        workflowFile,
+      ]);
+      if (!enqueueRes.ok) throw new Error(enqueueRes.stderr || enqueueRes.stdout || "Failed to enqueue workflow run");
+
+      const enqueueJson = JSON.parse(String(enqueueRes.stdout ?? "{}")) as { ok?: boolean; runId?: string; runLogPath?: string };
+      const enqRunId = String(enqueueJson.runId ?? "").trim();
+      const runLogPath = String(enqueueJson.runLogPath ?? "").trim();
+      if (!enqRunId) throw new Error("Enqueue succeeded but did not return runId");
+
+      if (modeNorm === "run_now") {
+        const agentListRes = await runOpenClaw(["agents", "list", "--json"]);
+        if (!agentListRes.ok) throw new Error(agentListRes.stderr || agentListRes.stdout || "Failed to list agents");
+        const agentList = JSON.parse(String(agentListRes.stdout ?? "[]")) as Array<{ id?: unknown }>;
+        const knownAgentIds = new Set(agentList.map((a) => String(a.id ?? "").trim()).filter(Boolean));
+
+        const requiredAgentIds = (Array.isArray(wf.nodes) ? wf.nodes : [])
+          .filter((n) =>
+            n &&
+            typeof n === "object" &&
+            (n as { type?: unknown }).type !== "start" &&
+            (n as { type?: unknown }).type !== "end" &&
+            (n as { type?: unknown }).type !== "human_approval"
+          )
+          .map((n) => {
+            const cfg = (n as { config?: unknown }).config;
+            const o = cfg && typeof cfg === "object" && !Array.isArray(cfg) ? (cfg as Record<string, unknown>) : {};
+            return String(o.agentId ?? "").trim();
+          })
+          .filter(Boolean);
+
+        const uniq = Array.from(new Set(requiredAgentIds));
+        const missingAgents = uniq.filter((id) => !knownAgentIds.has(id));
+        if (missingAgents.length) {
+          throw new Error(
+            `Unknown agentId(s) in workflow node assignments: ${missingAgents.join(", ")}. ` +
+              `These must match real OpenClaw agent ids (see openclaw agents list).`
+          );
+        }
+
+        // Try to claim the newly enqueued run before ticking workers.
+        for (let attempt = 0; attempt < 4; attempt++) {
+          const runnerRes = await runOpenClaw(["recipes", "workflows", "runner-once", "--team-id", teamId]);
+          if (!runnerRes.ok) throw new Error(runnerRes.stderr || runnerRes.stdout || "Failed to run runner-once");
+
+          try {
+            const { run } = await readWorkflowRun(teamId, workflowId, enqRunId);
+            const statusAny = (run as unknown as { status?: unknown }).status;
+            if (statusAny && String(statusAny) != "queued") break;
+          } catch {
+            // fall through
+          }
+
+          await new Promise((r) => setTimeout(r, 250));
+        }
+
+        for (const agentId of uniq) {
+          const workerRes = await runOpenClaw([
+            "recipes",
+            "workflows",
+            "worker-tick",
+            "--team-id",
+            teamId,
+            "--agent-id",
+            agentId,
+            "--limit",
+            "5",
+            "--worker-id",
+            "kitchen-run-now",
+          ]);
+          if (!workerRes.ok) throw new Error(workerRes.stderr || workerRes.stdout || `Failed worker-tick for ${agentId}`);
+        }
+      }
+
+      return jsonOkRest({
+        ok: true,
+        runId: enqRunId,
+        path: `shared-context/workflow-runs/${enqRunId}/run.json`,
+        ...(runLogPath ? { runLogPath } : {}),
+      });
+    }
     // Create mode
     const run: WorkflowRunFileV1 =
       modeNorm === "sample"
