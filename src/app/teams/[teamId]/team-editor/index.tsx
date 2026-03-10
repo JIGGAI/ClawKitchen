@@ -20,6 +20,7 @@ import { TeamSkillsTab } from "./TeamSkillsTab";
 import { TeamCronTab } from "./TeamCronTab";
 import { TeamFilesTab } from "./TeamFilesTab";
 import { TeamMemoryTab } from "./TeamMemoryTab";
+import { TeamChatTab } from "./TeamChatTab";
 import { OrchestratorPanel } from "../OrchestratorPanel";
 import WorkflowsClient from "../workflows/workflows-client";
 import { DeliverablesTab } from "./DeliverablesTab";
@@ -35,6 +36,7 @@ const BASE_TABS = [
 ] as const;
 
 const EXPERIMENTAL_TABS = [
+  { id: "chat" as const, label: "Chat" },
   { id: "memory" as const, label: "Memory" },
   { id: "workflows" as const, label: "Workflows" },
   { id: "deliverables" as const, label: "Deliverables" },
@@ -59,7 +61,7 @@ export default function TeamEditor({ teamId, initialTab }: { teamId: string; ini
   // (Avoids SSR/minifier TDZ issues like "Cannot access before initialization".)
 
   const [activeTab, setActiveTab] = useState<TabId>(() => {
-    const valid: TabId[] = ["recipe", "agents", "skills", "cron", "files", "memory", "orchestrator", "workflows"]; // removed plugins
+    const valid: TabId[] = ["recipe", "agents", "skills", "cron", "files", "chat", "memory", "orchestrator", "workflows", "deliverables"]; // removed plugins
     return valid.includes(initialTab as TabId) ? (initialTab as TabId) : "recipe";
   });
   const tabs = useMemo(() => [...BASE_TABS, ...EXPERIMENTAL_TABS], []);
@@ -155,7 +157,7 @@ export default function TeamEditor({ teamId, initialTab }: { teamId: string; ini
     setTeamMetaRecipeHash(null);
     setPublishOpen(false);
     setDeleteOpen(false);
-    const valid: TabId[] = ["recipe", "agents", "skills", "cron", "files", "memory", "orchestrator", "workflows"];
+    const valid: TabId[] = ["recipe", "agents", "skills", "cron", "files", "chat", "memory", "orchestrator", "workflows", "deliverables", "plugins"];
     if (initialTab && valid.includes(initialTab as TabId)) {
       setActiveTab(initialTab as TabId);
     }
@@ -478,6 +480,12 @@ export default function TeamEditor({ teamId, initialTab }: { teamId: string; ini
 
 
       {activeTab === "orchestrator" && <OrchestratorPanel teamId={teamId} />}
+
+      {activeTab === "chat" && (
+        <div className="mt-6">
+          <TeamChatTab teamId={teamId} />
+        </div>
+      )}
 
       {activeTab === "memory" && (
         <div className="mt-6">
