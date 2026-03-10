@@ -62,14 +62,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const isTeamEditorRoute = useMemo(() => pathname.startsWith("/teams/"), [pathname]);
 
-  const [storedTeamId, setStoredTeamId] = useState<string>(() => {
-    if (typeof window === "undefined") return "";
-    try {
-      return (localStorage.getItem("ck-selected-team") || "").trim();
-    } catch {
-      return "";
-    }
-  });
+  const [storedTeamId, setStoredTeamId] = useState<string>("");
 
   const selectedTeamId = (teamIdFromPath || storedTeamId).trim();
 
@@ -113,6 +106,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       // ignore
     }
   }
+
+  // Load persisted selected team after hydration to avoid SSR/client mismatch.
+  useEffect(() => {
+    try {
+      setStoredTeamId((localStorage.getItem("ck-selected-team") || "").trim());
+    } catch {
+      // ignore
+    }
+  }, []);
 
   // Keep URL in sync with the selected team on pages that support team filtering.
   useEffect(() => {
