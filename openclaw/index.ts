@@ -1,10 +1,9 @@
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
+import { spawn, type ChildProcess } from "node:child_process";
 import http from "node:http";
 import path from "node:path";
+import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
-
-// Next is already a dependency of ClawKitchen.
-import next from "next";
 
 type KitchenConfig = {
   enabled?: boolean;
@@ -84,7 +83,63 @@ function parseCookies(req: http.IncomingMessage): Record<string, string> {
 }
 
 let server: http.Server | null = null;
+let standaloneChild: ChildProcess | null = null;
+let standalonePort: number | null = null;
 let startedAt: string | null = null;
+
+function getRootDir() {
+  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+}
+
+function getStandaloneDir(rootDir: string) {
+  return path.join(rootDir, ".next", "standalone");
+}
+
+function getStandaloneServerPath(rootDir: string) {
+  return path.join(getStandaloneDir(rootDir), "server.js");
+}
+
+async function waitForStandaloneReady(port: number, timeoutMs = 15000) {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/healthz`);
+      if (res.ok) return;
+    } catch {
+      // ignore and retry
+    }
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  throw new Error(`Kitchen standalone server did not become ready on port ${port}`);
+}
+
+async function startStandaloneServer(api: OpenClawPluginApi, rootDir: string, host: string, port: number) {
+  const serverPath = getStandaloneServerPath(rootDir);
+  const child = spawn(process.execPath, [serverPath], {
+    cwd: getStandaloneDir(rootDir),
+    env: {
+      ...process.env,
+      HOSTNAME: host,
+      PORT: String(port),
+      NODE_ENV: "production",
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+
+  child.stdout?.on("data", (buf) => api.logger.info(`[kitchen:standalone] ${String(buf).trimEnd()}`));
+  child.stderr?.on("data", (buf) => api.logger.warn(`[kitchen:standalone] ${String(buf).trimEnd()}`));
+  child.on("exit", (code, signal) => {
+    api.logger.warn(`[kitchen:standalone] exited code=${code ?? "null"} signal=${signal ?? "null"}`);
+    if (standaloneChild === child) {
+      standaloneChild = null;
+      standalonePort = null;
+    }
+  });
+
+  standaloneChild = child;
+  standalonePort = port;
+  await waitForStandaloneReady(port);
+}
 
 async function startKitchen(api: OpenClawPluginApi, cfg: KitchenConfig) {
   if (server) return;
@@ -104,11 +159,14 @@ async function startKitchen(api: OpenClawPluginApi, cfg: KitchenConfig) {
     );
   }
 
-  const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const rootDir = getRootDir();
 
-  const app = next({ dev, dir: rootDir });
-  await app.prepare();
-  const handle = app.getRequestHandler();
+  if (!dev) {
+    // Production path: launch the self-contained Next standalone server.
+    // This avoids requiring host-installed `next` on user systems.
+    const internalPort = port + 1000;
+    await startStandaloneServer(api, rootDir, "127.0.0.1", internalPort);
+  }
 
   server = http.createServer(async (req, res) => {
     try {
@@ -128,11 +186,6 @@ async function startKitchen(api: OpenClawPluginApi, cfg: KitchenConfig) {
       // Some browsers fetch the PWA manifest without preserving Authorization headers,
       // causing noisy 401s in the console even though the app is working.
       // The manifest contains no secrets, so allow it unauthenticated.
-      const pathname = new URL(url, `http://${host}:${port}`).pathname;
-      if (pathname === "/manifest.webmanifest") {
-        await handle(req, res);
-        return;
-      }
 
       if (shouldProtect && !(authMode === "local" && isLocalRequest)) {
         // Optional headless QA bypass: safe-by-default (disabled unless cfg.qaToken is set).
@@ -171,7 +224,55 @@ async function startKitchen(api: OpenClawPluginApi, cfg: KitchenConfig) {
         }
       }
 
-      await handle(req, res);
+      if (dev) {
+        // Dev mode still uses Next directly from the repo workspace.
+        const nextMod = await import("next");
+        const app = nextMod.default({ dev: true, dir: rootDir });
+        await app.prepare();
+        const handle = app.getRequestHandler();
+        await handle(req, res);
+        return;
+      }
+
+      if (!standalonePort) {
+        throw new Error("Kitchen standalone server is not running");
+      }
+
+      const upstream = new URL(url, `http://127.0.0.1:${standalonePort}`);
+      const headers = new Headers();
+      for (const [k, v] of Object.entries(req.headers)) {
+        if (typeof v === "string") headers.set(k, v);
+        else if (Array.isArray(v)) headers.set(k, v.join(", "));
+      }
+      headers.set("host", `127.0.0.1:${standalonePort}`);
+
+      const method = (req.method || "GET").toUpperCase();
+      const requestBody = method === "GET" || method === "HEAD" ? undefined : Readable.toWeb(req) as ReadableStream;
+      const requestInit: RequestInit & { duplex?: "half" } = {
+        method,
+        headers,
+        redirect: "manual",
+      };
+      if (requestBody) {
+        requestInit.body = requestBody;
+        requestInit.duplex = "half";
+      }
+      const upstreamRes = await fetch(upstream, requestInit);
+
+      res.statusCode = upstreamRes.status;
+      upstreamRes.headers.forEach((value, key) => {
+        if (key.toLowerCase() === "transfer-encoding") return;
+        res.setHeader(key, value);
+      });
+      if (upstreamRes.body) {
+        const reader = upstreamRes.body.getReader();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          res.write(Buffer.from(value));
+        }
+      }
+      res.end();
     } catch (e: unknown) {
       api.logger.error(`[kitchen] request error: ${e instanceof Error ? e.message : String(e)}`);
       res.statusCode = 500;
@@ -189,11 +290,18 @@ async function startKitchen(api: OpenClawPluginApi, cfg: KitchenConfig) {
 }
 
 async function stopKitchen(api: OpenClawPluginApi) {
-  if (!server) return;
-  const s = server;
-  server = null;
+  if (server) {
+    const s = server;
+    server = null;
+    await new Promise<void>((resolve) => s.close(() => resolve()));
+  }
+  if (standaloneChild) {
+    const child = standaloneChild;
+    standaloneChild = null;
+    standalonePort = null;
+    child.kill("SIGTERM");
+  }
   startedAt = null;
-  await new Promise<void>((resolve) => s.close(() => resolve()));
   api.logger.info("[kitchen] stopped");
 }
 

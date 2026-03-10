@@ -37,6 +37,7 @@
     ".next/BUILD_ID",
     ".next/server/",
     ".next/static/",
+    ".next/standalone/",
     ".next/required-server-files.json",
     ".next/required-server-files.js",
     ".next/routes-manifest.json",
