@@ -21,7 +21,7 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v);
 }
 
-export default function WorkflowsClient({ teamId }: { teamId: string }) {
+export default function WorkflowsClient({ teamId, llmTaskEnabled }: { teamId: string; llmTaskEnabled?: boolean }) {
   const router = useRouter();
   const [workflows, setWorkflows] = useState<Array<{ id: string; name?: string }>>([]);
   const [loading, setLoading] = useState(true);
@@ -196,6 +196,22 @@ export default function WorkflowsClient({ teamId }: { teamId: string }) {
     return <div className="ck-glass p-4">Loading workflows…</div>;
   }
 
+  const llmHelp = llmTaskEnabled === false ? (
+    <div className="rounded-[var(--ck-radius-sm)] border border-amber-500/30 bg-amber-500/10 p-4 text-sm">
+      <div className="font-medium text-amber-200">LLM support is not enabled</div>
+      <div className="mt-1 text-[color:var(--ck-text-secondary)]">
+        Workflow LLM nodes require the optional built-in <code className="px-1">llm-task</code> plugin.
+      </div>
+      <div className="mt-2 text-[color:var(--ck-text-secondary)]">
+        Enable it with: <code className="px-1">openclaw plugins enable llm-task</code> then run{' '}
+        <code className="px-1">openclaw gateway restart</code>.
+      </div>
+      <div className="mt-2 text-xs text-[color:var(--ck-text-tertiary)]">
+        If you’re doing a non-interactive install, keep this command in your setup docs as a fallback.
+      </div>
+    </div>
+  ) : null;
+
   return (
     <div className="ck-glass p-6">
       <div>
@@ -203,6 +219,8 @@ export default function WorkflowsClient({ teamId }: { teamId: string }) {
         <p className="mt-1 text-sm text-[color:var(--ck-text-secondary)]">
           Stored in <code>shared-context/workflows/&lt;id&gt;.workflow.json</code> inside the team workspace.
         </p>
+
+        {llmHelp}
 
         <div className="mt-3 flex flex-wrap items-center justify-start gap-2">
           <button

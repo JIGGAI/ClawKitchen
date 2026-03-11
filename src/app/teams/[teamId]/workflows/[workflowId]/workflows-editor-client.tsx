@@ -19,10 +19,12 @@ export default function WorkflowsEditorClient({
   teamId,
   workflowId,
   draft,
+  llmTaskEnabled,
 }: {
   teamId: string;
   workflowId: string;
   draft: boolean;
+  llmTaskEnabled?: boolean;
 }) {
   const [view, setView] = useState<"canvas" | "json">("canvas");
   const [saving, setSaving] = useState(false);
@@ -359,6 +361,19 @@ export default function WorkflowsEditorClient({
   if (status.kind === "error") return <div className="ck-glass w-full p-6">{status.error}</div>;
 
   // (section collapse uses native <details> to keep this file simple)
+  const llmHelp = llmTaskEnabled === false ? (
+    <div className="mx-3 mb-3 rounded-[var(--ck-radius-sm)] border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+      <div className="font-medium text-amber-200">LLM support is not enabled</div>
+      <div className="mt-1 text-[color:var(--ck-text-secondary)]">
+        Workflow LLM nodes require the optional built-in <code className="px-1">llm-task</code> plugin.
+      </div>
+      <div className="mt-2 text-[color:var(--ck-text-secondary)]">
+        Enable it with: <code className="px-1">openclaw plugins enable llm-task</code> then run{' '}
+        <code className="px-1">openclaw gateway restart</code>.
+      </div>
+    </div>
+  ) : null;
+
 
   return (
     <div className="flex h-full min-h-0 w-full flex-1 flex-col">
@@ -463,6 +478,8 @@ export default function WorkflowsEditorClient({
           {/* Back button lives in the left header. */}
         </div>
       </div>
+
+      {llmHelp}
 
       {parsed.err ? (
         <div className="mt-3 rounded-[var(--ck-radius-sm)] border border-yellow-400/30 bg-yellow-500/10 p-3 text-sm text-yellow-100">
