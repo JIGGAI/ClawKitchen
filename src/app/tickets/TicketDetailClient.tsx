@@ -173,10 +173,10 @@ export function TicketDetailClient(props: {
                 type="button"
                 aria-busy={isPending}
                 className={
-                  "rounded-[var(--ck-radius-sm)] bg-[color:var(--ck-accent)] px-3 py-2 text-xs font-semibold text-black transition " +
-                  "hover:brightness-110 active:brightness-95 " +
+                  "rounded-[var(--ck-radius-sm)] bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-[var(--ck-shadow-1)] transition " +
+                  "hover:bg-emerald-500 active:bg-emerald-700 " +
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ck-border-strong)] focus-visible:ring-offset-2 focus-visible:ring-offset-black/30 " +
-                  "disabled:cursor-not-allowed disabled:border disabled:border-[color:var(--ck-border-subtle)] disabled:bg-[color:var(--ck-bg-glass)] disabled:text-[color:var(--ck-text-tertiary)]"
+                  "disabled:cursor-not-allowed disabled:opacity-50"
                 }
                 onClick={() => {
                   startTransition(() => {
