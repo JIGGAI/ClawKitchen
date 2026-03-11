@@ -385,7 +385,8 @@ async function startKitchen(api: OpenClawPluginApi, cfg: KitchenConfig) {
             return;
           }
 
-          broadcast(r.file, { type: "chat_message", message: r.message });
+          // The file watcher will fan this out to every subscriber, including the sender.
+          // Avoid an immediate second broadcast here, or websocket posts will appear twice.
         }
       });
 
