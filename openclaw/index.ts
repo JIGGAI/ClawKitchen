@@ -150,7 +150,18 @@ async function startKitchen(api: OpenClawPluginApi, cfg: KitchenConfig) {
     const set = roomClients.get(file);
     if (set) {
       set.delete(ws);
-      if (set.size === 0) roomClients.delete(file);
+      if (set.size === 0) {
+        roomClients.delete(file);
+        const tail = roomTails.get(file);
+        if (tail) {
+          try {
+            tail.watcher.close();
+          } catch {
+            // ignore
+          }
+          roomTails.delete(file);
+        }
+      }
     }
     delete ws.__roomFile;
   }
@@ -353,6 +364,10 @@ async function startKitchen(api: OpenClawPluginApi, cfg: KitchenConfig) {
         if (type === "subscribe") {
           const nextTeamId = String(obj.teamId || teamId).trim();
           const nextRoomId = String(obj.roomId || "").trim();
+          if (!nextRoomId) {
+            ws.send(JSON.stringify({ type: "error", error: "roomId is required" }));
+            return;
+          }
           const nextTeamDir = await getTeamWorkspaceDir(nextTeamId);
           const r2 = resolveRoomFile(nextTeamDir, nextRoomId);
           if (!r2.ok) {
@@ -369,6 +384,10 @@ async function startKitchen(api: OpenClawPluginApi, cfg: KitchenConfig) {
           const postTeamId = String(obj.teamId || teamId).trim();
           const postRoomId = String(obj.roomId || roomId).trim();
           const text = String(obj.text || "");
+          if (!text.trim()) {
+            ws.send(JSON.stringify({ type: "error", error: "text is required" }));
+            return;
+          }
           const author = obj.author && typeof obj.author === "object" ? (obj.author as Record<string, unknown>) : {};
 
           const postTeamDir = await getTeamWorkspaceDir(postTeamId);
