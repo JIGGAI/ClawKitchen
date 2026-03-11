@@ -14,6 +14,11 @@ type ChatMessage = {
   text: string;
 };
 
+function mergeChatMessages(current: ChatMessage[], incoming: ChatMessage): ChatMessage[] {
+  if (current.some((message) => message.id === incoming.id)) return current;
+  return [...current, incoming].sort((a, b) => a.ts.localeCompare(b.ts));
+}
+
 export function TeamChatTab({ teamId }: { teamId: string }) {
   const [rooms, setRooms] = useState<ChatRoom[]>([]);
   const [activeRoomId, setActiveRoomId] = useState<string>("team");
@@ -23,6 +28,7 @@ export function TeamChatTab({ teamId }: { teamId: string }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState<string>("");
   const [posting, setPosting] = useState(false);
+  const [wsConnected, setWsConnected] = useState(false);
 
   const activeRoom = useMemo(
     () => rooms.find((r) => r.roomId === activeRoomId) ?? { roomId: activeRoomId, label: activeRoomId },
@@ -75,7 +81,57 @@ export function TeamChatTab({ teamId }: { teamId: string }) {
 
   useEffect(() => {
     void loadHistory(activeRoomId);
-  }, [activeRoomId]);
+  }, [activeRoomId, teamId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    let closedByEffect = false;
+    setWsConnected(false);
+
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const ws = new WebSocket(
+      `${protocol}//${window.location.host}/ws/chat?teamId=${encodeURIComponent(teamId)}&roomId=${encodeURIComponent(activeRoomId)}`
+    );
+
+    ws.addEventListener("open", () => {
+      if (closedByEffect) return;
+      setWsConnected(true);
+    });
+
+    ws.addEventListener("message", (event) => {
+      try {
+        const payload = JSON.parse(String(event.data ?? "")) as
+          | { type?: string; error?: string }
+          | { type?: string; message?: ChatMessage };
+
+        if (payload.type === "error") {
+          setError(payload.error ? String(payload.error) : "WebSocket error");
+          return;
+        }
+
+        if (payload.type === "chat_message" && payload.message && payload.message.roomId === activeRoomId) {
+          setMessages((current) => mergeChatMessages(current, payload.message as ChatMessage));
+        }
+      } catch {
+        setError("Invalid websocket payload");
+      }
+    });
+
+    ws.addEventListener("error", () => {
+      if (!closedByEffect) setWsConnected(false);
+    });
+
+    ws.addEventListener("close", () => {
+      if (!closedByEffect) setWsConnected(false);
+    });
+
+    return () => {
+      closedByEffect = true;
+      setWsConnected(false);
+      ws.close();
+    };
+  }, [activeRoomId, teamId]);
 
   async function onPost() {
     const text = draft.trim();
@@ -89,7 +145,7 @@ export function TeamChatTab({ teamId }: { teamId: string }) {
         body: JSON.stringify({ teamId, roomId: activeRoomId, text }),
       });
       setDraft("");
-      await loadHistory(activeRoomId);
+      if (!wsConnected) await loadHistory(activeRoomId);
     } catch (e: unknown) {
       setError(errorMessage(e));
     } finally {
@@ -101,26 +157,31 @@ export function TeamChatTab({ teamId }: { teamId: string }) {
     <div className="mt-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="text-sm font-semibold text-[color:var(--ck-text-primary)]">Chat (MVP)</div>
+          <div className="text-sm font-semibold text-[color:var(--ck-text-primary)]">Chat</div>
           <div className="text-xs text-[color:var(--ck-text-tertiary)]">
-            File-first JSONL logs. Websocket streaming + agent poke will land next.
+            File-first JSONL logs with live websocket updates for team and role rooms.
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-[color:var(--ck-text-secondary)]">Room</label>
-          <select
-            value={activeRoomId}
-            onChange={(e) => setActiveRoomId(e.target.value)}
-            className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 text-sm text-[color:var(--ck-text-primary)]"
-            disabled={loadingRooms}
-          >
-            {(rooms.length ? rooms : [{ roomId: "team", label: "Team" }]).map((r) => (
-              <option key={r.roomId} value={r.roomId}>
-                {r.label}
-              </option>
-            ))}
-          </select>
+        <div className="flex items-center gap-3">
+          <div className={`text-xs ${wsConnected ? "text-emerald-300" : "text-[color:var(--ck-text-tertiary)]"}`}>
+            {wsConnected ? "Live updates on" : "Live updates reconnecting…"}
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-[color:var(--ck-text-secondary)]">Room</label>
+            <select
+              value={activeRoomId}
+              onChange={(e) => setActiveRoomId(e.target.value)}
+              className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 text-sm text-[color:var(--ck-text-primary)]"
+              disabled={loadingRooms}
+            >
+              {(rooms.length ? rooms : [{ roomId: "team", label: "Team" }]).map((r) => (
+                <option key={r.roomId} value={r.roomId}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -142,7 +203,7 @@ export function TeamChatTab({ teamId }: { teamId: string }) {
                 <div key={m.id} className="text-sm">
                   <div className="flex items-baseline justify-between gap-4">
                     <div className="text-xs text-[color:var(--ck-text-tertiary)]">
-                      {m.author?.kind}:{m.author?.id}
+                      {m.author?.label || `${m.author?.kind}:${m.author?.id}`}
                     </div>
                     <div className="text-xs text-[color:var(--ck-text-tertiary)]">{new Date(m.ts).toLocaleString()}</div>
                   </div>
