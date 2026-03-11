@@ -5,6 +5,23 @@ export type PluginListEntry = {
   enabled?: unknown;
 };
 
+function extractPluginEntries(raw: unknown): PluginListEntry[] {
+  if (Array.isArray(raw)) return raw as PluginListEntry[];
+  if (raw && typeof raw === "object" && Array.isArray((raw as { plugins?: unknown }).plugins)) {
+    return (raw as { plugins: PluginListEntry[] }).plugins;
+  }
+  return [];
+}
+
+export function parseEnabledPluginIds(stdout: string): string[] {
+  const parsed = JSON.parse(stdout) as unknown;
+  const items = extractPluginEntries(parsed);
+  return items
+    .filter((p) => Boolean(p) && typeof p === "object" && (p as { enabled?: unknown }).enabled === true)
+    .map((p) => String(p.id ?? ""))
+    .filter(Boolean);
+}
+
 export async function getEnabledPluginIds(): Promise<{ ok: true; ids: string[] } | { ok: false; error: string }> {
   const res = await runOpenClaw(["plugins", "list", "--json", "--verbose"]);
   if (!res.ok) {
@@ -13,14 +30,7 @@ export async function getEnabledPluginIds(): Promise<{ ok: true; ids: string[] }
   }
 
   try {
-    const items = JSON.parse(res.stdout) as PluginListEntry[];
-    const ids = Array.isArray(items)
-      ? items
-          .filter((p) => Boolean(p) && typeof p === "object" && (p as { enabled?: unknown }).enabled === true)
-          .map((p) => String(p.id ?? ""))
-          .filter(Boolean)
-      : [];
-    return { ok: true, ids };
+    return { ok: true, ids: parseEnabledPluginIds(res.stdout) };
   } catch {
     return { ok: false, error: "Failed to parse openclaw plugins list output" };
   }
