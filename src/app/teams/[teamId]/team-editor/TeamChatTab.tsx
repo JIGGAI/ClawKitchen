@@ -101,17 +101,21 @@ export function TeamChatTab({ teamId }: { teamId: string }) {
 
     ws.addEventListener("message", (event) => {
       try {
-        const payload = JSON.parse(String(event.data ?? "")) as
-          | { type?: string; error?: string }
-          | { type?: string; message?: ChatMessage };
+        const payload = JSON.parse(String(event.data ?? "")) as {
+          type?: string;
+          error?: unknown;
+          message?: unknown;
+        };
 
         if (payload.type === "error") {
-          setError(payload.error ? String(payload.error) : "WebSocket error");
+          setError(typeof payload.error === "string" ? payload.error : "WebSocket error");
           return;
         }
 
-        if (payload.type === "chat_message" && payload.message && payload.message.roomId === activeRoomId) {
-          setMessages((current) => mergeChatMessages(current, payload.message as ChatMessage));
+        if (payload.type === "chat_message") {
+          const msg = payload.message as ChatMessage | undefined;
+          if (!msg || msg.roomId !== activeRoomId) return;
+          setMessages((current) => mergeChatMessages(current, msg));
         }
       } catch {
         setError("Invalid websocket payload");
