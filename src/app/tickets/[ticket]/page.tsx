@@ -35,6 +35,7 @@ export default async function TicketDetailPage({
       ticketId={data.id}
       file={data.file}
       markdown={data.markdown}
+      stage={data.stage}
       currentOwner={data.owner}
     />
   );

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { unstable_noStore as noStore } from "next/cache";
 
 import { getTeamDisplayName } from "@/lib/recipes";
+import { isPluginEnabled } from "@/lib/plugins";
 import WorkflowsClient from "./workflows-client";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +35,7 @@ export default async function WorkflowsPage({
         </div>
       </div>
 
-      <WorkflowsClient teamId={teamId} />
+      <WorkflowsClient teamId={teamId} llmTaskEnabled={await isPluginEnabled("llm-task")} />
     </div>
   );
 }
