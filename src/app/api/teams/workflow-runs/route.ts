@@ -508,10 +508,30 @@ export async function POST(req: Request) {
       ]);
       if (!enqueueRes.ok) throw new Error(enqueueRes.stderr || enqueueRes.stdout || "Failed to enqueue workflow run");
 
-      const enqueueJson = JSON.parse(String(enqueueRes.stdout ?? "{}")) as { ok?: boolean; runId?: string; runLogPath?: string };
-      const enqRunId = String(enqueueJson.runId ?? "").trim();
-      const runLogPath = String(enqueueJson.runLogPath ?? "").trim();
-      if (!enqRunId) throw new Error("Enqueue succeeded but did not return runId");
+      const enqueueJson = JSON.parse(String(enqueueRes.stdout ?? "{}")) as {
+              ok?: boolean;
+              runId?: string;
+              runLogPath?: string;
+              path?: string;
+            };
+            
+            const rawRunId = String(enqueueJson.runId ?? "").trim();
+            const runLogPath = String(enqueueJson.runLogPath ?? enqueueJson.path ?? "").trim();
+            if (!rawRunId && !runLogPath) throw new Error("Enqueue succeeded but did not return runId");
+            
+            const canonicalRunId = (() => {
+              const p = runLogPath;
+              if (p) {
+                const m1 = p.match(/workflow-runs\/([^/]+)\/run\.json$/);
+                if (m1?.[1]) return m1[1];
+                const m2 = p.match(/workflow-runs\/([^/]+)\.run\.json$/);
+                if (m2?.[1]) return m2[1];
+              }
+              return rawRunId;
+            })();
+            if (!canonicalRunId) throw new Error("Enqueue succeeded but did not return runId");
+            
+            const enqRunId = canonicalRunId;
 
       if (modeNorm === "run_now") {
         const agentListRes = await runOpenClaw(["agents", "list", "--json"]);
@@ -823,10 +843,26 @@ export async function POST(req: Request) {
               ok?: boolean;
               runId?: string;
               runLogPath?: string;
+              path?: string;
             };
-            const enqRunId = String(enqueueJson.runId ?? "").trim();
-            const runLogPath = String(enqueueJson.runLogPath ?? "").trim();
-            if (!enqRunId) throw new Error("Enqueue succeeded but did not return runId");
+            
+            const rawRunId = String(enqueueJson.runId ?? "").trim();
+            const runLogPath = String(enqueueJson.runLogPath ?? enqueueJson.path ?? "").trim();
+            if (!rawRunId && !runLogPath) throw new Error("Enqueue succeeded but did not return runId");
+            
+            const canonicalRunId = (() => {
+              const p = runLogPath;
+              if (p) {
+                const m1 = p.match(/workflow-runs\/([^/]+)\/run\.json$/);
+                if (m1?.[1]) return m1[1];
+                const m2 = p.match(/workflow-runs\/([^/]+)\.run\.json$/);
+                if (m2?.[1]) return m2[1];
+              }
+              return rawRunId;
+            })();
+            if (!canonicalRunId) throw new Error("Enqueue succeeded but did not return runId");
+            
+            const enqRunId = canonicalRunId;
 
             if (modeNorm === "run_now") {
               // Run now = enqueue + runner + workers.
