@@ -19,7 +19,18 @@ function cronName(teamId: string, agentId: string) {
 }
 
 function buildWorkerMessage(teamId: string, agentId: string) {
-  return `Workflow worker tick: pull + execute pending workflow tasks for this agent.\n\nCommand:\n  openclaw recipes workflows worker-tick --team-id ${teamId} --agent-id ${agentId} --limit 5 --worker-id cron\n`;
+  return [
+    "Run exactly one shell command using the exec tool. Do not use the process tool.",
+    "",
+    "Command:",
+    `openclaw recipes workflows worker-tick --team-id ${teamId} --agent-id ${agentId} --limit 5 --worker-id cron`,
+    "",
+    "Rules:",
+    "1) Execute the command with exec.",
+    "2) Wait for completion.",
+    "3) If the command reports no work, reply exactly NO_REPLY.",
+    "4) Otherwise reply with a one-line summary or a short error.",
+  ].join("\n");
 }
 
 async function getAgentWorkspace(agentId: string): Promise<string> {
@@ -91,14 +102,18 @@ async function installWorkerCron(teamId: string, agentId: string): Promise<{
 
   const mapping = await readMapping(mappingPath);
   const existing = mapping.entries[key];
-  if (existing && existing.installedCronId && !existing.orphaned) {
-    await runOpenClaw(["cron", "enable", String(existing.installedCronId)]);
-    return { alreadyInstalled: true, installedCronId: String(existing.installedCronId), mappingPath, key };
-  }
 
   const name = cronName(teamId, agentId);
   const description = "Workflow worker cron (Kitchen)";
   const message = buildWorkerMessage(teamId, agentId);
+
+  // Reconcile must refresh stale cron payloads/delivery, not just re-enable whatever id is recorded.
+  if (existing && existing.installedCronId && !existing.orphaned) {
+    const oldId = String(existing.installedCronId).trim();
+    if (oldId) {
+      await runOpenClaw(["cron", "rm", oldId]);
+    }
+  }
 
   const add = await runOpenClaw([
     "cron",
@@ -113,6 +128,8 @@ async function installWorkerCron(teamId: string, agentId: string): Promise<{
     description,
     "--message",
     message,
+    "--delivery",
+    "none",
     "--json",
   ]);
   if (!add.ok) throw new Error(add.stderr || add.stdout || "Failed to add cron");
@@ -126,7 +143,7 @@ async function installWorkerCron(teamId: string, agentId: string): Promise<{
   mapping.entries[key] = { installedCronId };
   await writeMapping(mappingPath, mapping);
 
-  return { alreadyInstalled: false, installedCronId, mappingPath, key };
+  return { alreadyInstalled: Boolean(existing && existing.installedCronId && !existing.orphaned), installedCronId, mappingPath, key };
 }
 
 export async function POST(req: Request) {

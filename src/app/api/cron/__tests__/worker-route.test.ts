@@ -20,6 +20,9 @@ const runOpenClawMock = vi.fn(async (args: string[]) => {
   if (cmd.startsWith("cron add")) {
     return { ok: true, stdout: JSON.stringify({ job: { id: "cron-123" } }), stderr: "" };
   }
+  if (cmd.startsWith("cron rm")) {
+    return { ok: true, stdout: "", stderr: "" };
+  }
   if (cmd.startsWith("cron enable")) {
     return { ok: true, stdout: "", stderr: "" };
   }
@@ -71,6 +74,35 @@ describe("/api/cron/worker POST", () => {
     const mappingRaw = await fs.readFile(path.join(AGENT_WS, "notes", "cron-jobs.json"), "utf8");
     const mapping = JSON.parse(mappingRaw) as { version: number; entries: Record<string, { installedCronId: string }> };
     expect(mapping.version).toBe(1);
+    expect(mapping.entries["workflow-worker:claw-marketing-team:claw-marketing-team-writer"].installedCronId).toBe("cron-123");
+  });
+
+  it("reinstalling an existing worker cron replaces stale tracked jobs and uses silent delivery", async () => {
+    await fs.mkdir(path.join(AGENT_WS, "notes"), { recursive: true });
+    await fs.writeFile(
+      path.join(AGENT_WS, "notes", "cron-jobs.json"),
+      JSON.stringify({ version: 1, entries: { "workflow-worker:claw-marketing-team:claw-marketing-team-writer": { installedCronId: "cron-old" } } }, null, 2),
+      "utf8"
+    );
+
+    const { POST } = await import("../worker/route");
+    const res = await POST(
+      new Request("http://localhost/api/cron/worker", {
+        method: "POST",
+        body: JSON.stringify({ action: "install", teamId: "claw-marketing-team", agentId: "claw-marketing-team-writer" }),
+      })
+    );
+
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { ok: boolean; installedCronId: string; alreadyInstalled: boolean };
+    expect(json.ok).toBe(true);
+    expect(json.alreadyInstalled).toBe(true);
+    expect(json.installedCronId).toBe("cron-123");
+    expect(runOpenClawMock).toHaveBeenCalledWith(["cron", "rm", "cron-old"]);
+    expect(runOpenClawMock).toHaveBeenCalledWith(expect.arrayContaining(["cron", "add", "--delivery", "none"]));
+
+    const mappingRaw = await fs.readFile(path.join(AGENT_WS, "notes", "cron-jobs.json"), "utf8");
+    const mapping = JSON.parse(mappingRaw) as { entries: Record<string, { installedCronId: string }> };
     expect(mapping.entries["workflow-worker:claw-marketing-team:claw-marketing-team-writer"].installedCronId).toBe("cron-123");
   });
 
