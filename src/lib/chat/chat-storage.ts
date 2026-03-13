@@ -38,6 +38,7 @@ export async function listChatRooms(teamDir: string): Promise<{ ok: true; rooms:
 
   const team = resolveRoomFile(teamDir, "team");
   if (!team.ok) return team;
+  await ensureChatFile(team.file);
   rooms.push({ roomId: "team", label: "Team", file: team.file });
 
   const rolesDir = path.join(teamDir, "roles");
@@ -51,6 +52,7 @@ export async function listChatRooms(teamDir: string): Promise<{ ok: true; rooms:
       const rid = `role:${role}`;
       const rr = resolveRoomFile(teamDir, rid);
       if (!rr.ok) continue;
+      await ensureChatFile(rr.file);
       rooms.push({ roomId: rid, label: `Role: ${role}`, file: rr.file });
     }
   } catch {

@@ -41,6 +41,11 @@ describe("lib/chat chat-storage", () => {
     if (!r.ok) return;
 
     expect(r.rooms.map((x) => x.roomId)).toEqual(["team", "role:dev", "role:qa"]);
+
+    // listChatRooms should ensure canonical chat files exist (scaffold behavior)
+    await expect(fs.stat(path.join(teamDir, "shared-context", "chat", "team.jsonl"))).resolves.toBeTruthy();
+    await expect(fs.stat(path.join(teamDir, "roles", "dev", "chat.jsonl"))).resolves.toBeTruthy();
+    await expect(fs.stat(path.join(teamDir, "roles", "qa", "chat.jsonl"))).resolves.toBeTruthy();
   });
 
   it("appendChatMessage writes jsonl and readChatHistory returns tail", async () => {
