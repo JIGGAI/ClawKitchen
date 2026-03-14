@@ -72,9 +72,9 @@ openclaw gateway restart
 ## Workflows: experimental + `llm-task` enablement
 
 - **Workflows are experimental** and the schema/runner behavior may change. If you rely on workflows in production, pin versions and expect breaking changes.
-- Workflow **LLM nodes** require the built-in optional plugin **`llm-task`** to be enabled.
-
-Enable it with:
+- Workflow **LLM nodes** require the optional built-in plugin **`llm-task`**.
+- **Preferred setup:** if OpenClaw shows an install/setup prompt for `llm-task`, confirm it there.
+- **Fallback:** if you already skipped the prompt or are doing setup later, enable it manually:
 
 ```bash
 openclaw plugins enable llm-task
