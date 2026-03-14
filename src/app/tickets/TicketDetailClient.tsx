@@ -172,7 +172,14 @@ export function TicketDetailClient(props: {
                   className="rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] bg-black/10 p-3"
                 >
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <div className="text-xs font-medium text-[color:var(--ck-text-primary)]">{c.author}</div>
+                    <div className="flex flex-wrap items-baseline gap-2">
+                      <div className="text-xs font-medium text-[color:var(--ck-text-primary)]">{c.authorName}</div>
+                      {c.authorRole ? (
+                        <div className="rounded border border-[color:var(--ck-border-subtle)] bg-black/10 px-1.5 py-0.5 text-[10px] font-medium text-[color:var(--ck-text-tertiary)]">
+                          {c.authorRole}
+                        </div>
+                      ) : null}
+                    </div>
                     <div className="text-xs text-[color:var(--ck-text-tertiary)]">{c.timestamp}</div>
                   </div>
                   <div className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-[color:var(--ck-text-secondary)]">

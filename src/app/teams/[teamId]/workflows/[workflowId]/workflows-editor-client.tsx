@@ -163,21 +163,26 @@ export default function WorkflowsEditorClient({
     const channel = String(match.channel ?? "").trim();
     if (!channel) return null;
 
+    const bindingAgentId = String(b.agentId ?? "").trim();
     const accountId = String(match.accountId ?? "").trim();
-    if (accountId) {
-      const id = `${channel}:account:${accountId}`;
-      return { id, label: `${channel} · account:${accountId}`, channel, target: accountId };
-    }
-
     const peer = isRecord(match.peer) ? match.peer : null;
     const kind = peer ? String(peer.kind ?? "").trim() : "";
     const peerId = peer ? String(peer.id ?? "").trim() : "";
-    if (kind && peerId) {
-      const id = `${channel}:${kind}:${peerId}`;
-      return { id, label: `${channel} · ${kind}:${peerId}`, channel, target: peerId };
-    }
+    const target = peerId || accountId;
 
-    return null;
+    if (!target) return null;
+
+    // approvalBindingId must be the actual config binding id (agentId) when available.
+    // Older Kitchen builds synthesized ids like telegram:dm:<peer> or telegram:account:<id>,
+    // which can be ambiguous and break approval resolution when multiple bindings share a peer.
+    const id = bindingAgentId || (accountId ? `${channel}:account:${accountId}` : `${channel}:${kind}:${peerId}`);
+
+    const parts = [channel];
+    if (bindingAgentId) parts.push(bindingAgentId);
+    if (accountId) parts.push(`account:${accountId}`);
+    if (kind && peerId) parts.push(`${kind}:${peerId}`);
+
+    return { id, label: parts.join(" · "), channel, target };
   }
 
   useEffect(() => {
@@ -1267,9 +1272,40 @@ export default function WorkflowsEditorClient({
                                   approvalProvider: selected.channel,
                                   approvalTarget: selected.target,
                                 },
+                                nodes: wf.nodes.map((n) =>
+                                  n.type === "human_approval"
+                                    ? {
+                                        ...n,
+                                        config: {
+                                          ...((n.config && typeof n.config === "object" && !Array.isArray(n.config)
+                                            ? n.config
+                                            : {}) as Record<string, unknown>),
+                                          approvalBindingId: selected.id,
+                                          provider: selected.channel,
+                                          target: selected.target,
+                                        },
+                                      }
+                                    : n
+                                ),
                               });
                             } else {
-                              setWorkflow({ ...wf, meta: { ...meta, approvalBindingId: "" } });
+                              setWorkflow({
+                                ...wf,
+                                meta: { ...meta, approvalBindingId: "" },
+                                nodes: wf.nodes.map((n) =>
+                                  n.type === "human_approval"
+                                    ? {
+                                        ...n,
+                                        config: {
+                                          ...((n.config && typeof n.config === "object" && !Array.isArray(n.config)
+                                            ? n.config
+                                            : {}) as Record<string, unknown>),
+                                          approvalBindingId: "",
+                                        },
+                                      }
+                                    : n
+                                ),
+                              });
                             }
                           }}
                           className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
@@ -1304,7 +1340,24 @@ export default function WorkflowsEditorClient({
                               value={approvalProvider}
                               onChange={(e) => {
                                 const nextProvider = String(e.target.value || "").trim() || "telegram";
-                                setWorkflow({ ...wf, meta: { ...meta, approvalBindingId: "", approvalProvider: nextProvider } });
+                                setWorkflow({
+                                  ...wf,
+                                  meta: { ...meta, approvalBindingId: "", approvalProvider: nextProvider },
+                                  nodes: wf.nodes.map((n) =>
+                                    n.type === "human_approval"
+                                      ? {
+                                          ...n,
+                                          config: {
+                                            ...((n.config && typeof n.config === "object" && !Array.isArray(n.config)
+                                              ? n.config
+                                              : {}) as Record<string, unknown>),
+                                            approvalBindingId: "",
+                                            provider: nextProvider,
+                                          },
+                                        }
+                                      : n
+                                  ),
+                                });
                               }}
                               className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                               placeholder="telegram"
@@ -1317,7 +1370,24 @@ export default function WorkflowsEditorClient({
                               value={approvalTarget}
                               onChange={(e) => {
                                 const nextTarget = String(e.target.value || "").trim();
-                                setWorkflow({ ...wf, meta: { ...meta, approvalBindingId: "", approvalTarget: nextTarget } });
+                                setWorkflow({
+                                  ...wf,
+                                  meta: { ...meta, approvalBindingId: "", approvalTarget: nextTarget },
+                                  nodes: wf.nodes.map((n) =>
+                                    n.type === "human_approval"
+                                      ? {
+                                          ...n,
+                                          config: {
+                                            ...((n.config && typeof n.config === "object" && !Array.isArray(n.config)
+                                              ? n.config
+                                              : {}) as Record<string, unknown>),
+                                            approvalBindingId: "",
+                                            target: nextTarget,
+                                          },
+                                        }
+                                      : n
+                                  ),
+                                });
                               }}
                               className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                               placeholder="(e.g. Telegram chat id)"

@@ -1,26 +1,31 @@
-# ClawKitchen QA Auth (headless-friendly)
+# QA / auth
 
-ClawKitchen can optionally be protected by HTTP Basic auth when binding to a non-localhost host (e.g. Tailscale IP).
+## What this is for
 
-For automated/headless QA (Playwright, etc.), HTTP Basic auth prompts can be awkward.
-ClawKitchen supports an **optional QA-only bootstrap token** that sets a short-lived session cookie.
+ClawKitchen can be protected by HTTP Basic auth when it is bound to a non-localhost host such as a Tailscale or LAN-accessible address.
+
+That is sensible for remote access, but it can make automated QA and browser tooling awkward.
+
+To make testing easier, ClawKitchen supports an optional **QA-only bootstrap token** flow that seeds a short-lived session cookie.
 
 ## How it works
 
 If `qaToken` is configured:
 
-1. Visit any Kitchen URL with `?qaToken=<token>` once.
-2. Kitchen sets an HttpOnly cookie `kitchenQaToken` (15 minutes) and **redirects** to the same URL with `qaToken` removed.
-3. Subsequent requests include the cookie and are authorized without triggering the Basic auth prompt.
+1. visit any Kitchen URL with `?qaToken=<token>` once
+2. Kitchen sets an HttpOnly cookie named `kitchenQaToken`
+3. Kitchen redirects back to the same URL with `qaToken` removed
+4. subsequent requests use the cookie instead of triggering the normal Basic auth prompt
 
-Notes:
-- This is **disabled by default**.
-- The cookie lifetime is **15 minutes**.
-- Intended for **dev/QA only**.
+## Important notes
 
-## Configure
+- this is **disabled by default**
+- the cookie lifetime is short-lived (about 15 minutes)
+- it is intended for **dev and QA**, not broad production exposure
 
-Set `qaToken` in the Kitchen plugin config (alongside `authToken`). Example:
+## Example config
+
+Set `qaToken` in the Kitchen plugin config alongside `authToken`:
 
 ```json
 {
@@ -34,29 +39,29 @@ Set `qaToken` in the Kitchen plugin config (alongside `authToken`). Example:
 }
 ```
 
-## Use (curl)
+## Example usage
 
-```bash
-# First request seeds cookie (note: follow redirect and store cookies)
-curl -i -c cookies.txt 'http://HOST:PORT/tickets?qaToken=YOUR_QA_TOKEN'
+Open a page once like this:
 
-# Subsequent request uses cookie
-curl -i -b cookies.txt 'http://HOST:PORT/tickets'
-```
-
-## Use (Playwright)
-
-Navigate once to:
-
-```
+```text
 http://HOST:PORT/tickets?qaToken=YOUR_QA_TOKEN
 ```
 
-Then proceed normally; the cookie is set for ~15 minutes.
+After that redirect, the browser should be authorized for a short period without another prompt.
+
+## Why this matters
+
+This is especially useful for:
+
+- screenshot capture
+- Playwright/browser automation
+- headless testing
+- temporary QA access without fighting a Basic auth prompt on every run
 
 ## Troubleshooting
 
-If you still get `401 Unauthorized` with `WWW-Authenticate: Basic`:
+If you still get `401 Unauthorized` and a Basic auth challenge:
 
-- Verify `qaToken` is actually configured in the running Kitchen instance.
-- Ensure you are hitting the Kitchen server directly (not a separate reverse proxy applying Basic auth *before* Kitchen can read the query params).
+- verify `qaToken` is actually configured in the running Kitchen instance
+- make sure you are hitting Kitchen directly, not a separate proxy applying auth before Kitchen sees the request
+- verify you are using the same host/path scope that the cookie is expected to cover
