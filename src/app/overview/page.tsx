@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { unstable_noStore as noStore } from "next/cache";
 
+import { execFileAsync } from "@/lib/exec";
 import { runOpenClaw } from "@/lib/openclaw";
 import { listRecipes } from "@/lib/recipes";
 
@@ -60,6 +61,80 @@ async function getActiveSessions(minutes: number): Promise<SessionListItem[]> {
   return Array.isArray(parsed.sessions) ? parsed.sessions : [];
 }
 
+type GatewayStatusSummary = {
+  ok: boolean;
+  statusLabel: string;
+  configOk: boolean;
+  rpcOk: boolean;
+  portStatus?: string;
+};
+
+
+type GatewayStatusJson = {
+  service?: {
+    runtime?: { status?: string; state?: string };
+    configAudit?: { ok?: boolean };
+  };
+  rpc?: { ok?: boolean };
+  port?: { status?: string };
+};
+
+async function getGatewayStatusSummary(): Promise<GatewayStatusSummary> {
+  const res = await runOpenClaw(["gateway", "status", "--json"]);
+  if (!res.ok) {
+    return {
+      ok: false,
+      statusLabel: "unknown",
+      configOk: false,
+      rpcOk: false,
+    };
+  }
+
+  const parsed = JSON.parse(res.stdout) as GatewayStatusJson;
+  const runtimeStatus = String(parsed?.service?.runtime?.status ?? "unknown");
+  const runtimeState = String(parsed?.service?.runtime?.state ?? "unknown");
+  const configOk = Boolean(parsed?.service?.configAudit?.ok);
+  const rpcOk = Boolean(parsed?.rpc?.ok);
+  const portStatus = String(parsed?.port?.status ?? "unknown");
+
+  const running = runtimeStatus === "running" && runtimeState === "active";
+  const ok = running && configOk && rpcOk;
+
+  return {
+    ok,
+    statusLabel: running ? "running" : runtimeStatus,
+    configOk,
+    rpcOk,
+    portStatus,
+  };
+}
+
+let cachedGatewayErrCount: { ts: number; value: number | null } = { ts: 0, value: null };
+
+async function getGatewayErrorsLast24h(): Promise<number | null> {
+  // journalctl can be expensive; cache for 60s per server instance.
+  const now = Date.now();
+  if (now - cachedGatewayErrCount.ts < 60_000) return cachedGatewayErrCount.value;
+
+  try {
+    const { stdout } = await execFileAsync(
+      "bash",
+      [
+        "-lc",
+        "journalctl --user -u openclaw-gateway --since '24 hours ago' -p err --no-pager 2>/dev/null | wc -l",
+      ],
+      { encoding: "utf8", timeout: 5_000 },
+    );
+    const n = Number(String(stdout).trim());
+    const value = Number.isFinite(n) ? n : null;
+    cachedGatewayErrCount = { ts: now, value };
+    return value;
+  } catch {
+    cachedGatewayErrCount = { ts: now, value: null };
+    return null;
+  }
+}
+
 function formatAgeMs(ms: number | undefined) {
   if (ms == null) return "";
   const s = Math.round(ms / 1000);
@@ -71,10 +146,7 @@ function formatAgeMs(ms: number | undefined) {
 }
 
 function displayNameForTeam(teamId: string, teamNames: Record<string, string>) {
-  const fallback = teamId
-    .replace(/[-_]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  const fallback = teamId.replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
   return teamNames[teamId] || fallback || teamId;
 }
 
@@ -90,10 +162,13 @@ export default async function OverviewPage({
   const team = (Array.isArray(teamRaw) ? teamRaw[0] : teamRaw) || "";
   const teamFilter = team.trim();
 
-  const [agents, sessions60, { teamNames }] = await Promise.all([
+  const [agents, sessions60, sessions5, { teamNames }, gateway, gatewayErr24h] = await Promise.all([
     getAgents(),
     getActiveSessions(60),
+    getActiveSessions(5),
     getTeamsFromRecipes(),
+    getGatewayStatusSummary(),
+    getGatewayErrorsLast24h(),
   ]);
 
   const agentsById = new Map(agents.map((a) => [a.id, a] as const));
@@ -105,11 +180,19 @@ export default async function OverviewPage({
     return t === teamFilter;
   });
 
+  const sessions5Filtered = sessions5.filter((s) => {
+    if (!teamFilter) return true;
+    const a = agentsById.get(s.agentId);
+    const t = inferTeamIdFromWorkspace(a?.workspace ?? null);
+    return t === teamFilter;
+  });
+
   const installedAgents = teamFilter
     ? agents.filter((a) => inferTeamIdFromWorkspace(a.workspace ?? null) === teamFilter)
     : agents;
 
   const activeSessions = sessionsFiltered.length;
+  const tasksRunning = sessions5Filtered.length;
 
   const kpi = [
     {
@@ -124,20 +207,17 @@ export default async function OverviewPage({
     },
     {
       label: "Tasks Running",
-      value: "—",
-      note: "not wired yet",
+      value: String(tasksRunning),
+      note: "active sessions (last 5m)",
     },
     {
       label: "Errors (24h)",
-      value: "—",
-      note: "not wired yet",
+      value: gatewayErr24h == null ? "—" : String(gatewayErr24h),
+      note: "gateway journalctl -p err",
     },
   ];
 
-  const sessionsPreview = sessionsFiltered
-    .slice()
-    .sort((a, b) => b.updatedAt - a.updatedAt)
-    .slice(0, 8);
+  const sessionsPreview = sessionsFiltered.slice().sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 8);
 
   return (
     <div className="ck-glass w-full p-6 sm:p-8">
@@ -166,7 +246,9 @@ export default async function OverviewPage({
         {kpi.map((t) => (
           <div key={t.label} className="ck-glass px-4 py-3">
             <div className="text-xs text-[color:var(--ck-text-secondary)]">{t.label}</div>
-            <div className="mt-1 text-2xl font-semibold tracking-tight text-[color:var(--ck-text-primary)]">{t.value}</div>
+            <div className="mt-1 text-2xl font-semibold tracking-tight text-[color:var(--ck-text-primary)]">
+              {t.value}
+            </div>
             <div className="mt-1 text-xs text-[color:var(--ck-text-tertiary)]">{t.note}</div>
           </div>
         ))}
@@ -175,11 +257,33 @@ export default async function OverviewPage({
       <div className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-12">
         <section className="ck-glass lg:col-span-4 px-4 py-3">
           <div className="text-sm font-semibold text-[color:var(--ck-text-primary)]">System Health</div>
-          <div className="mt-2 text-sm text-[color:var(--ck-text-secondary)]">
-            Gateway status and deeper health checks are not yet surfaced here.
+          <div className="mt-2 grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <div className="text-xs text-[color:var(--ck-text-tertiary)]">Gateway</div>
+              <div className="mt-1 font-medium text-[color:var(--ck-text-primary)]">
+                {gateway.statusLabel}
+                {!gateway.ok ? (
+                  <span className="ml-2 text-xs text-[color:var(--ck-text-secondary)]">(degraded)</span>
+                ) : null}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-[color:var(--ck-text-tertiary)]">RPC</div>
+              <div className="mt-1 font-medium text-[color:var(--ck-text-primary)]">{gateway.rpcOk ? "ok" : "not ok"}</div>
+            </div>
+            <div>
+              <div className="text-xs text-[color:var(--ck-text-tertiary)]">Config audit</div>
+              <div className="mt-1 font-medium text-[color:var(--ck-text-primary)]">
+                {gateway.configOk ? "ok" : "issues"}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-[color:var(--ck-text-tertiary)]">Port</div>
+              <div className="mt-1 font-medium text-[color:var(--ck-text-primary)]">{gateway.portStatus ?? "—"}</div>
+            </div>
           </div>
           <div className="mt-3 text-xs text-[color:var(--ck-text-tertiary)]">
-            Next step: wire <code>openclaw gateway status</code> + worker/cron heartbeat summaries.
+            Source: <code>openclaw gateway status --json</code>
           </div>
         </section>
 
