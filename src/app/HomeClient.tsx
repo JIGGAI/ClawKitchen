@@ -24,11 +24,12 @@ function normalizeTeamId(teamId: string) {
 export default function HomeClient({
   agents,
   teamNames,
+  appVersion,
 }: {
   agents: AgentListItem[];
   teamNames: Record<string, string>;
+  appVersion: string;
 }) {
-
   const selectedTeamId = useSelectedTeamId();
   const teamFilter = selectedTeamId || "all";
 
@@ -89,8 +90,8 @@ export default function HomeClient({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">
-            Claw Kitchen{" "}
-            <span className="text-sm align-middle text-[color:var(--ck-text-secondary)]">(v2)</span>
+            ClawKitchen{" "}
+            <span className="text-sm align-middle text-[color:var(--ck-text-secondary)]">({appVersion}-beta)</span>
           </h1>
           <p className="mt-2 max-w-prose text-[color:var(--ck-text-secondary)]">
             Installed agents on this machine, grouped by team workspace when available.
