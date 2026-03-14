@@ -1,5 +1,6 @@
 import { unstable_noStore as noStore } from "next/cache";
 import { type AgentListItem } from "@/lib/agents";
+import { APP_VERSION } from "@/lib/app-info";
 import { runOpenClaw } from "@/lib/openclaw";
 import { listRecipes } from "@/lib/recipes";
 import HomeClient from "./HomeClient";
@@ -29,5 +30,5 @@ export default async function Home() {
   noStore();
 
   const [agents, { teamNames }] = await Promise.all([getAgents(), getTeamsFromRecipes()]);
-  return <HomeClient agents={agents} teamNames={teamNames} />;
+  return <HomeClient agents={agents} teamNames={teamNames} appVersion={APP_VERSION} />;
 }
