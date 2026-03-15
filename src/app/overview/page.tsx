@@ -194,7 +194,11 @@ export default async function OverviewPage({
   const activeSessions = sessionsFiltered.length;
   const tasksRunning = sessions5Filtered.length;
 
-  const kpi = [
+  const tasksHref = teamFilter
+    ? `/overview/tasks?team=${encodeURIComponent(teamFilter)}`
+    : `/overview/tasks`;
+
+  const kpi: Array<{ label: string; value: string; note: string; href?: string }> = [
     {
       label: "Active Sessions (last 60m)",
       value: String(activeSessions),
@@ -209,6 +213,7 @@ export default async function OverviewPage({
       label: "Tasks Running",
       value: String(tasksRunning),
       note: "active sessions (last 5m)",
+      href: tasksHref,
     },
     {
       label: "Errors (24h)",
@@ -223,7 +228,7 @@ export default async function OverviewPage({
     <div className="ck-glass w-full p-6 sm:p-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Mission Control</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">Kitchen Sink</h1>
           <p className="mt-2 max-w-prose text-[color:var(--ck-text-secondary)]">
             A live overview of your OpenClaw system. Data is real when available; otherwise we show explicit unknowns.
           </p>
@@ -247,7 +252,17 @@ export default async function OverviewPage({
           <div key={t.label} className="ck-glass px-4 py-3">
             <div className="text-xs text-[color:var(--ck-text-secondary)]">{t.label}</div>
             <div className="mt-1 text-2xl font-semibold tracking-tight text-[color:var(--ck-text-primary)]">
-              {t.value}
+              {t.href ? (
+                <Link
+                  href={t.href}
+                  className="underline decoration-white/20 underline-offset-4 transition-colors hover:decoration-white/50"
+                  title="View details"
+                >
+                  {t.value}
+                </Link>
+              ) : (
+                t.value
+              )}
             </div>
             <div className="mt-1 text-xs text-[color:var(--ck-text-tertiary)]">{t.note}</div>
           </div>

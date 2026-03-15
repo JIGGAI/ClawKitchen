@@ -121,7 +121,7 @@ export default function HomeClient({
             href="/overview"
             className="text-sm font-medium text-[color:var(--ck-text-secondary)] transition-colors hover:text-[color:var(--ck-text-primary)]"
           >
-            Mission Control
+            Kitchen Sink
           </Link>
           <Link
             href="/channels"
