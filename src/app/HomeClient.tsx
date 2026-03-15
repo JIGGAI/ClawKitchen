@@ -116,6 +116,13 @@ export default function HomeClient({
           >
             Tickets
           </Link>
+
+          <Link
+            href="/overview"
+            className="text-sm font-medium text-[color:var(--ck-text-secondary)] transition-colors hover:text-[color:var(--ck-text-primary)]"
+          >
+            Kitchen Sink
+          </Link>
           <Link
             href="/channels"
             className="text-sm font-medium text-[color:var(--ck-text-secondary)] transition-colors hover:text-[color:var(--ck-text-primary)]"
