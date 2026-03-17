@@ -39,6 +39,17 @@ export async function getWorkspaceRecipesDir() {
 
 export async function getWorkspaceGoalsDir() {
   const ws = await getWorkspaceDir();
+
+  // Back-compat: some installs keep goals at <workspace>/goals.
+  // Prefer that when present, otherwise fall back to <workspace>/notes/goals.
+  const direct = path.join(ws, "goals");
+  try {
+    const st = await fs.stat(direct);
+    if (st.isDirectory()) return direct;
+  } catch {
+    // ignore
+  }
+
   return path.join(ws, "notes", "goals");
 }
 
