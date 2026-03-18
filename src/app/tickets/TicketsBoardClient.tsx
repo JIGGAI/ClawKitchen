@@ -206,8 +206,8 @@ export function TicketsBoardClient({
                   <Link
                     href={(() => {
                       const base = `${basePath}/${encodeURIComponent(t.id)}`;
-                      if (!selectedTeamId) return base;
-                      return `${base}?team=${encodeURIComponent(selectedTeamId)}`;
+                      const team = selectedTeamId || t.teamId;
+                      return team ? `${base}?team=${encodeURIComponent(team)}` : base;
                     })()}
                     prefetch={false}
                     className="block text-sm font-medium text-[color:var(--ck-text-primary)] hover:underline"
