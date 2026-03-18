@@ -17,8 +17,12 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
     const existing = await readGoal(goalId);
     if (!existing) return NextResponse.json({ error: "Goal not found" }, { status: 404 });
 
-    // 1) Create inbox item for development-team lead to scope
-    const teamId = "development-team";
+    // 1) Create inbox item for the goal's first team (or require ?team= param)
+    const teams = Array.isArray(existing.frontmatter.teams) ? existing.frontmatter.teams.filter((t: string) => t && t !== "main") : [];
+    const teamId = teams[0];
+    if (!teamId) {
+      return NextResponse.json({ error: "Goal has no team assigned. Add a team to the goal before promoting." }, { status: 400 });
+    }
     const teamWs = await getTeamWorkspaceDir(teamId);
     const inboxDir = path.join(teamWs, "inbox");
     await fs.mkdir(inboxDir, { recursive: true });
@@ -29,7 +33,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
     const filename = `${received.slice(0, 10)}-${received.slice(11, 16).replace(":", "")}-goal-${titlePart || goalId}.md`;
 
     const inboxBody = [
-      "# Inbox — development-team",
+      `# Inbox — ${teamId}`,
       "",
       `Received: ${received}`,
       "",
@@ -74,7 +78,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
     const cfg = await readOpenClawConfig();
     const enabled = cfg.tools?.agentToAgent?.enabled === true;
     const allow = cfg.tools?.agentToAgent?.allow ?? [];
-    const targetAgentId = "development-team-lead";
+    const targetAgentId = `${teamId}-lead`;
     const permitted = enabled && (allow.includes("*") || allow.includes(targetAgentId));
 
     let pingAttempted = false;
@@ -93,7 +97,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
           "--agent",
           targetAgentId,
           "--message",
-          `New goal promoted to development-team inbox: ${updated.frontmatter.title} (${goalId}). Inbox file: ${inboxPath}`,
+          `New goal promoted to ${teamId} inbox: ${updated.frontmatter.title} (${goalId}). Inbox file: ${inboxPath}`,
           "--timeout",
           "60",
           "--json",

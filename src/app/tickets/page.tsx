@@ -13,9 +13,12 @@ export default async function TicketsPage({
   const sp = await searchParams;
   const team = typeof sp.team === "string" ? sp.team.trim() : "";
 
-  // If no team is specified, fall back to legacy behavior.
-  // (AppShell will try to keep /tickets synced with the globally selected team via ?team=.)
-  const teamId = team || "development-team";
+  // AppShell keeps /tickets synced with the globally selected team via ?team=.
+  // If no team is specified, show an empty prompt instead of assuming a hardcoded team.
+  if (!team) {
+    return <TicketsBoardClient tickets={[]} basePath="/tickets" selectedTeamId={null} />;
+  }
+  const teamId = team;
 
   const scope = teamId === "main" ? await getWorkspaceDir() : teamId;
   const tickets = await listTickets(scope);

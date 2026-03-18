@@ -57,19 +57,26 @@ export async function POST(req: Request) {
   const body = (await req.json().catch(() => null)) as null | {
     ticket: string;
     assignee: string;
+    teamId?: string;
   };
 
   if (!body?.ticket || !body?.assignee) {
     return NextResponse.json({ error: "Missing ticket or assignee" }, { status: 400 });
   }
 
-  const ticket = await getTicketByIdOrNumber(body.ticket);
+  const teamId = String(body.teamId ?? "").trim();
+  if (!teamId) {
+    return NextResponse.json({ error: "Missing teamId" }, { status: 400 });
+  }
+
+  const teamDir = getTeamWorkspaceDir(teamId);
+  const ticket = await getTicketByIdOrNumber(body.ticket, teamId);
   if (!ticket) {
     return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
   }
 
   const assignee = body.assignee.trim();
-  const nextStage = await desiredStageForAssignee({ teamDir: getTeamWorkspaceDir(), assignee, currentStage: ticket.stage });
+  const nextStage = await desiredStageForAssignee({ teamDir, assignee, currentStage: ticket.stage });
 
   const currentMd = await fs.readFile(ticket.file, "utf8");
   let updatedMd = upsertField(currentMd, "Owner", assignee);
@@ -77,9 +84,9 @@ export async function POST(req: Request) {
   updatedMd = upsertField(updatedMd, "Status", nextStage);
 
   const filename = path.basename(ticket.file);
-  const nextPath = path.join(stageDir(nextStage), filename);
+  const nextPath = path.join(stageDir(nextStage, teamId), filename);
 
-  await ensureDir(stageDir(nextStage));
+  await ensureDir(stageDir(nextStage, teamId));
 
   if (ticket.file !== nextPath) {
     await fs.rename(ticket.file, nextPath);
@@ -89,6 +96,6 @@ export async function POST(req: Request) {
 
   // Assignment stubs are deprecated; do not create/update work/assignments/*.md.
 
-  const refreshed = (await listTickets()).find((t) => t.number === ticket.number);
+  const refreshed = (await listTickets(teamId)).find((t) => t.number === ticket.number);
   return NextResponse.json({ ok: true, ticket: refreshed ?? null });
 }
