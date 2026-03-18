@@ -1,9 +1,37 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NextResponse } from "next/server";
 
-vi.mock("@/lib/paths", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/paths")>();
-  return { ...actual, readOpenClawConfig: vi.fn() };
-});
+vi.mock("@/lib/paths", () => ({
+  readOpenClawConfig: vi.fn(),
+}));
+
+vi.mock("@/lib/api-route-helpers", () => ({
+  withTeamContextFromQuery: async (req: Request, handler: (ctx: { teamDir: string; teamId: string }) => Promise<Response>) => {
+    const teamId = new URL(req.url).searchParams.get("teamId") || "";
+    if (!teamId.trim()) {
+      return NextResponse.json({ ok: false, error: "teamId is required" }, { status: 400 });
+    }
+    return handler({ teamId: teamId.trim(), teamDir: "/workspace-demo" });
+  },
+  parseJsonBody: async (req: Request) => {
+    try {
+      const body = await req.json();
+      return { body };
+    } catch {
+      return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
+    }
+  },
+  getTeamContextFromBody: async (body: { teamId?: string }) => {
+    const teamId = String(body.teamId ?? "").trim();
+    if (!teamId) {
+      return NextResponse.json({ ok: false, error: "teamId is required" }, { status: 400 });
+    }
+    return { teamId, teamDir: "/workspace-demo" };
+  },
+  withStorageError: async (fn: () => Promise<unknown>) => {
+    return Response.json(await fn());
+  },
+}));
 
 vi.mock("@/lib/chat/chat-storage", () => ({
   listChatRooms: vi.fn(),

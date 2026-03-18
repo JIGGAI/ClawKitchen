@@ -1,17 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("node:fs/promises", () => ({
-  default: {
+vi.mock("node:fs/promises", () => {
+  const mock = {
     mkdir: vi.fn(),
     stat: vi.fn(),
     writeFile: vi.fn(),
     readdir: vi.fn(),
     readFile: vi.fn(),
     appendFile: vi.fn(),
-  },
-}));
+    randomUUID: vi.fn(() => "123e4567-e89b-12d3-a456-426614174000"),
+    join: (...parts: string[]) => parts.join("/"),
+    dirname: (file: string) => file.split("/").slice(0, -1).join("/"),
+  };
+  return {
+    default: mock,
+    ...mock,
+  };
+});
 
-import fs from "node:fs/promises";
+import * as fs from "node:fs/promises";
 import {
   appendChatMessage,
   ensureChatFile,
