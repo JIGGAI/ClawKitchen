@@ -35,18 +35,58 @@ function extractStderr(err: { stderr?: unknown; message?: unknown }, fallback: u
   return String(fallback);
 }
 
+/**
+ * Strip non-JSON diagnostic lines from stdout.
+ *
+ * OpenClaw may print plugin/doctor/diagnostic lines to stdout before the
+ * actual JSON payload (e.g. "[doctor] ...", "[plugins] ...", "🦞 OpenClaw ...").
+ * This breaks callers that do JSON.parse(stdout).
+ *
+ * If stdout looks like it contains a JSON payload with leading noise, strip the
+ * noise lines. Otherwise return as-is (non-JSON commands like `config get` may
+ * return plain text).
+ */
+function sanitizeStdout(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return raw;
+
+  // Fast path: already starts with JSON
+  const firstChar = trimmed[0];
+  if (firstChar === "[" || firstChar === "{" || firstChar === '"') return raw;
+
+  // Look for the first line starting with a JSON token
+  const lines = trimmed.split("\n");
+  const jsonStartIdx = lines.findIndex((l) => /^\s*[[\{"]/.test(l));
+  if (jsonStartIdx > 0) {
+    // Verify the remainder is valid JSON before stripping
+    const candidate = lines.slice(jsonStartIdx).join("\n");
+    try {
+      JSON.parse(candidate);
+      return candidate;
+    } catch {
+      // Not valid JSON after stripping — return original
+    }
+  }
+
+  return raw;
+}
+
 async function runOpenClawLocal(args: string[]): Promise<OpenClawExecResult> {
   try {
+    const isWindows = process.platform === "win32";
     const res = await execFileAsync("openclaw", args, {
       timeout: 120000,
       windowsHide: true,
       maxBuffer: 10 * 1024 * 1024,
+      // Windows requires shell:true to resolve executables on PATH via PATHEXT.
+      // Without it, execFile throws ENOENT even when openclaw is installed globally.
+      ...(isWindows ? { shell: true } : {}),
     });
 
     return {
       ok: true,
       exitCode: 0,
-      stdout: String(res.stdout ?? ""),
+      stdout: sanitizeStdout(String(res.stdout ?? "")),
       stderr: String(res.stderr ?? ""),
     };
   } catch (e: unknown) {
@@ -56,6 +96,53 @@ async function runOpenClawLocal(args: string[]): Promise<OpenClawExecResult> {
     const stderr = extractStderr(err, e);
     return { ok: false, exitCode, stdout, stderr };
   }
+}
+
+/**
+ * Extract a JSON payload from stdout that may contain non-JSON diagnostic lines
+ * (e.g. [doctor], [plugins], [recipes] log lines before the actual JSON).
+ * Returns the parsed value or null if no JSON found.
+ */
+export function extractJson<T = unknown>(stdout: string): T | null {
+  const trimmed = stdout.trim();
+  if (!trimmed) return null;
+
+  // Fast path: pure JSON
+  try {
+    return JSON.parse(trimmed) as T;
+  } catch {
+    // fall through
+  }
+
+  // Find the first line starting with [ or { (JSON array/object)
+  const lines = trimmed.split("\n");
+  const jsonStartIdx = lines.findIndex((l) => /^\s*[[\{]/.test(l));
+  if (jsonStartIdx >= 0) {
+    const jsonSlice = lines.slice(jsonStartIdx).join("\n");
+    try {
+      return JSON.parse(jsonSlice) as T;
+    } catch {
+      // fall through
+    }
+  }
+
+  // Last resort: find the last JSON block (scan from end)
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (/^\s*[\]}]/.test(lines[i])) {
+      // Walk backward to find the matching open
+      for (let j = i; j >= 0; j--) {
+        if (/^\s*[[\{]/.test(lines[j])) {
+          try {
+            return JSON.parse(lines.slice(j, i + 1).join("\n")) as T;
+          } catch {
+            // continue searching
+          }
+        }
+      }
+    }
+  }
+
+  return null;
 }
 
 export async function runOpenClaw(args: string[]): Promise<OpenClawExecResult> {
@@ -77,7 +164,7 @@ export async function runOpenClaw(args: string[]): Promise<OpenClawExecResult> {
       status?: unknown;
     };
 
-    const stdout = String(res.stdout ?? "");
+    const stdout = sanitizeStdout(String(res.stdout ?? ""));
     const stderr = String(res.stderr ?? "");
     const exitCode = resolveExitCode(res);
 
