@@ -5,13 +5,27 @@ import { runOpenClaw } from "@/lib/openclaw";
 import { getTeamWorkspaceDir } from "@/lib/paths";
 import { errorMessage } from "@/lib/errors";
 
+// ---------------------------------------------------------------------------
+// Provenance format — matches ClawRecipes CronMappingStateV1 so both systems
+// read/write the same file and never create duplicates.
+// ---------------------------------------------------------------------------
 type MappingStateV1 = {
   version: 1;
-  entries: Record<string, { installedCronId: string; orphaned?: boolean }>;
+  entries: Record<string, {
+    installedCronId: string;
+    specHash?: string;
+    orphaned?: boolean;
+    updatedAtMs?: number;
+  }>;
 };
 
+/**
+ * Provenance key — matches the format used by ClawRecipes cron-utils.cronKey()
+ * for team-scoped cron jobs. Using the same key format means recipe-installed
+ * crons and Kitchen-installed crons share a single namespace and cannot collide.
+ */
 function workerKey(teamId: string, agentId: string) {
-  return `workflow-worker:${teamId}:${agentId}`;
+  return `team:${teamId}:recipe:workflow-worker:cron:${agentId}`;
 }
 
 function cronName(teamId: string, agentId: string) {
@@ -22,15 +36,9 @@ function buildWorkerMessage(teamId: string, agentId: string) {
   return `Workflow worker tick: pull + execute pending workflow tasks for this agent.\n\nCommand:\n  openclaw recipes workflows worker-tick --team-id ${teamId} --agent-id ${agentId} --limit 5 --worker-id cron\n`;
 }
 
-async function getAgentWorkspace(agentId: string): Promise<string> {
-  const cfgText = await runOpenClaw(["config", "get", "agents.list", "--no-color"]);
-  if (!cfgText.ok) throw new Error(cfgText.stderr || cfgText.stdout || "Failed to load agents.list");
-  const list = JSON.parse(String(cfgText.stdout ?? "[]")) as Array<{ id?: unknown; workspace?: unknown }>;
-  const match = list.find((a) => String(a.id ?? "").trim() === agentId);
-  const ws = String(match?.workspace ?? "").trim();
-  if (!ws) throw new Error(`Workspace not found for agent: ${agentId}`);
-  return ws;
-}
+// ---------------------------------------------------------------------------
+// Single provenance file: <teamDir>/notes/cron-jobs.json
+// ---------------------------------------------------------------------------
 
 async function readMapping(mappingPath: string): Promise<MappingStateV1> {
   try {
@@ -46,6 +54,10 @@ async function readMapping(mappingPath: string): Promise<MappingStateV1> {
 async function writeMapping(mappingPath: string, mapping: MappingStateV1): Promise<void> {
   await fs.mkdir(path.dirname(mappingPath), { recursive: true });
   await fs.writeFile(mappingPath, JSON.stringify(mapping, null, 2) + "\n", "utf8");
+}
+
+function teamMappingPath(teamDir: string): string {
+  return path.join(teamDir, "notes", "cron-jobs.json");
 }
 
 async function listTeamWorkflowAgentIds(teamId: string): Promise<string[]> {
@@ -85,15 +97,16 @@ async function installWorkerCron(teamId: string, agentId: string): Promise<{
   mappingPath: string;
   key: string;
 }> {
-  const agentWs = await getAgentWorkspace(agentId);
-  const mappingPath = path.join(agentWs, "notes", "cron-jobs.json");
+  const teamDir = await getTeamWorkspaceDir(teamId);
+  const mp = teamMappingPath(teamDir);
   const key = workerKey(teamId, agentId);
+  const now = Date.now();
 
-  const mapping = await readMapping(mappingPath);
+  const mapping = await readMapping(mp);
   const existing = mapping.entries[key];
   if (existing && existing.installedCronId && !existing.orphaned) {
     await runOpenClaw(["cron", "enable", String(existing.installedCronId)]);
-    return { alreadyInstalled: true, installedCronId: String(existing.installedCronId), mappingPath, key };
+    return { alreadyInstalled: true, installedCronId: String(existing.installedCronId), mappingPath: mp, key };
   }
 
   const name = cronName(teamId, agentId);
@@ -106,27 +119,26 @@ async function installWorkerCron(teamId: string, agentId: string): Promise<{
     "--agent",
     agentId,
     "--cron",
-    "* * * * *",
+    "*/5 * * * *",
     "--name",
     name,
     "--description",
     description,
     "--message",
     message,
+    "--no-deliver",
     "--json",
   ]);
   if (!add.ok) throw new Error(add.stderr || add.stdout || "Failed to add cron");
 
-  // openclaw cron add --json returns the job object itself (id at top-level).
-  // Older versions may return { job: { id } }.
   const parsed = JSON.parse(String(add.stdout ?? "{}")) as { id?: unknown; job?: { id?: unknown } };
   const installedCronId = String(parsed?.id ?? parsed?.job?.id ?? "").trim();
   if (!installedCronId) throw new Error("Cron add succeeded but did not return id");
 
-  mapping.entries[key] = { installedCronId };
-  await writeMapping(mappingPath, mapping);
+  mapping.entries[key] = { installedCronId, updatedAtMs: now };
+  await writeMapping(mp, mapping);
 
-  return { alreadyInstalled: false, installedCronId, mappingPath, key };
+  return { alreadyInstalled: false, installedCronId, mappingPath: mp, key };
 }
 
 export async function POST(req: Request) {
@@ -145,6 +157,8 @@ export async function POST(req: Request) {
     }
 
     if (action === "reconcile") {
+      const teamDir = await getTeamWorkspaceDir(teamId);
+      const mp = teamMappingPath(teamDir);
       const requiredAgentIds = await listTeamWorkflowAgentIds(teamId);
 
       const installed: Array<{ agentId: string; installedCronId: string; alreadyInstalled: boolean }> = [];
@@ -153,33 +167,24 @@ export async function POST(req: Request) {
         installed.push({ agentId: a, installedCronId: res.installedCronId, alreadyInstalled: res.alreadyInstalled });
       }
 
-      // Disable orphaned entries for this team in any agent mapping.
+      // Disable orphaned entries for this team in the single team mapping.
       const disabled: Array<{ agentId: string; installedCronId: string; key: string }> = [];
-
-      const cfgText = await runOpenClaw(["config", "get", "agents.list", "--no-color"]);
-      if (cfgText.ok) {
-        const list = JSON.parse(String(cfgText.stdout ?? "[]")) as Array<{ id?: unknown; workspace?: unknown }>;
-        for (const ent of list) {
-          const ws = String(ent.workspace ?? "").trim();
-          if (!ws) continue;
-          const mappingPath = path.join(ws, "notes", "cron-jobs.json");
-          const mapping = await readMapping(mappingPath);
-          let changed = false;
-          for (const [k, v] of Object.entries(mapping.entries)) {
-            if (!k.startsWith(`workflow-worker:${teamId}:`)) continue;
-            const agentInKey = k.replace(`workflow-worker:${teamId}:`, "");
-            if (requiredAgentIds.includes(agentInKey)) continue;
-            if (v && !v.orphaned) {
-              const id = String(v.installedCronId ?? "").trim();
-              if (id) await runOpenClaw(["cron", "disable", id]);
-              mapping.entries[k] = { ...v, orphaned: true };
-              disabled.push({ agentId: agentInKey, installedCronId: id, key: k });
-              changed = true;
-            }
-          }
-          if (changed) await writeMapping(mappingPath, mapping);
+      const mapping = await readMapping(mp);
+      const keyPrefix = `team:${teamId}:recipe:workflow-worker:cron:`;
+      let changed = false;
+      for (const [k, v] of Object.entries(mapping.entries)) {
+        if (!k.startsWith(keyPrefix)) continue;
+        const agentInKey = k.slice(keyPrefix.length);
+        if (requiredAgentIds.includes(agentInKey)) continue;
+        if (v && !v.orphaned) {
+          const id = String(v.installedCronId ?? "").trim();
+          if (id) await runOpenClaw(["cron", "disable", id]);
+          mapping.entries[k] = { ...v, orphaned: true, updatedAtMs: Date.now() };
+          disabled.push({ agentId: agentInKey, installedCronId: id, key: k });
+          changed = true;
         }
       }
+      if (changed) await writeMapping(mp, mapping);
 
       return NextResponse.json({ ok: true, action, teamId, requiredAgentIds, installed, disabled });
     }

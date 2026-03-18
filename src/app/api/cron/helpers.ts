@@ -21,21 +21,21 @@ function addEntriesToScopeMap(
     const installedCronId = String(v.installedCronId ?? "").trim();
     if (!installedCronId) continue;
 
-    // Special case: worker cron provenance keys encode the *team* even though provenance lives
-    // under an agent workspace. We want cron jobs page sorting to group these under the team.
-    if (kind === "agent") {
-      const m = String(k).match(/^workflow-worker:([^:]+):/);
-      if (m) {
-        const teamId = String(m[1] ?? "").trim();
-        if (teamId) {
-          idToScope.set(installedCronId, {
-            kind: "team",
-            id: teamId,
-            label: teamId,
-            href: hrefForScope({ kind: "team", id: teamId }),
-          });
-          continue;
-        }
+    // Workflow worker cron provenance keys should resolve to team scope.
+    // New format: team:<teamId>:recipe:workflow-worker:cron:<agentId>
+    // Legacy format: workflow-worker:<teamId>:<agentId>
+    {
+      const newFmt = String(k).match(/^team:([^:]+):recipe:workflow-worker:cron:/);
+      const legacyFmt = !newFmt && kind === "agent" ? String(k).match(/^workflow-worker:([^:]+):/) : null;
+      const teamId = String((newFmt ?? legacyFmt)?.[1] ?? "").trim();
+      if (teamId) {
+        idToScope.set(installedCronId, {
+          kind: "team",
+          id: teamId,
+          label: teamId,
+          href: hrefForScope({ kind: "team", id: teamId }),
+        });
+        continue;
       }
     }
 

@@ -1752,7 +1752,7 @@ export default function WorkflowsEditorClient({
                           {runPreflight.agentIdsMissingCron.join(", ")}
                         </div>
                         <div className="mt-2 text-xs text-[color:var(--ck-text-tertiary)]">
-                          Cron cadence: 1 minute. The worker runs: <span className="font-mono">openclaw recipes workflows worker-tick</span>.
+                          Cron cadence: every 5 minutes. The worker runs: <span className="font-mono">openclaw recipes workflows worker-tick</span>.
                         </div>
                       </div>
                     </ConfirmationModal>
