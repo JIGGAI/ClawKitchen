@@ -56,7 +56,7 @@ export function TicketAssignControl({
       const res = await fetch(url, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ticket, assignee: selected }),
+        body: JSON.stringify({ ticket, assignee: selected, ...(teamId ? { teamId } : {}) }),
       });
 
       const json = (await res.json()) as { error?: string };

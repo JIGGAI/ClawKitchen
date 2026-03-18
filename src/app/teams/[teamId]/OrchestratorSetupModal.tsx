@@ -27,7 +27,7 @@ export function OrchestratorSetupModal({
   const defaultAgentId = useMemo(() => `${teamId}-swarm-orchestrator`, [teamId]);
   const [agentId, setAgentId] = useState(defaultAgentId);
   const [repoDir, setRepoDir] = useState("");
-  const [worktreeRoot, setWorktreeRoot] = useState("/home/control/swarm-worktrees");
+  const [worktreeRoot, setWorktreeRoot] = useState(`~/swarm-worktrees/${teamId}`);
   const [baseRef, setBaseRef] = useState("origin/main");
   const [applyConfig, setApplyConfig] = useState(true);
   const [makeExecutable, setMakeExecutable] = useState(true);
@@ -74,7 +74,7 @@ export function OrchestratorSetupModal({
             <input
               value={repoDir}
               onChange={(e) => setRepoDir(e.target.value)}
-              placeholder="/home/control/clawkitchen"
+              placeholder="~/my-project"
               className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
             />
 

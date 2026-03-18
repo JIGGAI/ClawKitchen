@@ -14,7 +14,7 @@ vi.mock("@/lib/paths", () => ({
   readOpenClawConfig: vi.fn(),
 }));
 vi.mock("node:fs/promises", () => ({
-  default: { mkdir: vi.fn(), writeFile: vi.fn() },
+  default: { mkdir: vi.fn(), writeFile: vi.fn(), readFile: vi.fn() },
 }));
 
 import { readGoal, writeGoal } from "@/lib/goals";
@@ -25,7 +25,7 @@ describe("api goals promote route", () => {
   const teamWs = "/mock-workspace/development-team";
   const existingGoal = {
     id: "my-goal",
-    frontmatter: { id: "my-goal", title: "My Goal", tags: [], teams: [] },
+    frontmatter: { id: "my-goal", title: "My Goal", tags: [], teams: ["development-team"] },
     body: "## Existing body",
     raw: "",
   };
@@ -69,8 +69,8 @@ describe("api goals promote route", () => {
       new Request("https://test"),
       { params: Promise.resolve({ id: "my-goal" }) }
     );
-    expect(res.status).toBe(200);
     const json = await res.json();
+    expect(res.status).toBe(200);
     expect(json.ok).toBe(true);
     expect(json.goal.id).toBe("my-goal");
     expect(json.inboxPath).toContain("inbox");
@@ -184,6 +184,22 @@ describe("api goals promote route", () => {
     const secondPath = (fs.writeFile as ReturnType<typeof vi.fn>).mock.calls[1][0];
     expect(secondPath).toContain("-goal-");
     expect(secondPath).toContain(".md");
+  });
+
+  it("returns 400 when goal has no team assigned", async () => {
+    const noTeamGoal = {
+      ...existingGoal,
+      frontmatter: { ...existingGoal.frontmatter, teams: [] },
+    };
+    vi.mocked(readGoal).mockResolvedValue(noTeamGoal);
+
+    const res = await POST(
+      new Request("https://test"),
+      { params: Promise.resolve({ id: "my-goal" }) }
+    );
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain("no team assigned");
   });
 
   it("returns 500 when readGoal throws", async () => {

@@ -14,7 +14,17 @@ export default async function TicketDetailPage({
   const { ticket } = await params;
   const sp = await searchParams;
   const team = typeof sp.team === "string" ? sp.team.trim() : "";
-  const teamId = team || "development-team";
+  if (!team) {
+    return (
+      <div className="ck-glass p-6">
+        <h1 className="text-xl font-semibold tracking-tight">No team selected</h1>
+        <p className="mt-3 text-sm text-[color:var(--ck-text-secondary)]">
+          Select a team from the sidebar to view tickets.
+        </p>
+      </div>
+    );
+  }
+  const teamId = team;
 
   const data = await getTicketMarkdown(teamId, ticket);
 

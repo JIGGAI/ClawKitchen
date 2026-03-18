@@ -38,10 +38,14 @@ export function teamWorkspace(teamId: string) {
  */
 export function getTeamWorkspaceDir(teamId?: string): string {
   if (teamId) return teamWorkspace(teamId);
-  return process.env.CK_TEAM_WORKSPACE_DIR ?? teamWorkspace(process.env.CK_TEAM_ID ?? "development-team");
+  const envTeam = process.env.CK_TEAM_ID;
+  if (!envTeam && !process.env.CK_TEAM_WORKSPACE_DIR) {
+    throw new Error("No team specified. Pass a teamId or set CK_TEAM_ID / CK_TEAM_WORKSPACE_DIR.");
+  }
+  return process.env.CK_TEAM_WORKSPACE_DIR ?? teamWorkspace(envTeam!);
 }
 
-export function stageDir(stage: TicketStage, teamIdOrDir: string = "development-team") {
+export function stageDir(stage: TicketStage, teamIdOrDir: string) {
   const map: Record<TicketStage, string> = {
     backlog: "work/backlog",
     "in-progress": "work/in-progress",
@@ -134,10 +138,10 @@ export async function discoverTeamIds(): Promise<string[]> {
 
 /**
  * List tickets for a specific team (recommended).
- * - listTickets("development-team")
+ * - listTickets("my-team")
  * - listTickets(teamWorkspaceDir)
  */
-export async function listTickets(teamIdOrDir: string = "development-team"): Promise<TicketSummary[]> {
+export async function listTickets(teamIdOrDir: string): Promise<TicketSummary[]> {
   const teamId = isPathLike(teamIdOrDir) ? teamIdFromTeamDir(teamIdOrDir) : teamIdOrDir;
   const stages: TicketStage[] = ["backlog", "in-progress", "testing", "done"];
   const all: TicketSummary[] = [];
@@ -199,7 +203,7 @@ export async function listAllTeamsTickets(): Promise<TicketSummary[]> {
 /**
  * Back-compat helper used by some API routes.
  */
-export async function getTicketByIdOrNumber(ticketIdOrNumber: string, teamIdOrDir: string = "development-team") {
+export async function getTicketByIdOrNumber(ticketIdOrNumber: string, teamIdOrDir: string) {
   const tickets = await listTickets(teamIdOrDir);
   const normalized = ticketIdOrNumber.trim();
 
