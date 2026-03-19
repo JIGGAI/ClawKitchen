@@ -30,7 +30,7 @@ export function ScaffoldOverlay({
   return createPortal(
     <div className="fixed inset-0 z-[9999]">
       {/* Slightly transparent full-screen overlay so we hide the app while still showing a hint of context. */}
-      <div className="fixed inset-0 bg-white/90 dark:bg-black/90 pointer-events-none" />
+      <div className="fixed inset-0 bg-[color:var(--ck-bg-base)]/90 pointer-events-none" />
 
       {onDismiss ? (
         <button
