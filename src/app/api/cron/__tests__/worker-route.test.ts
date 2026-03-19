@@ -83,7 +83,7 @@ describe("/api/cron/worker POST", () => {
     const addCall = runOpenClawMock.mock.calls.find((c) => c[0].join(" ").startsWith("cron add"));
     expect(addCall).toBeDefined();
     expect(addCall![0]).toContain("--no-deliver");
-    expect(addCall![0]).toContain("*/5 * * * *");
+    expect(addCall![0]).toContain("*/15 * * * *");
   });
 
   it("reconcile installs missing and disables orphaned in team mapping", async () => {

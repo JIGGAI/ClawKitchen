@@ -33,7 +33,7 @@ function cronName(teamId: string, agentId: string) {
 }
 
 function buildWorkerMessage(teamId: string, agentId: string) {
-  return `Workflow worker tick: pull + execute pending workflow tasks for this agent.\n\nCommand:\n  openclaw recipes workflows worker-tick --team-id ${teamId} --agent-id ${agentId} --limit 5 --worker-id cron\n`;
+  return `Workflow worker tick (${agentId}).\n\nRun exactly one shell command using the exec tool.\n\nCommand:\nbash -lc 'openclaw recipes workflows worker-tick --team-id ${teamId} --agent-id ${agentId} --limit 5 --worker-id cron'\n\nRules:\n- Execute with exec and wait for completion.\n- If it succeeds, respond exactly: NO_REPLY\n- If it fails, respond with one short error line.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -113,13 +113,16 @@ async function installWorkerCron(teamId: string, agentId: string): Promise<{
   const description = "Workflow worker cron (Kitchen)";
   const message = buildWorkerMessage(teamId, agentId);
 
+  // Worker crons must run as agentId "main" so they have exec tool access
+  // to invoke the CLI. The --agent-id flag in the worker-tick command itself
+  // determines which agent's queue is drained.
   const add = await runOpenClaw([
     "cron",
     "add",
     "--agent",
-    agentId,
+    "main",
     "--cron",
-    "*/5 * * * *",
+    "*/15 * * * *",
     "--name",
     name,
     "--description",
