@@ -8,26 +8,34 @@ vi.mock("@/lib/openclaw", () => ({ runOpenClaw: vi.fn() }));
 
 // Vitest runs some suites in a browser-like environment; explicitly mock the Node builtins
 // this route uses so the orphan-marking logic is testable.
-vi.mock("node:fs/promises", () => ({
-  default: {
+vi.mock("node:fs/promises", () => {
+  const mock = {
     readdir: vi.fn(),
     stat: vi.fn(),
     readFile: vi.fn(),
     writeFile: vi.fn(),
-  },
-}));
-vi.mock("node:path", () => ({
-  default: {
+  };
+  return {
+    default: mock,
+    ...mock,
+  };
+});
+vi.mock("node:path", () => {
+  const mock = {
     resolve: (p: string, up: string) => {
       // minimal resolver for this test: resolve("/a/b", "..") -> "/a"
-      if (up !== "..") return String(p);
+      if (up != "..") return String(p);
       const parts = String(p).split("/").filter(Boolean);
       parts.pop();
       return "/" + parts.join("/");
     },
     join: (...parts: string[]) => parts.map(String).join("/"),
-  },
-}));
+  };
+  return {
+    default: mock,
+    ...mock,
+  };
+});
 
 import { toolsInvoke } from "@/lib/gateway";
 import { runOpenClaw } from "@/lib/openclaw";
