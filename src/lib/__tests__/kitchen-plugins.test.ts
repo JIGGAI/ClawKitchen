@@ -1,14 +1,27 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
-import { readFileSync, existsSync } from 'fs';
 import { discoverKitchenPlugins, clearPluginCache, createPluginContext } from "@/lib/kitchen-plugins";
 
-vi.mock('fs');
+const mockExistsSync = vi.fn();
+const mockReadFileSync = vi.fn();
+const mockReaddirSync = vi.fn();
+const mockMkdirSync = vi.fn();
+
+vi.mock('fs', () => ({
+  existsSync: (...args: unknown[]) => mockExistsSync(...args),
+  readFileSync: (...args: unknown[]) => mockReadFileSync(...args),
+  readdirSync: (...args: unknown[]) => mockReaddirSync(...args),
+  mkdirSync: (...args: unknown[]) => mockMkdirSync(...args),
+}));
+
+const mockDbExec = vi.fn();
+const mockDbClose = vi.fn();
+
 vi.mock('better-sqlite3', () => {
   return {
-    default: vi.fn(() => ({
-      exec: vi.fn(),
-      close: vi.fn(),
-    }))
+    default: class MockDatabase {
+      exec = mockDbExec;
+      close = mockDbClose;
+    }
   };
 });
 
@@ -29,8 +42,14 @@ vi.mock('drizzle-orm/better-sqlite3', () => ({
   }))
 }));
 
-const mockReadFileSync = vi.mocked(readFileSync);
-const mockExistsSync = vi.mocked(existsSync);
+vi.mock('drizzle-orm/sqlite-core', () => ({
+  sqliteTable: vi.fn(() => ({})),
+  text: vi.fn(() => ({})),
+}));
+
+vi.mock('drizzle-orm', () => ({
+  eq: vi.fn(),
+}));
 
 describe("Kitchen Plugins", () => {
   beforeEach(() => {
@@ -40,19 +59,14 @@ describe("Kitchen Plugins", () => {
 
   describe("discoverKitchenPlugins", () => {
     it("discovers valid kitchen plugins from package.json", () => {
-      // Mock filesystem structure
       mockExistsSync.mockReturnValue(true);
 
-      // Mock readdirSync to return plugin packages
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const fs = require('fs');
-      fs.readdirSync = vi.fn().mockImplementation((path: string) => {
-        if (path.includes('node_modules')) return ['@jiggai'];
+      mockReaddirSync.mockImplementation((path: string) => {
+        if (path.includes('node_modules') && !path.includes('@')) return ['@jiggai'];
         if (path.includes('@jiggai')) return ['kitchen-plugin-marketing'];
         return [];
       });
 
-      // Mock package.json content
       mockReadFileSync.mockReturnValue(JSON.stringify({
         name: '@jiggai/kitchen-plugin-marketing',
         version: '1.0.0',
@@ -86,15 +100,9 @@ describe("Kitchen Plugins", () => {
     });
 
     it("ignores packages without kitchenPlugin manifest", () => {
-      mockExistsSync.mockImplementation((path: string) => {
-        if (path.includes('node_modules')) return true;
-        if (path.includes('package.json')) return true;
-        return false;
-      });
+      mockExistsSync.mockReturnValue(true);
 
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const fs = require('fs');
-      fs.readdirSync = vi.fn().mockReturnValue(['regular-package']);
+      mockReaddirSync.mockReturnValue(['regular-package']);
 
       mockReadFileSync.mockReturnValue(JSON.stringify({
         name: 'regular-package',
@@ -108,6 +116,9 @@ describe("Kitchen Plugins", () => {
 
   describe("createPluginContext", () => {
     it("creates plugin context with encryption capabilities", () => {
+      mockExistsSync.mockReturnValue(false);
+      mockMkdirSync.mockReturnValue(undefined);
+
       const context = createPluginContext('test-plugin', '/test/team', 'test-token');
       
       expect(context).toBeDefined();
