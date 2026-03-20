@@ -6,11 +6,16 @@ const mockReadFileSync = vi.fn();
 const mockReaddirSync = vi.fn();
 const mockMkdirSync = vi.fn();
 
-vi.mock('fs', () => ({
+const fsMock = {
   existsSync: (...args: unknown[]) => mockExistsSync(...args),
   readFileSync: (...args: unknown[]) => mockReadFileSync(...args),
   readdirSync: (...args: unknown[]) => mockReaddirSync(...args),
   mkdirSync: (...args: unknown[]) => mockMkdirSync(...args),
+};
+
+vi.mock('fs', () => ({
+  ...fsMock,
+  default: fsMock,
 }));
 
 const mockDbExec = vi.fn();
