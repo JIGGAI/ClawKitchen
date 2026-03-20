@@ -71,7 +71,9 @@ function sanitizeStdout(raw: string): string {
   return raw;
 }
 
-async function runOpenClawLocal(args: string[]): Promise<OpenClawExecResult> {
+async function runOpenClawLocal(args: string[], options: { sanitizeStdout?: boolean } = {}): Promise<OpenClawExecResult> {
+  const { sanitizeStdout: shouldSanitize = true } = options;
+  
   try {
     const isWindows = process.platform === "win32";
     const res = await execFileAsync("openclaw", args, {
@@ -83,10 +85,12 @@ async function runOpenClawLocal(args: string[]): Promise<OpenClawExecResult> {
       ...(isWindows ? { shell: true } : {}),
     });
 
+    const rawStdout = String(res.stdout ?? "");
+    
     return {
       ok: true,
       exitCode: 0,
-      stdout: sanitizeStdout(String(res.stdout ?? "")),
+      stdout: shouldSanitize ? sanitizeStdout(rawStdout) : rawStdout,
       stderr: String(res.stderr ?? ""),
     };
   } catch (e: unknown) {
@@ -143,6 +147,14 @@ export function extractJson<T = unknown>(stdout: string): T | null {
   }
 
   return null;
+}
+
+/**
+ * Run OpenClaw without stdout sanitization (for raw text output like recipe markdown)
+ */
+export async function runOpenClawRaw(args: string[]): Promise<OpenClawExecResult> {
+  // Always use local exec for raw content to avoid Kitchen runtime restrictions
+  return runOpenClawLocal(args, { sanitizeStdout: false });
 }
 
 export async function runOpenClaw(args: string[]): Promise<OpenClawExecResult> {

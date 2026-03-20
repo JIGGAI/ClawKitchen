@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { GET, PUT } from "../recipes/[id]/route";
 import path from "node:path";
 
-vi.mock("@/lib/openclaw", () => ({ runOpenClaw: vi.fn() }));
+vi.mock("@/lib/openclaw", () => ({ runOpenClaw: vi.fn(), runOpenClawRaw: vi.fn() }));
 vi.mock("@/lib/recipes", () => ({
   findRecipeById: vi.fn(),
   parseFrontmatterId: vi.fn(),
@@ -10,7 +10,7 @@ vi.mock("@/lib/recipes", () => ({
   writeRecipeFile: vi.fn(),
 }));
 
-import { runOpenClaw } from "@/lib/openclaw";
+import { runOpenClaw, runOpenClawRaw } from "@/lib/openclaw";
 import { findRecipeById, parseFrontmatterId, resolveRecipePath, writeRecipeFile } from "@/lib/recipes";
 
 const workspaceItem = {
@@ -30,6 +30,7 @@ const builtinItem = {
 describe("api recipes [id] route", () => {
   beforeEach(() => {
     vi.mocked(runOpenClaw).mockReset();
+    vi.mocked(runOpenClawRaw).mockReset();
     vi.mocked(findRecipeById).mockReset();
     vi.mocked(resolveRecipePath).mockReset();
     vi.mocked(writeRecipeFile).mockReset();
@@ -50,7 +51,7 @@ describe("api recipes [id] route", () => {
 
     it("returns recipe with content on success", async () => {
       vi.mocked(findRecipeById).mockResolvedValue(workspaceItem);
-      vi.mocked(runOpenClaw).mockResolvedValueOnce({
+      vi.mocked(runOpenClawRaw).mockResolvedValueOnce({
         ok: true,
         exitCode: 0,
         stdout: "# Recipe content",
@@ -70,7 +71,7 @@ describe("api recipes [id] route", () => {
 
     it("returns filePath null when resolveRecipePath rejects", async () => {
       vi.mocked(findRecipeById).mockResolvedValue(workspaceItem);
-      vi.mocked(runOpenClaw).mockResolvedValueOnce({
+      vi.mocked(runOpenClawRaw).mockResolvedValueOnce({
         ok: true,
         exitCode: 0,
         stdout: "# Content",

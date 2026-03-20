@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
-import { runOpenClaw } from "@/lib/openclaw";
+import { runOpenClawRaw } from "@/lib/openclaw";
 import { findRecipeById, parseFrontmatterId, resolveRecipePath, writeRecipeFile } from "@/lib/recipes";
 
 function sha256(text: string) {
@@ -16,7 +16,7 @@ export async function GET(
   const item = await findRecipeById(id);
   if (!item) return NextResponse.json({ error: `Recipe not found: ${id}` }, { status: 404 });
 
-  const shown = await runOpenClaw(["recipes", "show", id]);
+  const shown = await runOpenClawRaw(["recipes", "show", id]);
   const filePath = await resolveRecipePath(item).catch(() => null);
 
   const recipeHash = sha256(shown.stdout);
