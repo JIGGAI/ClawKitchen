@@ -94,6 +94,9 @@ export default function TeamEditor({ teamId, initialTab }: { teamId: string; ini
   const [teamAgents, setTeamAgents] = useState<TeamAgentEntry[]>([]);
   const [teamAgentsLoading, setTeamAgentsLoading] = useState(false);
   
+  // Extract team type from recipe frontmatter
+  const DEFAULT_TEAM_TYPE = 'marketing-team';
+  
   const [teamType, setTeamType] = useState<string>(DEFAULT_TEAM_TYPE);
 
   const recipeAgents = useMemo(() => {
@@ -114,8 +117,6 @@ export default function TeamEditor({ teamId, initialTab }: { teamId: string; ini
     }
   }, [content]);
 
-  // Extract team type from recipe frontmatter
-  const DEFAULT_TEAM_TYPE = 'marketing-team';
   const recipeTeamType = useMemo(() => {
     const md = String(content ?? "");
     if (!md.startsWith("---\n")) return DEFAULT_TEAM_TYPE;
