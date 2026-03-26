@@ -595,6 +595,32 @@ export async function POST(req: Request) {
           ]);
           if (!workerRes.ok) throw new Error(workerRes.stderr || workerRes.stdout || `Failed worker-tick for ${agentId}`);
         }
+
+        // Second pass: nodes like human_approval get re-enqueued onto the
+        // agent that just finished the prior node.  The first pass won't have
+        // ticked that agent a second time, so re-tick all agents if the run
+        // is still in-flight.
+        try {
+          const { run: postRun } = await readWorkflowRun(teamId, workflowId, enqRunId);
+          const postStatus = String((postRun as unknown as { status?: unknown }).status ?? "");
+          if (postStatus === "waiting_workers") {
+            for (const agentId of uniq) {
+              try {
+                await runOpenClaw([
+                  "recipes", "workflows", "worker-tick",
+                  "--team-id", teamId,
+                  "--agent-id", agentId,
+                  "--limit", "5",
+                  "--worker-id", "kitchen-run-now-pass2",
+                ]);
+              } catch {
+                // best-effort second pass
+              }
+            }
+          }
+        } catch {
+          // best-effort second pass — don't fail the overall run_now
+        }
       }
 
       return jsonOkRest({
