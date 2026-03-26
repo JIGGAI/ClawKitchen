@@ -1,8 +1,9 @@
 {
   "name": "@jiggai/kitchen",
   "version": "0.3.24",
+  "main": "openclaw/index.ts",
   "description": "ClawKitchen - Web-based dashboard for OpenClaw agent teams, workflows, and automation",
-  "author": "@rjdjohnston · rjdjohnston",
+  "author": "@rjdjohnston \u00b7 rjdjohnston",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -16,7 +17,6 @@
     "workflows",
     "plugin"
   ],
-  "private": false,
   "openclaw": {
     "extensions": [
       "./openclaw/index.ts"
@@ -43,6 +43,9 @@
     "sync:plugin-version": "node scripts/sync-openclaw-plugin-version.mjs",
     "check:plugin-version": "node scripts/check-openclaw-plugin-version.mjs",
     "prepublishOnly": "npm run -s sync:plugin-version && npm run -s check:plugin-version"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "files": [
     "openclaw/",
