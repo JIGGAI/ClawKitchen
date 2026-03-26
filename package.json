@@ -1,6 +1,21 @@
 {
   "name": "@jiggai/kitchen",
   "version": "0.3.22",
+  "description": "ClawKitchen - Web-based dashboard for OpenClaw agent teams, workflows, and automation",
+  "author": "@rjdjohnston · rjdjohnston",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JIGGAI/clawkitchen.git"
+  },
+  "keywords": [
+    "openclaw",
+    "clawkitchen",
+    "dashboard",
+    "agents",
+    "workflows",
+    "plugin"
+  ],
   "private": false,
   "openclaw": {
     "extensions": [
@@ -77,20 +92,5 @@
   },
   "lint-staged": {
     "*.{ts,tsx}": "eslint --fix"
-  },
-  "description": "ClawKitchen - Web-based dashboard for OpenClaw agent teams, workflows, and automation",
-  "author": "@rjdjohnston · rjdjohnston",
-  "license": "Apache-2.0",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/JIGGAI/clawkitchen.git"
-  },
-  "keywords": [
-    "openclaw",
-    "clawkitchen",
-    "dashboard",
-    "agents",
-    "workflows",
-    "plugin"
-  ]
+  }
 }
