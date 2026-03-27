@@ -566,6 +566,7 @@ export async function POST(req: Request) {
         // Claim specifically the run we just enqueued (--run-id prevents picking up stale runs).
         const runnerRes = await runOpenClaw(["recipes", "workflows", "runner-once", "--team-id", teamId, "--run-id", enqRunId]);
         if (!runnerRes.ok) throw new Error(runnerRes.stderr || runnerRes.stdout || "Failed to run runner-once");
+<<<<<<< HEAD
 
         // Fire-and-forget: kick workers in the background so the run advances.
         // Cron workers will also pick up the work, so this is just best-effort acceleration.
@@ -604,6 +605,8 @@ export async function POST(req: Request) {
 
           await new Promise((r) => setTimeout(r, 250));
         }
+=======
+>>>>>>> 3ae5c12 (fix: pass --run-id to runner-once to prevent duplicate runs)
 
         // Best-effort: kick workers immediately so the run advances.
         // Failures here must NOT prevent returning the runId to the UI.
