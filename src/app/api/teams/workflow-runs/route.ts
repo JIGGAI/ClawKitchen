@@ -567,45 +567,32 @@ export async function POST(req: Request) {
         const runnerRes = await runOpenClaw(["recipes", "workflows", "runner-once", "--team-id", teamId, "--run-id", enqRunId]);
         if (!runnerRes.ok) throw new Error(runnerRes.stderr || runnerRes.stdout || "Failed to run runner-once");
 
-        // Best-effort: kick workers immediately so the run advances.
-        // Failures here must NOT prevent returning the runId to the UI.
-        try {
-          for (const agentId of uniq) {
-            await runOpenClaw([
-              "recipes",
-              "workflows",
-              "worker-tick",
-              "--team-id",
-              teamId,
-              "--agent-id",
-              agentId,
-              "--limit",
-              "5",
-              "--worker-id",
-              "kitchen-run-now",
-            ]);
-          }
-
-          // Second pass: nodes like human_approval get re-enqueued onto the
-          // agent that just finished the prior node.  The first pass won't have
-          // ticked that agent a second time, so re-tick all agents if the run
-          // is still in-flight.
-          const { run: postRun } = await readWorkflowRun(teamId, workflowId, enqRunId);
-          const postStatus = String((postRun as unknown as { status?: unknown }).status ?? "");
-          if (postStatus === "waiting_workers") {
-            for (const agentId of uniq) {
+        // Fire-and-forget: kick workers in the background so the run advances.
+        // Cron workers will also pick up the work, so this is just best-effort acceleration.
+        // We do NOT await this — return the runId to the UI immediately for redirect.
+        const workerAgentIds = [...uniq];
+        void (async () => {
+          try {
+            for (const agentId of workerAgentIds) {
               await runOpenClaw([
                 "recipes", "workflows", "worker-tick",
-                "--team-id", teamId,
-                "--agent-id", agentId,
-                "--limit", "5",
-                "--worker-id", "kitchen-run-now-pass2",
+                "--team-id", teamId, "--agent-id", agentId,
+                "--limit", "5", "--worker-id", "kitchen-run-now",
               ]);
             }
-          }
-        } catch {
-          // best-effort — cron workers will pick up remaining work
-        }
+            const { run: postRun } = await readWorkflowRun(teamId, workflowId, enqRunId);
+            const postStatus = String((postRun as unknown as { status?: unknown }).status ?? "");
+            if (postStatus === "waiting_workers") {
+              for (const agentId of workerAgentIds) {
+                await runOpenClaw([
+                  "recipes", "workflows", "worker-tick",
+                  "--team-id", teamId, "--agent-id", agentId,
+                  "--limit", "5", "--worker-id", "kitchen-run-now-pass2",
+                ]);
+              }
+            }
+          } catch { /* best-effort — cron workers will pick up remaining work */ }
+        })();
       }
 
       return jsonOkRest({
