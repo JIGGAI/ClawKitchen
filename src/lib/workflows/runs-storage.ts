@@ -405,6 +405,14 @@ function normalizeRunFile(teamId: string, workflowId: string, parsed: unknown, r
                 ? "canceled"
                 : "running";
 
+    // nodeStates is the authoritative per-node status map written by the worker.
+    // nodeResults may lack a status field, so cross-reference nodeStates.
+    const nodeStatesRaw = (parsed as { nodeStates?: unknown }).nodeStates;
+    const nodeStatesMap: Record<string, { status?: string; ts?: string }> =
+      nodeStatesRaw && typeof nodeStatesRaw === "object" && !Array.isArray(nodeStatesRaw)
+        ? (nodeStatesRaw as Record<string, { status?: string; ts?: string }>)
+        : {};
+
     const nodes = Array.isArray(o.nodeResults)
       ? o.nodeResults
           .map((nr) => {
@@ -420,7 +428,9 @@ function normalizeRunFile(teamId: string, workflowId: string, parsed: unknown, r
             const nodeId = typeof r.nodeId === "string" ? r.nodeId : "";
             if (!nodeId) return null;
 
-            const st = String(r.status ?? "pending");
+            // Prefer nodeStates (authoritative) over nodeResults.status (often absent).
+            const stateEntry = nodeStatesMap[nodeId];
+            const st = String(stateEntry?.status ?? r.status ?? "pending");
             const mapped =
               st === "awaiting_approval"
                 ? "waiting"
@@ -441,7 +451,7 @@ function normalizeRunFile(teamId: string, workflowId: string, parsed: unknown, r
                   : undefined;
 
             const startedAt = typeof r.startedAt === "string" ? r.startedAt : undefined;
-            const endedAt = typeof r.endedAt === "string" ? r.endedAt : undefined;
+            const endedAt = typeof r.endedAt === "string" ? r.endedAt : (stateEntry?.ts ? stateEntry.ts : undefined);
 
             return {
               nodeId,
