@@ -563,21 +563,9 @@ export async function POST(req: Request) {
           );
         }
 
-        // Try to claim the newly enqueued run before ticking workers.
-        for (let attempt = 0; attempt < 4; attempt++) {
-          const runnerRes = await runOpenClaw(["recipes", "workflows", "runner-once", "--team-id", teamId]);
-          if (!runnerRes.ok) throw new Error(runnerRes.stderr || runnerRes.stdout || "Failed to run runner-once");
-
-          try {
-            const { run } = await readWorkflowRun(teamId, workflowId, enqRunId);
-            const statusAny = (run as unknown as { status?: unknown }).status;
-            if (statusAny && String(statusAny) != "queued") break;
-          } catch {
-            // fall through
-          }
-
-          await new Promise((r) => setTimeout(r, 250));
-        }
+        // Claim specifically the run we just enqueued (--run-id prevents picking up stale runs).
+        const runnerRes = await runOpenClaw(["recipes", "workflows", "runner-once", "--team-id", teamId, "--run-id", enqRunId]);
+        if (!runnerRes.ok) throw new Error(runnerRes.stderr || runnerRes.stdout || "Failed to run runner-once");
 
         // Best-effort: kick workers immediately so the run advances.
         // Failures here must NOT prevent returning the runId to the UI.
