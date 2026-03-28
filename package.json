@@ -48,7 +48,7 @@
   "dependencies": {
     "better-sqlite3": "^12.8.0",
     "drizzle-kit": "^0.31.10",
-    "drizzle-orm": "^0.45.1",
+    "drizzle-orm": "^0.45.2",
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
