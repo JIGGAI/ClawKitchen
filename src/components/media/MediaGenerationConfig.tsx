@@ -57,15 +57,33 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId }: Med
         </div>
       )}
 
-      {!loading && availableProviders.length === 0 && (
-        <div className="rounded-[var(--ck-radius-sm)] border border-amber-200/50 bg-amber-50/50 p-3">
-          <div className="text-[10px] text-amber-900 space-y-2">
-            <p className="font-medium">⚠️ No media generation providers available</p>
+      {!loading && availableProviders.length === 0 && providers.length > 0 && (
+        <div className="rounded-[var(--ck-radius-sm)] border border-amber-500/20 bg-amber-500/10 p-3">
+          <div className="text-[10px] text-amber-200 space-y-2">
+            <p className="font-medium">⚠️ Media providers detected but not available</p>
             <div className="space-y-1">
+              <p><strong>Common Issues:</strong></p>
+              {providers.some(p => p.error?.includes('API key')) && (
+                <p>• Missing API keys - Check provider selection below for specific requirements</p>
+              )}
+              {providers.some(p => p.error?.includes('not running')) && (
+                <p>• Local services not running - Start Stable Diffusion, ComfyUI, etc.</p>
+              )}
+              <p>• <a href="https://docs.openclaw.ai/nodes/images" target="_blank" rel="noopener" className="text-blue-400 hover:text-blue-300 hover:underline">Setup troubleshooting →</a></p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!loading && providers.length === 0 && (
+        <div className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3">
+          <div className="text-xs text-[color:var(--ck-text-secondary)] space-y-2">
+            <p className="font-medium text-[color:var(--ck-text-primary)]">⚠️ No media generation providers detected</p>
+            <div className="space-y-1 text-[color:var(--ck-text-tertiary)]">
               <p><strong>Setup Options:</strong></p>
-              <p>• <a href="https://docs.openclaw.ai/nodes/images" target="_blank" rel="noopener" className="text-blue-700 hover:underline">Configure image generation models →</a></p>
-              <p>• <a href="https://clawhub.ai/skills?q=image" target="_blank" rel="noopener" className="text-blue-700 hover:underline">Install image generation skills →</a></p>
-              <p>• <a href="https://docs.openclaw.ai/setup/providers#openai" target="_blank" rel="noopener" className="text-blue-700 hover:underline">Add OpenAI API key for DALL-E →</a></p>
+              <p>• <a href="https://docs.openclaw.ai/nodes/images" target="_blank" rel="noopener" className="text-blue-400 hover:text-blue-300 hover:underline">Configure image generation models →</a></p>
+              <p>• <a href="https://clawhub.ai/skills?q=image" target="_blank" rel="noopener" className="text-blue-400 hover:text-blue-300 hover:underline">Install image generation skills →</a></p>
+              <p>• <a href="https://docs.openclaw.ai/setup/providers#openai" target="_blank" rel="noopener" className="text-blue-400 hover:text-blue-300 hover:underline">Add OpenAI API key for DALL-E →</a></p>
             </div>
           </div>
         </div>
@@ -95,8 +113,44 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId }: Med
             ))}
           </select>
           {selectedProvider && (
-            <div className="mt-1 text-[10px] text-[color:var(--ck-text-tertiary)]">
-              Supports: {selectedProvider.supportedTypes.join(', ')}
+            <div className="mt-1 space-y-1">
+              <div className="text-[10px] text-[color:var(--ck-text-tertiary)]">
+                Supports: {selectedProvider.supportedTypes.join(', ')}
+                {selectedProvider.models && selectedProvider.models.length > 0 && (
+                  <span className="ml-2">• Models: {selectedProvider.models.join(', ')}</span>
+                )}
+              </div>
+              {selectedProvider.error && (
+                <div className="rounded-[var(--ck-radius-sm)] border border-red-200/50 bg-red-50/50 px-2 py-1">
+                  <div className="text-[10px] text-red-700">
+                    <span className="font-medium">⚠️ Setup Required:</span> {selectedProvider.error}
+                  </div>
+                  {selectedProvider.id === 'openai' && selectedProvider.error.includes('OPENAI_API_KEY') && (
+                    <div className="mt-1 text-[9px] text-red-600">
+                      Add your OpenAI API key to environment variables or OpenClaw config.{' '}
+                      <a href="https://docs.openclaw.ai/setup/providers#openai" target="_blank" rel="noopener" className="underline">
+                        Setup guide →
+                      </a>
+                    </div>
+                  )}
+                  {selectedProvider.id === 'skills' && selectedProvider.error.includes('API keys') && (
+                    <div className="mt-1 text-[9px] text-red-600">
+                      Skills require API keys (OPENAI_API_KEY, EVOLINK_API_KEY).{' '}
+                      <a href="https://clawhub.ai/skills?q=image" target="_blank" rel="noopener" className="underline">
+                        Browse skills →
+                      </a>
+                    </div>
+                  )}
+                  {selectedProvider.id.startsWith('http-') && (
+                    <div className="mt-1 text-[9px] text-red-600">
+                      Start the local service or configure a different endpoint.{' '}
+                      <a href="https://docs.openclaw.ai/nodes/images#local-endpoints" target="_blank" rel="noopener" className="underline">
+                        Local setup →
+                      </a>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </label>
@@ -123,7 +177,7 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId }: Med
                   e.target.value = '';
                 }
               }}
-              className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 px-1 py-0.5 text-[9px] text-[color:var(--ck-text-secondary)]"
+              className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 px-1 py-0.5 text-[10px] text-[color:var(--ck-text-secondary)]"
             >
               <option value="">+ Variables</option>
               {TEMPLATE_VARIABLES.map(variable => (
@@ -232,9 +286,9 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId }: Med
 
       {/* Validation Errors */}
       {errors.length > 0 && (
-        <div className="rounded-[var(--ck-radius-sm)] border border-red-200 bg-red-50 p-2">
-          <div className="text-[10px] font-medium text-red-800 mb-1">Configuration Issues:</div>
-          <div className="text-[10px] text-red-700 space-y-0.5">
+        <div className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-red-900/20 p-2">
+          <div className="text-[10px] font-medium text-red-400 mb-1">Configuration Issues:</div>
+          <div className="text-[10px] text-red-300 space-y-0.5">
             {errors.map((error, index) => (
               <div key={index}>• {error}</div>
             ))}
@@ -242,33 +296,7 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId }: Med
         </div>
       )}
 
-      {/* Provider Status */}
-      {!loading && providers.length > 0 && (
-        <div className="text-[10px] text-[color:var(--ck-text-tertiary)]">
-          <div className="font-medium mb-1">Detected Providers:</div>
-          <div className="space-y-0.5">
-            {providers.map((provider) => (
-              <div key={provider.id} className="flex items-center gap-1.5">
-                <span className={`w-1.5 h-1.5 rounded-full ${provider.available ? 'bg-green-400' : 'bg-red-400'}`}></span>
-                <span className="font-medium">{provider.name}</span>
-                <span className="opacity-75">
-                  ({provider.supportedTypes.join(', ')})
-                  {provider.models && provider.models.length > 0 && ` • ${provider.models.join(', ')}`}
-                </span>
-                {provider.error && <span className="text-red-400 ml-auto">({provider.error})</span>}
-              </div>
-            ))}
-          </div>
-          {providers.filter(p => !p.available).length > 0 && (
-            <div className="mt-2 text-[9px] opacity-75">
-              ⚠️ Unavailable providers can be configured via{' '}
-              <a href="https://docs.openclaw.ai/nodes/images" target="_blank" rel="noopener" className="text-blue-600 hover:underline">
-                setup docs
-              </a>
-            </div>
-          )}
-        </div>
-      )}
+
     </div>
   );
 }

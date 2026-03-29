@@ -34,8 +34,8 @@ export async function GET(
     const providers: MediaProvider[] = [];
 
     // 1. Check OpenAI Provider
-    const openaiProvider = await checkOpenAIProvider();
-    if (openaiProvider) providers.push(openaiProvider);
+    const openaiProviders = await checkOpenAIProvider();
+    providers.push(...openaiProviders);
 
     // 2. Check Skill-based Providers
     const skillProviders = await checkSkillProviders();
@@ -62,101 +62,184 @@ export async function GET(
   }
 }
 
-async function checkOpenAIProvider(): Promise<MediaProvider | null> {
+async function checkOpenAIProvider(): Promise<MediaProvider[]> {
+  const providers: MediaProvider[] = [];
+  
   try {
-    // Check for OpenAI API key
-    const hasApiKey = !!process.env.OPENAI_API_KEY;
+    // Read OpenClaw config to get models
+    const configPath = path.join(process.env.HOME || '/home/control', '.openclaw', 'openclaw.json');
+    const configData = await fs.readFile(configPath, 'utf-8');
+    const config = JSON.parse(configData);
     
-    if (!hasApiKey) {
-      return {
-        id: 'openai',
-        name: 'OpenAI DALL-E',
-        supportedTypes: ['image'],
-        available: false,
-        error: 'OPENAI_API_KEY not configured',
-        priority: 100
-      };
-    }
-
-    // Test API availability by running a quick provider check
-    try {
-      await execAsync('openclaw recipes media providers openai --check', { 
-        timeout: 5000,
-        env: { ...process.env }
-      });
+    // Extract models from config
+    const fallbackModels = config.agents?.defaults?.model?.fallbacks || [];
+    const primaryModel = config.agents?.defaults?.model?.primary;
+    const allModels = [primaryModel, ...fallbackModels].filter(Boolean);
+    
+    // Group models by provider
+    const modelsByProvider: Record<string, string[]> = {};
+    allModels.forEach((model: string) => {
+      if (typeof model === 'string' && model.includes('/')) {
+        const [provider, modelName] = model.split('/');
+        if (!modelsByProvider[provider]) {
+          modelsByProvider[provider] = [];
+        }
+        modelsByProvider[provider].push(modelName);
+      }
+    });
+    
+    // Check OpenAI models (supports image generation)
+    if (modelsByProvider['openai'] || modelsByProvider['openai-codex']) {
+      const openaiModels = [...(modelsByProvider['openai'] || []), ...(modelsByProvider['openai-codex'] || [])];
+      const hasApiKey = !!process.env.OPENAI_API_KEY;
       
-      return {
-        id: 'openai',
-        name: 'OpenAI DALL-E',
+      providers.push({
+        id: 'openai-models',
+        name: 'OpenAI Models (Image Generation)',
         supportedTypes: ['image'],
-        available: true,
-        models: ['dall-e-2', 'dall-e-3'],
+        available: hasApiKey,
+        models: openaiModels,
+        error: hasApiKey ? undefined : 'OPENAI_API_KEY not configured',
         priority: 100
-      };
-    } catch {
-      return {
-        id: 'openai',
-        name: 'OpenAI DALL-E',
-        supportedTypes: ['image'],
-        available: false,
-        error: 'API key invalid or quota exceeded',
-        priority: 100
-      };
+      });
     }
-  } catch {
-    return null;
+    
+    // Check for DALL-E specifically
+    const hasApiKey = !!process.env.OPENAI_API_KEY;
+    providers.push({
+      id: 'dalle',
+      name: 'OpenAI DALL-E',
+      supportedTypes: ['image'],
+      available: hasApiKey,
+      models: ['dall-e-2', 'dall-e-3'],
+      error: hasApiKey ? undefined : 'OPENAI_API_KEY not configured',
+      priority: 90
+    });
+    
+  } catch (error) {
+    console.warn('Failed to read OpenClaw config:', error);
+    
+    // Fallback OpenAI provider
+    const hasApiKey = !!process.env.OPENAI_API_KEY;
+    providers.push({
+      id: 'openai-fallback',
+      name: 'OpenAI DALL-E (fallback)',
+      supportedTypes: ['image'],
+      available: hasApiKey,
+      models: ['dall-e-3'],
+      error: hasApiKey ? undefined : 'OPENAI_API_KEY not configured',
+      priority: 80
+    });
   }
+  
+  return providers;
 }
 
 async function checkSkillProviders(): Promise<MediaProvider[]> {
   const providers: MediaProvider[] = [];
   
   try {
-    // Scan skills directory for image generation capabilities
-    const skillsDir = path.join(process.env.HOME || '/home/control', '.openclaw/workspace/skills');
+    // Scan multiple skills directories
+    const skillsDirs = [
+      path.join(process.env.HOME || '/home/control', '.openclaw/workspace/skills'),
+      path.join(process.env.HOME || '/home/control', '.openclaw/skills')
+    ];
     
-    try {
-      const skillDirs = await fs.readdir(skillsDir);
-      
-      for (const skillDir of skillDirs) {
-        try {
-          const skillPath = path.join(skillsDir, skillDir);
-          const skillMd = await fs.readFile(path.join(skillPath, 'SKILL.md'), 'utf-8');
-          
-          // Check if skill mentions image/media generation capabilities
-          const hasImageGen = /\b(image|picture|photo|visual|media)\b.*\b(generat|creat|make|produc)\b/i.test(skillMd) ||
-                             /\b(generat|creat|make|produc)\b.*\b(image|picture|photo|visual|media)\b/i.test(skillMd);
-          
-          if (hasImageGen) {
-            providers.push({
-              id: `skill-${skillDir}`,
-              name: `Skill: ${skillDir.replace(/-/g, ' ')}`,
-              supportedTypes: ['image'],
-              available: true,
-              priority: 80
-            });
+    const allSkills: { name: string; description: string; hasMedia: boolean; supportedTypes: string[]; available: boolean; error?: string }[] = [];
+    
+    for (const skillsDir of skillsDirs) {
+      try {
+        const skillDirs = await fs.readdir(skillsDir);
+        
+        for (const skillDir of skillDirs) {
+          try {
+            const skillPath = path.join(skillsDir, skillDir);
+            const skillMd = await fs.readFile(path.join(skillPath, 'SKILL.md'), 'utf-8');
+            
+            // Extract skill name and description
+            let skillName = skillDir.replace(/-/g, ' ');
+            let description = '';
+            
+            // Parse frontmatter or description
+            const nameMatch = skillMd.match(/^name:\s*(.+)$/m);
+            if (nameMatch) skillName = nameMatch[1];
+            
+            const descMatch = skillMd.match(/^description:\s*(.+)$/m);
+            if (descMatch) description = descMatch[1].replace(/"/g, '');
+            
+            // Check for media generation capabilities
+            const hasImageGen = /\b(image|picture|photo|visual|media|video|audio)\b.*\b(generat|creat|make|produc)\b/i.test(skillMd) ||
+                               /\b(generat|creat|make|produc)\b.*\b(image|picture|photo|visual|media|video|audio)\b/i.test(skillMd) ||
+                               /dall.?e|stable.?diffusion|midjourney|cellcog|any.?to.?any/i.test(skillMd);
+            
+            if (hasImageGen) {
+              const supportedTypes: string[] = [];
+              if (/\b(image|picture|photo|visual)\b/i.test(skillMd)) supportedTypes.push('image');
+              if (/\bvideo\b/i.test(skillMd)) supportedTypes.push('video');
+              if (/\baudio\b/i.test(skillMd)) supportedTypes.push('audio');
+              if (supportedTypes.length === 0) supportedTypes.push('image'); // default
+              
+              // Check for API key requirements
+              let available = true;
+              let error: string | undefined;
+              
+              if (skillMd.includes('OPENAI_API_KEY') && !process.env.OPENAI_API_KEY) {
+                available = false;
+                error = 'OPENAI_API_KEY required';
+              }
+              if (skillMd.includes('CELLCOG_API_KEY') && !process.env.CELLCOG_API_KEY) {
+                available = false;
+                error = 'CELLCOG_API_KEY required';
+              }
+              if (skillMd.includes('EVOLINK_API_KEY') && !process.env.EVOLINK_API_KEY) {
+                available = false;
+                error = 'EVOLINK_API_KEY required';
+              }
+              
+              allSkills.push({
+                name: skillName,
+                description: description || `${skillName} skill`,
+                hasMedia: true,
+                supportedTypes,
+                available,
+                error
+              });
+            }
+          } catch {
+            // Skip invalid skills
           }
-        } catch {
-          // Skip invalid skills
         }
+      } catch {
+        // Skills directory doesn't exist or is inaccessible
       }
-    } catch {
-      // Skills directory doesn't exist or is inaccessible
     }
     
-    // Add fallback skill provider entry
+    // Create providers from detected skills
+    allSkills.forEach((skill, index) => {
+      providers.push({
+        id: `skill-${skill.name.toLowerCase().replace(/\s+/g, '-')}`,
+        name: skill.name,
+        supportedTypes: skill.supportedTypes as ('image' | 'video')[],
+        available: skill.available,
+        error: skill.error,
+        priority: 70 + index // Give different priorities to different skills
+      });
+    });
+    
+    // Add fallback skill provider entry if no skills found
     if (providers.length === 0) {
       providers.push({
-        id: 'skill',
+        id: 'skills-empty',
         name: 'OpenClaw Skills',
         supportedTypes: ['image'],
         available: false,
-        error: 'No image generation skills found',
-        priority: 80
+        error: 'No media generation skills installed',
+        priority: 60
       });
     }
-  } catch {
-    // Skill detection failed
+    
+  } catch (error) {
+    console.warn('Skill detection failed:', error);
   }
   
   return providers;
