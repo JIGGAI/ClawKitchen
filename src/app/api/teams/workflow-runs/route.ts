@@ -573,6 +573,7 @@ export async function POST(req: Request) {
         const workerAgentIds = [...uniq];
         void (async () => {
           try {
+<<<<<<< HEAD
             for (const agentId of workerAgentIds) {
               await runOpenClaw([
                 "recipes", "workflows", "worker-tick",
@@ -593,6 +594,57 @@ export async function POST(req: Request) {
             }
           } catch { /* best-effort — cron workers will pick up remaining work */ }
         })();
+=======
+            const { run } = await readWorkflowRun(teamId, workflowId, enqRunId);
+            const statusAny = (run as unknown as { status?: unknown }).status;
+            if (statusAny && String(statusAny) != "queued") break;
+          } catch {
+            // fall through
+          }
+
+          await new Promise((r) => setTimeout(r, 250));
+        }
+
+        // Best-effort: kick workers immediately so the run advances.
+        // Failures here must NOT prevent returning the runId to the UI.
+        try {
+          for (const agentId of uniq) {
+            await runOpenClaw([
+              "recipes",
+              "workflows",
+              "worker-tick",
+              "--team-id",
+              teamId,
+              "--agent-id",
+              agentId,
+              "--limit",
+              "5",
+              "--worker-id",
+              "kitchen-run-now",
+            ]);
+          }
+
+          // Second pass: nodes like human_approval get re-enqueued onto the
+          // agent that just finished the prior node.  The first pass won't have
+          // ticked that agent a second time, so re-tick all agents if the run
+          // is still in-flight.
+          const { run: postRun } = await readWorkflowRun(teamId, workflowId, enqRunId);
+          const postStatus = String((postRun as unknown as { status?: unknown }).status ?? "");
+          if (postStatus === "waiting_workers") {
+            for (const agentId of uniq) {
+              await runOpenClaw([
+                "recipes", "workflows", "worker-tick",
+                "--team-id", teamId,
+                "--agent-id", agentId,
+                "--limit", "5",
+                "--worker-id", "kitchen-run-now-pass2",
+              ]);
+            }
+          }
+        } catch {
+          // best-effort — cron workers will pick up remaining work
+        }
+>>>>>>> cd42640 (fix: wrap run_now worker-tick in best-effort so runId always returns)
       }
 
       return jsonOkRest({
