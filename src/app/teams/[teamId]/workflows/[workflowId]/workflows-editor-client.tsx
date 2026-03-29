@@ -1494,6 +1494,145 @@ export default function WorkflowsEditorClient({
                   </details>
 
                   <details open className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/15">
+                    <summary className="cursor-pointer list-none px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)]">Node inspector</summary>
+                    <div className="px-3 pb-3">
+                      <div className="flex items-center justify-between gap-2">
+                      {selectedNodeId ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nodeId = selectedNodeId;
+                            const nextNodes = wf.nodes.filter((n) => n.id !== nodeId);
+                            const nextEdges = (wf.edges ?? []).filter((e) => e.from !== nodeId && e.to !== nodeId);
+                            setWorkflow({ ...wf, nodes: nextNodes, edges: nextEdges });
+                            setSelectedNodeId("");
+                          }}
+                          className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-medium text-red-100 hover:bg-white/10"
+                        >
+                          Delete node
+                        </button>
+                      ) : null}
+                    </div>
+
+                    {selectedNodeId ? (
+                      (() => {
+                        const node = wf.nodes.find((n) => n.id === selectedNodeId);
+                        if (!node) return <div className="mt-2 text-sm text-[color:var(--ck-text-secondary)]">No node selected.</div>;
+
+                        return (
+                          <div className="mt-3 space-y-3">
+                            <div>
+                              <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">id</div>
+                              <div className="mt-1 rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]">
+                                {node.id}
+                              </div>
+                            </div>
+
+                            <label className="block">
+                              <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">name</div>
+                              <input
+                                value={String(node.name ?? "")}
+                                onChange={(e) => {
+                                  const nextName = e.target.value;
+                                  setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, name: nextName } : n)) });
+                                }}
+                                className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                                placeholder="Optional"
+                              />
+                            </label>
+
+                            <label className="block">
+                              <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">type</div>
+                              <select
+                                value={node.type}
+                                onChange={(e) => {
+                                  const nextType = e.target.value as WorkflowFileV1["nodes"][number]["type"];
+                                  setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, type: nextType } : n)) });
+                                }}
+                                className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                              >
+                                <option value="start">start</option>
+                                <option value="end">end</option>
+                                <option value="llm">llm</option>
+                                <option value="tool">tool</option>
+                                <option value="condition">condition</option>
+                                <option value="delay">delay</option>
+                                <option value="human_approval">human_approval</option>
+                                <option value="media-image">media-image</option>
+                                <option value="media-video">media-video</option>
+                              </select>
+                            </label>
+
+                            <div className="grid grid-cols-2 gap-2">
+                              <label className="block">
+                                <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">x</div>
+                                <input
+                                  type="number"
+                                  value={typeof node.x === "number" ? node.x : 0}
+                                  onChange={(e) => {
+                                    const nextX = Number(e.target.value);
+                                    setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, x: nextX } : n)) });
+                                  }}
+                                  className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                                />
+                              </label>
+                              <label className="block">
+                                <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">y</div>
+                                <input
+                                  type="number"
+                                  value={typeof node.y === "number" ? node.y : 0}
+                                  onChange={(e) => {
+                                    const nextY = Number(e.target.value);
+                                    setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, y: nextY } : n)) });
+                                  }}
+                                  className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                                />
+                              </label>
+                            </div>
+
+                            {/* Media Generation Configuration */}
+                            {isMediaNode(node.type) ? (
+                              <div>
+                                <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">Media Generation</div>
+                                <div className="mt-1">
+                                  <MediaGenerationConfigComponent
+                                    config={{
+                                      mediaType: 'image',
+                                      provider: 'auto',
+                                      prompt: '',
+                                      outputPath: './output',
+                                      ...((node.config as Record<string, unknown>) || {})
+                                    } as MediaGenerationConfig}
+                                    onChange={(newConfig) => {
+                                      setWorkflow({ 
+                                        ...wf, 
+                                        nodes: wf.nodes.map((n) => 
+                                          n.id === node.id ? { ...n, config: newConfig as unknown as Record<string, unknown> } : n
+                                        ) 
+                                      });
+                                    }}
+                                    teamId={teamId}
+                                  />
+                                </div>
+                              </div>
+                            ) : (
+                              <div>
+                                <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">config</div>
+                                <pre className="mt-1 max-h-[200px] overflow-auto rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-2 text-[10px] text-[color:var(--ck-text-secondary)]">
+                                  {JSON.stringify(node.config ?? {}, null, 2)}
+                                </pre>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()
+                    ) : (
+                      <div className="mt-2 text-sm text-[color:var(--ck-text-secondary)]">Select a node.</div>
+                    )}
+                  </div>
+                  </details>
+
+                  <details open className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/15">
                     <summary className="cursor-pointer list-none px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)]">Triggers</summary>
                     <div className="px-3 pb-3">
                     <div className="flex items-center justify-between gap-2">
@@ -2086,144 +2225,7 @@ export default function WorkflowsEditorClient({
                     </div>
                     </details>
 
-                    <details open className="mt-3 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/10">
-                      <summary className="cursor-pointer list-none px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)]">Node inspector</summary>
-                      <div className="px-3 pb-3">
-                        <div className="flex items-center justify-between gap-2">
-                        {selectedNodeId ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const nodeId = selectedNodeId;
-                              const nextNodes = wf.nodes.filter((n) => n.id !== nodeId);
-                              const nextEdges = (wf.edges ?? []).filter((e) => e.from !== nodeId && e.to !== nodeId);
-                              setWorkflow({ ...wf, nodes: nextNodes, edges: nextEdges });
-                              setSelectedNodeId("");
-                            }}
-                            className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-medium text-red-100 hover:bg-white/10"
-                          >
-                            Delete node
-                          </button>
-                        ) : null}
-                      </div>
 
-                      {selectedNodeId ? (
-                        (() => {
-                          const node = wf.nodes.find((n) => n.id === selectedNodeId);
-                          if (!node) return <div className="mt-2 text-sm text-[color:var(--ck-text-secondary)]">No node selected.</div>;
-
-                          return (
-                            <div className="mt-3 space-y-3">
-                              <div>
-                                <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">id</div>
-                                <div className="mt-1 rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]">
-                                  {node.id}
-                                </div>
-                              </div>
-
-                              <label className="block">
-                                <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">name</div>
-                                <input
-                                  value={String(node.name ?? "")}
-                                  onChange={(e) => {
-                                    const nextName = e.target.value;
-                                    setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, name: nextName } : n)) });
-                                  }}
-                                  className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
-                                  placeholder="Optional"
-                                />
-                              </label>
-
-                              <label className="block">
-                                <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">type</div>
-                                <select
-                                  value={node.type}
-                                  onChange={(e) => {
-                                    const nextType = e.target.value as WorkflowFileV1["nodes"][number]["type"];
-                                    setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, type: nextType } : n)) });
-                                  }}
-                                  className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
-                                >
-                                  <option value="start">start</option>
-                                  <option value="end">end</option>
-                                  <option value="llm">llm</option>
-                                  <option value="tool">tool</option>
-                                  <option value="condition">condition</option>
-                                  <option value="delay">delay</option>
-                                  <option value="human_approval">human_approval</option>
-                                  <option value="media-image">media-image</option>
-                                  <option value="media-video">media-video</option>
-                                </select>
-                              </label>
-
-                              <div className="grid grid-cols-2 gap-2">
-                                <label className="block">
-                                  <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">x</div>
-                                  <input
-                                    type="number"
-                                    value={typeof node.x === "number" ? node.x : 0}
-                                    onChange={(e) => {
-                                      const nextX = Number(e.target.value);
-                                      setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, x: nextX } : n)) });
-                                    }}
-                                    className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
-                                  />
-                                </label>
-                                <label className="block">
-                                  <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">y</div>
-                                  <input
-                                    type="number"
-                                    value={typeof node.y === "number" ? node.y : 0}
-                                    onChange={(e) => {
-                                      const nextY = Number(e.target.value);
-                                      setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, y: nextY } : n)) });
-                                    }}
-                                    className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
-                                  />
-                                </label>
-                              </div>
-
-                              {/* Media Generation Configuration */}
-                              {isMediaNode(node.type) ? (
-                                <div>
-                                  <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">Media Generation</div>
-                                  <div className="mt-1">
-                                    <MediaGenerationConfigComponent
-                                      config={{
-                                        mediaType: 'image',
-                                        provider: 'auto',
-                                        prompt: '',
-                                        outputPath: './output',
-                                        ...((node.config as Record<string, unknown>) || {})
-                                      } as MediaGenerationConfig}
-                                      onChange={(newConfig) => {
-                                        setWorkflow({ 
-                                          ...wf, 
-                                          nodes: wf.nodes.map((n) => 
-                                            n.id === node.id ? { ...n, config: newConfig as unknown as Record<string, unknown> } : n
-                                          ) 
-                                        });
-                                      }}
-                                      teamId={teamId}
-                                    />
-                                  </div>
-                                </div>
-                              ) : (
-                                <div>
-                                  <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">config</div>
-                                  <pre className="mt-1 max-h-[200px] overflow-auto rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-2 text-[10px] text-[color:var(--ck-text-secondary)]">
-                                    {JSON.stringify(node.config ?? {}, null, 2)}
-                                  </pre>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })()
-                      ) : (
-                        <div className="mt-2 text-sm text-[color:var(--ck-text-secondary)]">Select a node.</div>
-                      )}
-                    </div>
-                    </details>
                   </div>
                   </details>
                 </div>
