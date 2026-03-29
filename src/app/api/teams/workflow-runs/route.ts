@@ -9,7 +9,7 @@ import { errorMessage } from "@/lib/errors";
 import { toolsInvoke } from "@/lib/gateway";
 import { runOpenClaw } from "@/lib/openclaw";
 import { assertSafeRelativeFileName, getTeamWorkspaceDir } from "@/lib/paths";
-import { listWorkflowRuns, readWorkflowRun, writeWorkflowRun } from "@/lib/workflows/runs-storage";
+import { listWorkflowRuns, readWorkflowRun, writeWorkflowRun, appendWorkflowRunEvent, writeApprovalFile } from "@/lib/workflows/runs-storage";
 import type { WorkflowRunFileV1, WorkflowRunNodeResultV1 } from "@/lib/workflows/runs-types";
 import { readWorkflow } from "@/lib/workflows/storage";
 import type { WorkflowFileV1 } from "@/lib/workflows/types";
@@ -414,7 +414,22 @@ export async function POST(req: Request) {
           nodes: stoppedNodes,
         };
 
-        return jsonOkRest({ ...(await writeWorkflowRun(teamId, workflowId, stoppedRun)), runId: run.id });
+        const writeResult = await writeWorkflowRun(teamId, workflowId, stoppedRun);
+        
+        // Add event to ClawRecipes event log for audit trail
+        try {
+          await appendWorkflowRunEvent(teamId, workflowId, run.id, {
+            type: "workflow.stopped",
+            action: "stop",
+            stoppedAt,
+            reason: "manual_stop"
+          });
+        } catch (eventError) {
+          // Don't fail the request if event logging fails
+          console.warn("Failed to log stop event:", eventError);
+        }
+
+        return jsonOkRest({ ...writeResult, runId: run.id });
       }
 
       // Handle delete action
@@ -426,13 +441,24 @@ export async function POST(req: Request) {
         try {
           await fs.rm(runDir, { recursive: true, force: true });
         } catch {
-          // Also try legacy path structure
+          // Directory doesn't exist, continue with cleanup
+        }
+        
+        // Also clean up legacy formats
+        try {
+          // Legacy flat file format
+          const flatFile = path.join(teamDir, `shared-context/workflow-runs/${runIdFromBody}.run.json`);
+          await fs.rm(flatFile, { force: true });
+        } catch {
+          // File doesn't exist, that's fine
+        }
+        
+        try {
+          // Legacy per-workflow directory
           const legacyRunDir = path.join(teamDir, `shared-context/workflows/${workflowId}/runs/${runIdFromBody}`);
-          try {
-            await fs.rm(legacyRunDir, { recursive: true, force: true });
-          } catch {
-            // If neither path exists, that's fine - already deleted
-          }
+          await fs.rm(legacyRunDir, { recursive: true, force: true });
+        } catch {
+          // Directory doesn't exist, that's fine
         }
 
         return jsonOkRest({ ok: true, deleted: true, runId: runIdFromBody });
@@ -522,7 +548,38 @@ export async function POST(req: Request) {
         }
       }
 
-      return jsonOkRest({ ...(await writeWorkflowRun(teamId, workflowId, finalRun)), runId: run.id });
+      const writeResult = await writeWorkflowRun(teamId, workflowId, finalRun);
+      
+      // Add event to ClawRecipes event log for audit trail
+      try {
+        await appendWorkflowRunEvent(teamId, workflowId, run.id, {
+          type: action === "approve" ? "approval.approved" : action === "request_changes" ? "approval.changes_requested" : "approval.canceled",
+          nodeId: approvalNodeId,
+          action,
+          decidedBy: decidedBy || "unknown",
+          note: note || undefined,
+          decision: nextState
+        });
+      } catch (eventError) {
+        // Don't fail the request if event logging fails
+        console.warn("Failed to log approval event:", eventError);
+      }
+
+      // Write approval file in ClawRecipes format
+      try {
+        await writeApprovalFile(teamId, workflowId, run.id, approvalNodeId, {
+          state: nextState,
+          requestedAt: run.approval?.requestedAt,
+          decidedAt: nextState === "changes_requested" ? undefined : decidedAt,
+          note,
+          decidedBy
+        });
+      } catch (approvalFileError) {
+        // Don't fail the request if approval file writing fails
+        console.warn("Failed to write approval file:", approvalFileError);
+      }
+
+      return jsonOkRest({ ...writeResult, runId: run.id });
     }
 
 
