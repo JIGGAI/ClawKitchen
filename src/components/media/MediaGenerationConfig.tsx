@@ -58,18 +58,22 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId }: Med
       )}
 
       {!loading && availableProviders.length === 0 && providers.length > 0 && (
-        <div className="rounded-[var(--ck-radius-sm)] border border-amber-500/20 bg-amber-500/10 p-3">
-          <div className="text-[10px] text-amber-200 space-y-2">
-            <p className="font-medium">⚠️ Media providers detected but not available</p>
-            <div className="space-y-1">
-              <p><strong>Common Issues:</strong></p>
-              {providers.some(p => p.error?.includes('API key')) && (
-                <p>• Missing API keys - Check provider selection below for specific requirements</p>
-              )}
-              {providers.some(p => p.error?.includes('not running')) && (
-                <p>• Local services not running - Start Stable Diffusion, ComfyUI, etc.</p>
-              )}
-              <p>• <a href="https://docs.openclaw.ai/nodes/images" target="_blank" rel="noopener" className="text-blue-400 hover:text-blue-300 hover:underline">Setup troubleshooting →</a></p>
+        <div className="mt-2 rounded-[var(--ck-radius-sm)] border border-amber-400/30 bg-amber-500/10 p-2 text-xs text-amber-50">
+          <div className="space-y-1">
+            <div className="font-medium">⚠️ Media providers detected but not available</div>
+            <div>
+              <strong>Common Issues:</strong>
+            </div>
+            {providers.some(p => p.error?.includes('API key')) && (
+              <div>• Missing API keys - Check provider selection below for specific requirements</div>
+            )}
+            {providers.some(p => p.error?.includes('not running')) && (
+              <div>• Local services not running - Start Stable Diffusion, ComfyUI, etc.</div>
+            )}
+            <div>
+              • <a href="https://docs.openclaw.ai/nodes/images" target="_blank" rel="noopener" className="text-amber-100 underline hover:text-amber-50">
+                Setup troubleshooting →
+              </a>
             </div>
           </div>
         </div>
@@ -121,30 +125,30 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId }: Med
                 )}
               </div>
               {selectedProvider.error && (
-                <div className="rounded-[var(--ck-radius-sm)] border border-red-200/50 bg-red-50/50 px-2 py-1">
-                  <div className="text-[10px] text-red-700">
+                <div className="mt-2 rounded-[var(--ck-radius-sm)] border border-red-400/30 bg-red-500/10 p-2 text-xs text-red-100">
+                  <div>
                     <span className="font-medium">⚠️ Setup Required:</span> {selectedProvider.error}
                   </div>
                   {selectedProvider.id === 'openai' && selectedProvider.error.includes('OPENAI_API_KEY') && (
-                    <div className="mt-1 text-[9px] text-red-600">
+                    <div className="mt-1">
                       Add your OpenAI API key to environment variables or OpenClaw config.{' '}
-                      <a href="https://docs.openclaw.ai/setup/providers#openai" target="_blank" rel="noopener" className="underline">
+                      <a href="https://docs.openclaw.ai/setup/providers#openai" target="_blank" rel="noopener" className="text-red-200 underline hover:text-red-100">
                         Setup guide →
                       </a>
                     </div>
                   )}
                   {selectedProvider.id === 'skills' && selectedProvider.error.includes('API keys') && (
-                    <div className="mt-1 text-[9px] text-red-600">
+                    <div className="mt-1">
                       Skills require API keys (OPENAI_API_KEY, EVOLINK_API_KEY).{' '}
-                      <a href="https://clawhub.ai/skills?q=image" target="_blank" rel="noopener" className="underline">
+                      <a href="https://clawhub.ai/skills?q=image" target="_blank" rel="noopener" className="text-red-200 underline hover:text-red-100">
                         Browse skills →
                       </a>
                     </div>
                   )}
                   {selectedProvider.id.startsWith('http-') && (
-                    <div className="mt-1 text-[9px] text-red-600">
+                    <div className="mt-1">
                       Start the local service or configure a different endpoint.{' '}
-                      <a href="https://docs.openclaw.ai/nodes/images#local-endpoints" target="_blank" rel="noopener" className="underline">
+                      <a href="https://docs.openclaw.ai/nodes/images#local-endpoints" target="_blank" rel="noopener" className="text-red-200 underline hover:text-red-100">
                         Local setup →
                       </a>
                     </div>
@@ -286,9 +290,9 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId }: Med
 
       {/* Validation Errors */}
       {errors.length > 0 && (
-        <div className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-red-900/20 p-2">
-          <div className="text-[10px] font-medium text-red-400 mb-1">Configuration Issues:</div>
-          <div className="text-[10px] text-red-300 space-y-0.5">
+        <div className="mt-2 rounded-[var(--ck-radius-sm)] border border-red-400/30 bg-red-500/10 p-2 text-xs text-red-100">
+          <div className="font-medium mb-1">Configuration Issues:</div>
+          <div className="space-y-0.5">
             {errors.map((error, index) => (
               <div key={index}>• {error}</div>
             ))}
