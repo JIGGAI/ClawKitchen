@@ -9,7 +9,7 @@ import { errorMessage } from "@/lib/errors";
 import { toolsInvoke } from "@/lib/gateway";
 import { runOpenClaw } from "@/lib/openclaw";
 import { assertSafeRelativeFileName, getTeamWorkspaceDir } from "@/lib/paths";
-import { getWorkflowRunsDir, listWorkflowRuns, readWorkflowRun, writeWorkflowRun } from "@/lib/workflows/runs-storage";
+import { listWorkflowRuns, readWorkflowRun, writeWorkflowRun } from "@/lib/workflows/runs-storage";
 import type { WorkflowRunFileV1, WorkflowRunNodeResultV1 } from "@/lib/workflows/runs-types";
 import { readWorkflow } from "@/lib/workflows/storage";
 import type { WorkflowFileV1 } from "@/lib/workflows/types";
@@ -374,32 +374,33 @@ export async function POST(req: Request) {
   if (!workflowId) return NextResponse.json({ ok: false, error: "workflowId is required" }, { status: 400 });
 
   try {
-    // Action mode: approve/request_changes/cancel (file-first) updates an existing run.
+    // Action mode: approve/request_changes/cancel/stop/delete updates an existing run.
     if (action) {
       if (!runIdFromBody) return NextResponse.json({ ok: false, error: "runId is required for action" }, { status: 400 });
       if (!["approve", "request_changes", "cancel", "stop", "delete"].includes(action)) {
         return NextResponse.json({ ok: false, error: `Unsupported action: ${action}` }, { status: 400 });
       }
 
-      const existing = await readWorkflowRun(teamId, workflowId, runIdFromBody);
-      const run = existing.run;
-
       // Handle stop action
       if (action === "stop") {
-        if (!["running", "waiting_for_approval"].includes(run.status)) {
-          return NextResponse.json({ ok: false, error: "Can only stop running or waiting runs" }, { status: 400 });
+        const existing = await readWorkflowRun(teamId, workflowId, runIdFromBody);
+        const run = existing.run;
+        
+        // Only allow stopping runs that are active
+        if (!["queued", "running", "waiting_for_approval", "waiting_workers"].includes(run.status)) {
+          return NextResponse.json({ ok: false, error: `Cannot stop run with status: ${run.status}` }, { status: 400 });
         }
 
         const stoppedAt = nowIso();
-        const stoppedNodes: WorkflowRunNodeResultV1[] = Array.isArray(run.nodes)
+        const stoppedNodes = Array.isArray(run.nodes)
           ? run.nodes.map((n) => {
-              // Mark pending/running nodes as canceled
-              if (["pending", "running", "waiting"].includes(n.status)) {
+              if (n.status === "pending" || n.status === "running") {
                 return {
                   ...n,
                   status: "skipped" as const,
+                  startedAt: n.startedAt ?? stoppedAt,
                   endedAt: stoppedAt,
-                  output: { ...((typeof n.output === "object" && n.output) || {}), note: "stopped by user" },
+                  output: n.output ?? { note: "skipped due to stop" },
                 };
               }
               return n;
@@ -418,33 +419,27 @@ export async function POST(req: Request) {
 
       // Handle delete action
       if (action === "delete") {
-        const runDir = path.join((await getWorkflowRunsDir(teamId, workflowId)), runIdFromBody);
+        // Delete run directory entirely
+        const teamDir = await getTeamWorkspaceDir(teamId);
+        const runDir = path.join(teamDir, `shared-context/workflow-runs/${runIdFromBody}`);
         
         try {
-          // Try to remove directory-per-run layout first (preferred runner layout)
           await fs.rm(runDir, { recursive: true, force: true });
         } catch {
-          // Ignore errors, file may not exist
-        }
-
-        try {
-          // Try to remove flat run file
-          const flatRunPath = path.join(await getWorkflowRunsDir(teamId, workflowId), `${runIdFromBody}.run.json`);
-          await fs.unlink(flatRunPath);
-        } catch {
-          // Ignore errors, file may not exist
-        }
-
-        try {
-          // Try to remove legacy per-workflow run file
-          const legacyRunPath = path.join(await getWorkflowRunsDir(teamId, workflowId), workflowId, `${runIdFromBody}.run.json`);
-          await fs.unlink(legacyRunPath);
-        } catch {
-          // Ignore errors, file may not exist
+          // Also try legacy path structure
+          const legacyRunDir = path.join(teamDir, `shared-context/workflows/${workflowId}/runs/${runIdFromBody}`);
+          try {
+            await fs.rm(legacyRunDir, { recursive: true, force: true });
+          } catch {
+            // If neither path exists, that's fine - already deleted
+          }
         }
 
         return jsonOkRest({ ok: true, deleted: true, runId: runIdFromBody });
       }
+
+      const existing = await readWorkflowRun(teamId, workflowId, runIdFromBody);
+      const run = existing.run;
 
       const approvalNodeId = run.approval?.nodeId || (Array.isArray(run.nodes) ? run.nodes.find((n) => n.status === "waiting")?.nodeId : undefined);
       if (!approvalNodeId) {

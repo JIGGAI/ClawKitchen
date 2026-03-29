@@ -15,6 +15,11 @@ vi.mock("@/lib/openclaw", () => ({
   runOpenClaw: vi.fn(),
 }));
 
+vi.mock("@/lib/paths", () => ({
+  assertSafeRelativeFileName: vi.fn(),
+  getTeamWorkspaceDir: vi.fn().mockResolvedValue("/home/test/workspace"),
+}));
+
 vi.mock("node:fs/promises", () => ({
   default: {
     rm: vi.fn().mockResolvedValue(undefined),
@@ -232,7 +237,7 @@ describe("api teams workflow-runs route", () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toBe("Can only stop running or waiting runs");
+    expect(json.error).toBe("Cannot stop run with status: success");
     expect(writeWorkflowRun).not.toHaveBeenCalled();
   });
 

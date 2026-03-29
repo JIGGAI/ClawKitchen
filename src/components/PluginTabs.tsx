@@ -76,7 +76,7 @@ export default function PluginTabs({ teamType }: PluginTabsProps) {
       const bundleCode = await response.text();
       
       // Execute the bundle code (using Function constructor as safer alternative to eval)
-      // eslint-disable-next-line no-new-func
+       
       new Function(bundleCode)();
       
       setLoadedTabs(prev => new Set([...prev, tabKey]));
