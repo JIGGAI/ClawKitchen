@@ -9,6 +9,8 @@ export type WorkflowTriggerCronV1 = {
   tz?: string;
 };
 
+
+
 export type WorkflowNodeV1 = {
   id: string;
   type:
@@ -18,7 +20,9 @@ export type WorkflowNodeV1 = {
     | "tool"
     | "condition"
     | "delay"
-    | "human_approval";
+    | "human_approval"
+    | "media-image"
+    | "media-video";
   name?: string;
   /** UI layout hints (optional) */
   x?: number;

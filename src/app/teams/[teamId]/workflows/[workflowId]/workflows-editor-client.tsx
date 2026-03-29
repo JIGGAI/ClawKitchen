@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ConfirmationModal } from "@/components/ConfirmationModal";
 import type { WorkflowFileV1 } from "@/lib/workflows/types";
 import { validateWorkflowFileV1 } from "@/lib/workflows/validate";
+import { getMediaNodeConfig, isMediaNode, type MediaGenerationConfig } from "@/lib/workflows/media-nodes";
+import { MediaGenerationConfigComponent } from "@/components/media/MediaGenerationConfig";
 
 type LoadState =
   | { kind: "loading" }
@@ -27,7 +28,6 @@ export default function WorkflowsEditorClient({
   draft: boolean;
   llmTaskEnabled?: boolean;
 }) {
-  const router = useRouter();
   const [view, setView] = useState<"canvas" | "json">("canvas");
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<LoadState>({ kind: "loading" });
@@ -206,11 +206,8 @@ export default function WorkflowsEditorClient({
   }, []);
 
   const refreshCronMap = useCallback(async (): Promise<Record<string, boolean>> => {
-    // Preflight helper: determine whether each workflow-assigned agent has a
-    // workflow worker-tick cron installed and enabled.  Safe-idle or other
-    // generic crons do NOT satisfy this requirement — only crons whose name
-    // starts with "workflow-worker:" or whose payload message contains
-    // "worker-tick" count.
+    // Preflight helper: determine whether each agent has any cron job installed/enabled.
+    // (Used to warn/block enqueue when the assigned worker has no cron heartbeat.)
     setCronError("");
     setCronLoading(true);
     try {
@@ -221,41 +218,21 @@ export default function WorkflowsEditorClient({
 
       const map: Record<string, boolean> = {};
       for (const j of jobs) {
-        const job = j as {
-          enabled?: unknown;
-          name?: unknown;
-          agentId?: unknown;
-          payload?: { message?: unknown; kind?: unknown };
-          scope?: { kind?: unknown; id?: unknown };
-        };
+        // openclaw cron list returns `agentId` on the job when scoped to an agent.
+        // We also enrich jobs with `scope`, but that may be team-scoped for worker-cron grouping.
+        const job = j as { enabled?: unknown; agentId?: unknown; scope?: { kind?: unknown; id?: unknown } };
         if (!job || !Boolean(job.enabled)) continue;
 
-        // Only match workflow worker-tick crons, not safe-idle or other agent crons.
-        const jobName = String(job.name ?? "");
-        const payloadMsg = String(job.payload?.message ?? "");
-        const isWorkerTick = jobName.startsWith("workflow-worker:") || payloadMsg.includes("worker-tick");
-        if (!isWorkerTick) continue;
-
-        // Worker-tick crons run as agentId "main" but reference the target
-        // agent in the name (workflow-worker:<teamId>:<agentId>) and message.
-        // Extract the target agent from the name or payload.
-        const nameMatch = jobName.match(/^workflow-worker:[^:]+:(.+)$/);
-        if (nameMatch?.[1]) {
-          map[nameMatch[1]] = true;
-          continue;
-        }
-
-        // Fallback: extract from payload message pattern "worker-tick ... --agent-id <id>"
-        const msgMatch = payloadMsg.match(/--agent-id\s+(\S+)/);
-        if (msgMatch?.[1]) {
-          map[msgMatch[1]] = true;
-          continue;
-        }
-
-        // Last resort: if the cron runs as a non-main agent, use that.
         const agentId = String(job.agentId ?? "").trim();
-        if (agentId && agentId !== "main") {
+        if (agentId) {
           map[agentId] = true;
+          continue;
+        }
+
+        // Back-compat: if we don't have agentId, fall back to enriched scope.
+        if (job.scope && String(job.scope.kind) === "agent") {
+          const id = String(job.scope.id ?? "").trim();
+          if (id) map[id] = true;
         }
       }
       setAgentHasCron(map);
@@ -602,13 +579,17 @@ export default function WorkflowsEditorClient({
               const x = Math.max(0, clickX - 90);
               const y = Math.max(0, clickY - 24);
 
+              const defaultConfig = isMediaNode(activeTool.nodeType) 
+                ? getMediaNodeConfig(activeTool.nodeType)
+                : {};
+
               const nextNode: WorkflowFileV1["nodes"][number] = {
                 id,
                 type: activeTool.nodeType,
                 name: id,
                 x,
                 y,
-                config: {},
+                config: defaultConfig,
               };
 
               setWorkflow({ ...wf, nodes: [...wf.nodes, nextNode] });
@@ -779,6 +760,38 @@ export default function WorkflowsEditorClient({
                             </svg>
                           ),
                         },
+                        {
+                          key: "media-image",
+                          label: "Image",
+                          active: activeTool.kind === "add-node" && activeTool.nodeType === "media-image",
+                          onClick: () => {
+                            setActiveTool({ kind: "add-node", nodeType: "media-image" });
+                            setConnectFromNodeId("");
+                          },
+                          icon: (
+                            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
+                              <path d="M14.5 4h-5L7 6.5 4.5 9v6L7 17.5 9.5 20h5L17 17.5 19.5 15V9L17 6.5 14.5 4Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+                              <path d="M9 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" fill="currentColor" />
+                              <path d="m4.5 15 3.5-3.5L11 14l3.5-3.5 4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          ),
+                        },
+                        {
+                          key: "media-video",
+                          label: "Video",
+                          active: activeTool.kind === "add-node" && activeTool.nodeType === "media-video",
+                          onClick: () => {
+                            setActiveTool({ kind: "add-node", nodeType: "media-video" });
+                            setConnectFromNodeId("");
+                          },
+                          icon: (
+                            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
+                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                              <path d="M14 2v6h6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                              <path d="M10 12l4.5 2.5-4.5 2.5v-5z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          ),
+                        },
                       ] as const
                     ).map((b) => (
                       <button
@@ -835,6 +848,8 @@ export default function WorkflowsEditorClient({
                       { t: "condition", label: "If" },
                       { t: "delay", label: "Delay" },
                       { t: "human_approval", label: "Approve" },
+                      { t: "media-image", label: "🎨 Image" },
+                      { t: "media-video", label: "🎬 Video" },
                       { t: "end", label: "End" },
                     ] as Array<{ t: WorkflowFileV1["nodes"][number]["type"]; label: string }>).map((x) => (
                       <button
@@ -1054,10 +1069,37 @@ export default function WorkflowsEditorClient({
                     }
                     style={{ left: x, top: y, width: 180 }}
                   >
-                    <div className="font-medium text-[color:var(--ck-text-primary)]">{n.name || n.id}</div>
+                    <div className="flex items-center gap-2">
+                      {isMediaNode(n.type) && (
+                        <span className="text-lg">
+                          {n.type === 'media-image' ? '🎨' : '🎬'}
+                        </span>
+                      )}
+                      <div className="font-medium text-[color:var(--ck-text-primary)]">{n.name || n.id}</div>
+                    </div>
                     <div className="mt-0.5 text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">{n.type}</div>
                     {(() => {
                       const cfg = n.config && typeof n.config === "object" && !Array.isArray(n.config) ? (n.config as Record<string, unknown>) : null;
+                      
+                      // Show media generation prompt for media nodes
+                      if (isMediaNode(n.type) && cfg) {
+                        const prompt = String(cfg.prompt ?? "").trim();
+                        const provider = String(cfg.provider ?? "auto");
+                        return (
+                          <div className="mt-1 space-y-0.5">
+                            {prompt && (
+                              <div className="text-[10px] text-[color:var(--ck-text-secondary)] truncate" title={prompt}>
+                                &quot;{prompt.length > 40 ? prompt.substring(0, 40) + '...' : prompt}&quot;
+                              </div>
+                            )}
+                            <div className="text-[10px] text-[color:var(--ck-text-tertiary)]">
+                              Provider: {provider}
+                            </div>
+                          </div>
+                        );
+                      }
+                      
+                      // Show agent for other nodes
                       const agentId = cfg ? String(cfg.agentId ?? "").trim() : "";
                       if (!agentId) return null;
                       const short = agentId.replace(`${teamId}-`, "");
@@ -1127,6 +1169,8 @@ export default function WorkflowsEditorClient({
                           <option value="condition">condition</option>
                           <option value="delay">delay</option>
                           <option value="human_approval">human_approval</option>
+                          <option value="media-image">media-image</option>
+                          <option value="media-video">media-video</option>
                         </select>
                       </label>
 
@@ -1199,6 +1243,32 @@ export default function WorkflowsEditorClient({
                                 Vars: {"{{workflowName}}"}, {"{{workflowId}}"}, {"{{runId}}"}, {"{{nodeId}}"}
                               </div>
                             </label>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {isMediaNode(node.type) ? (
+                        <div className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-2">
+                          <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">Media Generation</div>
+                          <div className="mt-2">
+                            <MediaGenerationConfigComponent
+                              config={{
+                                mediaType: 'image',
+                                provider: 'auto',
+                                prompt: '',
+                                outputPath: './output',
+                                ...((node.config as Record<string, unknown>) || {})
+                              } as MediaGenerationConfig}
+                              onChange={(newConfig) => {
+                                setWorkflow({ 
+                                  ...wf, 
+                                  nodes: wf.nodes.map((n) => 
+                                    n.id === node.id ? { ...n, config: newConfig as unknown as Record<string, unknown> } : n
+                                  ) 
+                                });
+                              }}
+                              teamId={teamId}
+                            />
                           </div>
                         </div>
                       ) : null}
@@ -1683,13 +1753,6 @@ export default function WorkflowsEditorClient({
                               const json = await res.json();
                               if (!res.ok || !json.ok) throw new Error(json.error || "Failed to create run");
 
-                              const newRunId = String(json.runId ?? "").trim();
-                              if (newRunId) {
-                                router.push(`/teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(wfId)}/${encodeURIComponent(newRunId)}`);
-                                return;
-                              }
-
-                              // Fallback: refresh list if no runId returned
                               const listRes = await fetch(
                                 `/api/teams/workflow-runs?teamId=${encodeURIComponent(teamId)}&workflowId=${encodeURIComponent(wfId)}`,
                                 { cache: "no-store" }
@@ -1797,7 +1860,7 @@ export default function WorkflowsEditorClient({
 
                     <div className="mt-2 space-y-1">
                       {workflowRunsLoading ? (
-                        <div className="text-xs text-[color:var(--ck-text-secondary)]">Serving up hot…</div>
+                        <div className="text-xs text-[color:var(--ck-text-secondary)]">Loading runs…</div>
                       ) : workflowRuns.length ? (
                         workflowRuns.slice(0, 8).map((f) => {
                           const wfId = String(wf.id ?? "").trim();
@@ -1868,6 +1931,8 @@ export default function WorkflowsEditorClient({
                               <option value="condition">condition</option>
                               <option value="delay">delay</option>
                               <option value="human_approval">human_approval</option>
+                              <option value="media-image">media-image</option>
+                              <option value="media-video">media-video</option>
                             </select>
                           </label>
 
@@ -2086,6 +2151,8 @@ export default function WorkflowsEditorClient({
                                   <option value="condition">condition</option>
                                   <option value="delay">delay</option>
                                   <option value="human_approval">human_approval</option>
+                                  <option value="media-image">media-image</option>
+                                  <option value="media-video">media-video</option>
                                 </select>
                               </label>
 
@@ -2116,12 +2183,39 @@ export default function WorkflowsEditorClient({
                                 </label>
                               </div>
 
-                              <div>
-                                <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">config</div>
-                                <pre className="mt-1 max-h-[200px] overflow-auto rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-2 text-[10px] text-[color:var(--ck-text-secondary)]">
-                                  {JSON.stringify(node.config ?? {}, null, 2)}
-                                </pre>
-                              </div>
+                              {/* Media Generation Configuration */}
+                              {isMediaNode(node.type) ? (
+                                <div>
+                                  <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">Media Generation</div>
+                                  <div className="mt-1">
+                                    <MediaGenerationConfigComponent
+                                      config={{
+                                        mediaType: 'image',
+                                        provider: 'auto',
+                                        prompt: '',
+                                        outputPath: './output',
+                                        ...((node.config as Record<string, unknown>) || {})
+                                      } as MediaGenerationConfig}
+                                      onChange={(newConfig) => {
+                                        setWorkflow({ 
+                                          ...wf, 
+                                          nodes: wf.nodes.map((n) => 
+                                            n.id === node.id ? { ...n, config: newConfig as unknown as Record<string, unknown> } : n
+                                          ) 
+                                        });
+                                      }}
+                                      teamId={teamId}
+                                    />
+                                  </div>
+                                </div>
+                              ) : (
+                                <div>
+                                  <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">config</div>
+                                  <pre className="mt-1 max-h-[200px] overflow-auto rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-2 text-[10px] text-[color:var(--ck-text-secondary)]">
+                                    {JSON.stringify(node.config ?? {}, null, 2)}
+                                  </pre>
+                                </div>
+                              )}
                             </div>
                           );
                         })()
