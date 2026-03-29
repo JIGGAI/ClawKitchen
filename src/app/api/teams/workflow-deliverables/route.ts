@@ -1,124 +1,149 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import fs from "node:fs/promises";
 import path from "node:path";
+
 import { getTeamWorkspaceDir } from "@/lib/paths";
-import { jsonOkRest } from "@/lib/api-route-helpers";
+import { listAllWorkflowRuns } from "@/lib/workflows/runs-storage";
 
-interface DeliverableFile {
-  id: string;
-  workflowId: string;
+export type WorkflowDeliverable = {
   runId: string;
-  filename: string;
-  path: string;
+  workflowId: string;
+  fileName: string;
+  relativePath: string;
+  absolutePath: string;
   size: number;
+  mtime: string;
   isText: boolean;
-  content?: string;
-  lastModified: string;
-}
+  contentPreview?: string; // For text files only
+};
 
-async function isTextFile(filePath: string): Promise<boolean> {
+export type WorkflowDeliverablesResponse = {
+  ok: true;
+  teamId: string;
+  deliverables: WorkflowDeliverable[];
+};
+
+async function getFileContentPreview(filePath: string, maxBytes = 1024): Promise<string | undefined> {
   try {
-    const stats = await fs.stat(filePath);
-    if (stats.size > 1024 * 1024) return false; // Skip files > 1MB
-
-    const buffer = await fs.readFile(filePath, { encoding: null });
-    const sample = buffer.subarray(0, Math.min(512, buffer.length));
+    const buffer = Buffer.alloc(maxBytes);
+    const fd = await fs.open(filePath, "r");
+    const { bytesRead } = await fd.read(buffer, 0, maxBytes, 0);
+    await fd.close();
     
-    // Check for null bytes (binary indicator)
-    for (let i = 0; i < sample.length; i++) {
-      if (sample[i] === 0) return false;
+    // Check if it's likely text
+    const content = buffer.subarray(0, bytesRead).toString("utf8");
+    // Basic heuristic: if it contains null bytes or has too many non-printable chars, it's binary
+    if (content.includes("\0") || content.split("").filter(c => c.charCodeAt(0) < 32 && c !== "\n" && c !== "\r" && c !== "\t").length > bytesRead * 0.1) {
+      return undefined;
     }
     
-    return true;
+    return content;
   } catch {
-    return false;
+    return undefined;
   }
 }
 
-async function scanDeliverables(teamId: string): Promise<DeliverableFile[]> {
-  const deliverables: DeliverableFile[] = [];
+function isTextFile(fileName: string): boolean {
+  const textExtensions = [
+    ".md", ".txt", ".json", ".xml", ".html", ".css", ".js", ".ts", 
+    ".tsx", ".jsx", ".py", ".yml", ".yaml", ".toml", ".ini", ".cfg"
+  ];
+  const ext = path.extname(fileName.toLowerCase());
+  return textExtensions.includes(ext);
+}
+
+async function scanRunDeliverables(
+  teamId: string, 
+  runId: string, 
+  workflowId: string
+): Promise<WorkflowDeliverable[]> {
   const teamDir = await getTeamWorkspaceDir(teamId);
-  const runsDir = path.join(teamDir, "shared-context/workflow-runs");
-
+  const runDir = path.join(teamDir, "shared-context", "workflow-runs", runId);
+  
+  const deliverables: WorkflowDeliverable[] = [];
+  
   try {
-    const runIds = await fs.readdir(runsDir);
-    
-    for (const runId of runIds) {
-      const runDir = path.join(runsDir, runId);
+    // Check if run directory exists
+    const stat = await fs.stat(runDir);
+    if (!stat.isDirectory()) return [];
+
+    // Recursively scan for files (excluding run.json and node-outputs/)
+    async function scanDirectory(dir: string, relativeBase = ""): Promise<void> {
+      const entries = await fs.readdir(dir, { withFileTypes: true });
       
-      try {
-        const runStat = await fs.stat(runDir);
-        if (!runStat.isDirectory()) continue;
-
-        // Read run.json to get workflow ID
-        const runJsonPath = path.join(runDir, "run.json");
-        let workflowId = "unknown";
-        try {
-          const runJson = JSON.parse(await fs.readFile(runJsonPath, "utf8"));
-          workflowId = runJson.workflowId || "unknown";
-        } catch {
-          // Continue without workflow ID
-        }
-
-        // Scan all files in run directory
-        const entries = await fs.readdir(runDir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        const relativePath = path.join(relativeBase, entry.name);
         
-        for (const entry of entries) {
-          if (entry.isFile() && entry.name !== "run.json") {
-            const filePath = path.join(runDir, entry.name);
-            const stats = await fs.stat(filePath);
-            const isText = await isTextFile(filePath);
+        if (entry.isDirectory()) {
+          // Skip node-outputs directory as it contains internal node results
+          if (entry.name === "node-outputs") continue;
+          await scanDirectory(fullPath, relativePath);
+        } else if (entry.isFile()) {
+          // Skip the main run.json file as it's internal
+          if (entry.name === "run.json" && relativeBase === "") continue;
+          
+          try {
+            const fileStat = await fs.stat(fullPath);
+            const isText = isTextFile(entry.name);
+            const contentPreview = isText ? await getFileContentPreview(fullPath) : undefined;
             
-            let content: string | undefined;
-            if (isText && stats.size < 100 * 1024) { // Only read text files < 100KB
-              try {
-                content = await fs.readFile(filePath, "utf8");
-              } catch {
-                // Content unavailable, continue without it
-              }
-            }
-
             deliverables.push({
-              id: `${runId}-${entry.name}`,
-              workflowId,
               runId,
-              filename: entry.name,
-              path: filePath,
-              size: stats.size,
+              workflowId,
+              fileName: entry.name,
+              relativePath,
+              absolutePath: fullPath,
+              size: fileStat.size,
+              mtime: fileStat.mtime.toISOString(),
               isText,
-              content,
-              lastModified: stats.mtime.toISOString(),
+              contentPreview,
             });
+          } catch {
+            // Skip files we can't read
           }
         }
-      } catch {
-        // Skip this run directory if we can't read it
-        continue;
       }
     }
+    
+    await scanDirectory(runDir);
   } catch {
-    // No runs directory, return empty array
-    return [];
+    // Run directory doesn't exist or can't be read
   }
-
-  return deliverables.sort((a, b) => 
-    new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime()
-  );
+  
+  return deliverables;
 }
 
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const teamId = searchParams.get("teamId");
-
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const teamId = url.searchParams.get("teamId")?.trim();
+  
   if (!teamId) {
     return NextResponse.json({ ok: false, error: "teamId is required" }, { status: 400 });
   }
-
+  
   try {
-    const deliverables = await scanDeliverables(teamId);
-    return jsonOkRest({ ok: true, deliverables });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
+    // Get all workflow runs for the team
+    const { runs } = await listAllWorkflowRuns(teamId);
+    
+    // Scan each run for deliverables
+    const deliverablesNested = await Promise.all(
+      runs.map(run => scanRunDeliverables(teamId, run.runId, run.workflowId))
+    );
+    
+    const deliverables = deliverablesNested.flat();
+    
+    // Sort by modification time (newest first)
+    deliverables.sort((a, b) => new Date(b.mtime).getTime() - new Date(a.mtime).getTime());
+    
+    return NextResponse.json({
+      ok: true,
+      teamId,
+      deliverables,
+    } satisfies WorkflowDeliverablesResponse);
+    
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }

@@ -9,7 +9,7 @@ import { errorMessage } from "@/lib/errors";
 import { toolsInvoke } from "@/lib/gateway";
 import { runOpenClaw } from "@/lib/openclaw";
 import { assertSafeRelativeFileName, getTeamWorkspaceDir } from "@/lib/paths";
-import { listWorkflowRuns, readWorkflowRun, writeWorkflowRun } from "@/lib/workflows/runs-storage";
+import { getWorkflowRunsDir, listWorkflowRuns, readWorkflowRun, writeWorkflowRun } from "@/lib/workflows/runs-storage";
 import type { WorkflowRunFileV1, WorkflowRunNodeResultV1 } from "@/lib/workflows/runs-types";
 import { readWorkflow } from "@/lib/workflows/storage";
 import type { WorkflowFileV1 } from "@/lib/workflows/types";
@@ -440,6 +440,68 @@ export async function POST(req: Request) {
 
       const existing = await readWorkflowRun(teamId, workflowId, runIdFromBody);
       const run = existing.run;
+
+      // Handle stop action
+      if (action === "stop") {
+        if (!["running", "waiting_for_approval"].includes(run.status)) {
+          return NextResponse.json({ ok: false, error: "Can only stop running or waiting runs" }, { status: 400 });
+        }
+
+        const stoppedAt = nowIso();
+        const stoppedNodes: WorkflowRunNodeResultV1[] = Array.isArray(run.nodes)
+          ? run.nodes.map((n) => {
+              // Mark pending/running nodes as canceled
+              if (["pending", "running", "waiting"].includes(n.status)) {
+                return {
+                  ...n,
+                  status: "skipped" as const,
+                  endedAt: stoppedAt,
+                  output: { ...((typeof n.output === "object" && n.output) || {}), note: "stopped by user" },
+                };
+              }
+              return n;
+            })
+          : [];
+
+        const stoppedRun: WorkflowRunFileV1 = {
+          ...run,
+          status: "canceled",
+          endedAt: stoppedAt,
+          nodes: stoppedNodes,
+        };
+
+        return jsonOkRest({ ...(await writeWorkflowRun(teamId, workflowId, stoppedRun)), runId: run.id });
+      }
+
+      // Handle delete action
+      if (action === "delete") {
+        const runDir = path.join((await getWorkflowRunsDir(teamId, workflowId)), runIdFromBody);
+        
+        try {
+          // Try to remove directory-per-run layout first (preferred runner layout)
+          await fs.rm(runDir, { recursive: true, force: true });
+        } catch {
+          // Ignore errors, file may not exist
+        }
+
+        try {
+          // Try to remove flat run file
+          const flatRunPath = path.join(await getWorkflowRunsDir(teamId, workflowId), `${runIdFromBody}.run.json`);
+          await fs.unlink(flatRunPath);
+        } catch {
+          // Ignore errors, file may not exist
+        }
+
+        try {
+          // Try to remove legacy per-workflow run file
+          const legacyRunPath = path.join(await getWorkflowRunsDir(teamId, workflowId), workflowId, `${runIdFromBody}.run.json`);
+          await fs.unlink(legacyRunPath);
+        } catch {
+          // Ignore errors, file may not exist
+        }
+
+        return jsonOkRest({ ok: true, deleted: true, runId: runIdFromBody });
+      }
 
       const approvalNodeId = run.approval?.nodeId || (Array.isArray(run.nodes) ? run.nodes.find((n) => n.status === "waiting")?.nodeId : undefined);
       if (!approvalNodeId) {
