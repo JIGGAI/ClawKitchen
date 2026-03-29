@@ -54,7 +54,8 @@ export async function listWorkflowRuns(teamId: string, workflowId: string) {
       try {
         const raw = await fs.readFile(p, "utf8");
         const parsed = JSON.parse(raw) as unknown;
-        const normalized = normalizeRunFile(teamId, wfId, parsed, runId);
+        const runDir = path.join(dir, runId);
+        const normalized = await normalizeRunFile(teamId, wfId, parsed, runId, runDir);
         if (normalized.workflowId === wfId) runIds.push(runId);
       } catch {
         // ignore
@@ -72,7 +73,7 @@ export async function listWorkflowRuns(teamId: string, workflowId: string) {
       try {
         const raw = await fs.readFile(path.join(dir, f), "utf8");
         const parsed = JSON.parse(raw) as unknown;
-        const normalized = normalizeRunFile(teamId, wfId, parsed, runId);
+        const normalized = await normalizeRunFile(teamId, wfId, parsed, runId);
         if (normalized.workflowId === wfId) runIds.push(runId);
       } catch {
         // ignore
@@ -107,7 +108,8 @@ export async function readWorkflowRun(teamId: string, workflowId: string, runId:
   try {
     const raw = await fs.readFile(pRunner, "utf8");
     const parsed = JSON.parse(raw) as unknown;
-    const run = normalizeRunFile(teamId, wfId, parsed, rId);
+    const runDir = path.join(dir, rId);
+    const run = await normalizeRunFile(teamId, wfId, parsed, rId, runDir);
 
     // Runner stores rich node outputs as files under:
     //   workflow-runs/<runId>/node-outputs/*-<nodeId>.json
@@ -170,13 +172,13 @@ export async function readWorkflowRun(teamId: string, workflowId: string, runId:
   try {
     const raw = await fs.readFile(p0, "utf8");
     const parsed = JSON.parse(raw) as unknown;
-    return { ok: true as const, path: p0, run: normalizeRunFile(teamId, wfId, parsed, rId) };
+    return { ok: true as const, path: p0, run: await normalizeRunFile(teamId, wfId, parsed, rId) };
   } catch (err: unknown) {
     if (LEGACY_PER_WORKFLOW_LAYOUT && err && typeof err === "object" && (err as { code?: unknown }).code === "ENOENT") {
       const legacy = path.join(dir, wfId, workflowRunFileName(rId));
       const raw = await fs.readFile(legacy, "utf8");
       const parsed = JSON.parse(raw) as unknown;
-      return { ok: true as const, path: legacy, run: normalizeRunFile(teamId, wfId, parsed, rId) };
+      return { ok: true as const, path: legacy, run: await normalizeRunFile(teamId, wfId, parsed, rId) };
     }
     throw err;
   }
@@ -188,42 +190,175 @@ export async function writeWorkflowRun(teamId: string, workflowId: string, run: 
   const dir = await getWorkflowRunsDir(teamId, wfId);
   await fs.mkdir(dir, { recursive: true });
 
-  // Default layout: write to shared-context/workflow-runs/<runId>.run.json
-  //
-  // IMPORTANT: that filename may already be occupied by a runner-owned run log (different schema).
-  // In that case, keep the runner log intact and write the Kitchen run file to the legacy
-  // per-workflow directory shared-context/workflow-runs/<workflowId>/<runId>.run.json.
-  const p0 = path.join(dir, workflowRunFileName(rId));
+  // Phase 2: Unified format - write directly to ClawRecipes directory format
+  // shared-context/workflow-runs/<runId>/run.json
+  const runDir = path.join(dir, rId);
+  const runPath = path.join(runDir, "run.json");
 
-  let p = p0;
+  // Create run directory if it doesn't exist
+  await fs.mkdir(runDir, { recursive: true });
+
+  // Check if ClawRecipes format file already exists
+  let existingClawRecipesRun: Record<string, unknown> | null = null;
   try {
-    const raw = await fs.readFile(p0, "utf8");
-    const existing = JSON.parse(raw) as unknown;
-    const isRunnerLog =
-      Boolean(existing) &&
-      typeof existing === "object" &&
-      !Array.isArray(existing) &&
-      "runId" in (existing as Record<string, unknown>) &&
-      !("schema" in (existing as Record<string, unknown>));
-
-    if (isRunnerLog && LEGACY_PER_WORKFLOW_LAYOUT) {
-      const legacyDir = path.join(dir, wfId);
-      await fs.mkdir(legacyDir, { recursive: true });
-      p = path.join(legacyDir, workflowRunFileName(rId));
-    }
+    const existingRaw = await fs.readFile(runPath, "utf8");
+    existingClawRecipesRun = JSON.parse(existingRaw);
   } catch {
-    // ignore read/parse errors; we'll write to p0
+    // File doesn't exist or isn't parseable - will create new one
   }
 
-  const toWrite: WorkflowRunFileV1 = {
-    ...run,
-    schema: "clawkitchen.workflow-run.v1",
-    id: rId,
-    workflowId: wfId,
-    teamId,
+  if (existingClawRecipesRun) {
+    // Update existing ClawRecipes format run
+    // Preserve important ClawRecipes fields like events, nodeStates, etc.
+    const updatedRun = {
+      ...existingClawRecipesRun,
+      // Update status and timing from ClawKitchen format
+      status: mapKitchenStatusToRecipes(run.status),
+      updatedAt: new Date().toISOString(),
+      // Merge node results if provided
+      ...(run.nodes && { nodeResults: run.nodes }),
+    };
+
+    await fs.writeFile(runPath, JSON.stringify(updatedRun, null, 2) + "\n", "utf8");
+    return { ok: true as const, path: runPath };
+  } else {
+    // Create new run in ClawRecipes format
+    // Convert ClawKitchen format to ClawRecipes format
+    const clawRecipesRun = {
+      runId: rId,
+      createdAt: run.startedAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      teamId,
+      workflow: { 
+        file: `${wfId}.workflow.json`,
+        id: wfId,
+        name: wfId // Use workflowId as name fallback
+      },
+      ticket: {
+        file: `${rId}.md`, // Default ticket file pattern
+        number: rId,
+        lane: "in-progress" as const
+      },
+      trigger: { 
+        kind: "manual",
+        at: run.startedAt || new Date().toISOString()
+      },
+      status: mapKitchenStatusToRecipes(run.status),
+      events: [] as Array<Record<string, unknown>>,
+      nodeResults: run.nodes || [],
+      nodeStates: {} as Record<string, Record<string, unknown>>
+    };
+
+    // Convert nodes to nodeStates
+    if (run.nodes) {
+      for (const node of run.nodes) {
+        clawRecipesRun.nodeStates[node.nodeId] = {
+          status: node.status === "success" ? "success" : node.status === "error" ? "error" : "waiting",
+          ts: node.endedAt || node.startedAt || new Date().toISOString(),
+          message: typeof node.output === "object" && node.output ? JSON.stringify(node.output) : undefined
+        };
+      }
+    }
+
+    await fs.writeFile(runPath, JSON.stringify(clawRecipesRun, null, 2) + "\n", "utf8");
+    return { ok: true as const, path: runPath };
+  }
+}
+
+// Helper function to map ClawKitchen status to ClawRecipes status
+function mapKitchenStatusToRecipes(kitchenStatus: string): string {
+  switch (kitchenStatus) {
+    case "success":
+      return "completed";
+    case "canceled":
+      return "canceled";
+    case "error":
+      return "error";
+    case "waiting_for_approval":
+      return "waiting";
+    case "waiting_workers":
+    case "running":
+    case "queued":
+      return "running";
+    default:
+      return kitchenStatus;
+  }
+}
+
+// Helper function to append events to ClawRecipes run log
+export async function appendWorkflowRunEvent(
+  teamId: string, 
+  workflowId: string, 
+  runId: string, 
+  event: { type: string; [key: string]: unknown }
+) {
+  const wfId = assertSafeWorkflowId(workflowId);
+  const rId = assertSafeRunId(runId);
+  const dir = await getWorkflowRunsDir(teamId, wfId);
+  const runDir = path.join(dir, rId);
+  const runPath = path.join(runDir, "run.json");
+
+  try {
+    const existingRaw = await fs.readFile(runPath, "utf8");
+    const existingRun = JSON.parse(existingRaw);
+    
+    // Add timestamp to event
+    const timestampedEvent = {
+      ...event,
+      ts: new Date().toISOString()
+    };
+    
+    // Append event to events array
+    if (!existingRun.events) {
+      existingRun.events = [];
+    }
+    existingRun.events.push(timestampedEvent);
+    existingRun.updatedAt = new Date().toISOString();
+
+    await fs.writeFile(runPath, JSON.stringify(existingRun, null, 2) + "\n", "utf8");
+    return { ok: true as const, path: runPath };
+  } catch {
+    // If file doesn't exist, we can't append an event
+    throw new Error(`Cannot append event to non-existent run: ${runId}`);
+  }
+}
+
+// Helper function to write approval files in ClawRecipes format
+export async function writeApprovalFile(
+  teamId: string,
+  workflowId: string, 
+  runId: string,
+  nodeId: string,
+  approvalData: {
+    state: string;
+    requestedAt?: string;
+    decidedAt?: string;
+    note?: string;
+    decidedBy?: string;
+  }
+) {
+  const wfId = assertSafeWorkflowId(workflowId);
+  const rId = assertSafeRunId(runId);
+  const dir = await getWorkflowRunsDir(teamId, wfId);
+  const runDir = path.join(dir, rId);
+  const approvalsDir = path.join(runDir, "approvals");
+  const approvalPath = path.join(approvalsDir, "approval.json");
+
+  // Create approvals directory if it doesn't exist
+  await fs.mkdir(approvalsDir, { recursive: true });
+
+  // Write approval file in ClawRecipes format
+  const approvalFile = {
+    nodeId,
+    state: approvalData.state,
+    requestedAt: approvalData.requestedAt || new Date().toISOString(),
+    decidedAt: approvalData.decidedAt,
+    note: approvalData.note,
+    decidedBy: approvalData.decidedBy
   };
-  await fs.writeFile(p, JSON.stringify(toWrite, null, 2) + "\n", "utf8");
-  return { ok: true as const, path: p };
+
+  await fs.writeFile(approvalPath, JSON.stringify(approvalFile, null, 2) + "\n", "utf8");
+  return { ok: true as const, path: approvalPath };
 }
 
 export type WorkflowRunSummary = {
@@ -254,7 +389,8 @@ export async function listAllWorkflowRuns(teamId: string): Promise<{ ok: true; d
       const full = path.join(dir, runId, "run.json");
       try {
         const [raw, st] = await Promise.all([fs.readFile(full, "utf8"), fs.stat(full)]);
-        const normalized = normalizeRunFile(teamId, "(unknown)", JSON.parse(raw) as unknown, runId);
+        const runDir = path.join(dir, runId);
+        const normalized = await normalizeRunFile(teamId, "(unknown)", JSON.parse(raw) as unknown, runId, runDir);
         runs.push({
           workflowId: normalized.workflowId,
           runId: normalized.id,
@@ -280,7 +416,7 @@ export async function listAllWorkflowRuns(teamId: string): Promise<{ ok: true; d
       const full = path.join(dir, fileName);
       try {
         const [raw, st] = await Promise.all([fs.readFile(full, "utf8"), fs.stat(full)]);
-        const normalized = normalizeRunFile(teamId, "(unknown)", JSON.parse(raw) as unknown, runId);
+        const normalized = await normalizeRunFile(teamId, "(unknown)", JSON.parse(raw) as unknown, runId);
         runs.push({
           workflowId: normalized.workflowId,
           runId: normalized.id,
@@ -369,7 +505,13 @@ export async function listAllWorkflowRuns(teamId: string): Promise<{ ok: true; d
   return { ok: true as const, dir, runs: deduped };
 }
 
-function normalizeRunFile(teamId: string, workflowId: string, parsed: unknown, runIdFallback: string): WorkflowRunFileV1 {
+async function normalizeRunFile(
+  teamId: string, 
+  workflowId: string, 
+  parsed: unknown, 
+  runIdFallback: string, 
+  runDirPath?: string
+): Promise<WorkflowRunFileV1> {
   // Kitchen schema
   if (parsed && typeof parsed === "object" && (parsed as { schema?: unknown }).schema === "clawkitchen.workflow-run.v1") {
     return parsed as WorkflowRunFileV1;
@@ -465,6 +607,43 @@ function normalizeRunFile(teamId: string, workflowId: string, parsed: unknown, r
           .filter((x): x is WorkflowRunNodeResultV1 => x !== null)
       : undefined;
 
+    // Read approval file from ClawRecipes format if available
+    let approval: WorkflowRunFileV1["approval"] = undefined;
+    if (runDirPath) {
+      const approvalFile = path.join(runDirPath, "approvals", "approval.json");
+      try {
+        const approvalRaw = await fs.readFile(approvalFile, "utf8");
+        const approvalData = JSON.parse(approvalRaw) as {
+          nodeId?: string;
+          status?: string;
+          requestedAt?: string;
+          decidedAt?: string;
+          note?: string;
+          decidedBy?: string;
+          bindingId?: string;
+        };
+
+        if (approvalData.nodeId) {
+          const state = 
+            approvalData.status === "approved" ? "approved" as const :
+            approvalData.status === "rejected" ? "changes_requested" as const :
+            approvalData.status === "canceled" ? "canceled" as const :
+            "pending" as const;
+
+          approval = {
+            nodeId: approvalData.nodeId,
+            state,
+            requestedAt: approvalData.requestedAt,
+            decidedAt: approvalData.decidedAt,
+            note: approvalData.note,
+            decidedBy: approvalData.decidedBy,
+          };
+        }
+      } catch {
+        // Ignore approval file read errors - approval files may not exist
+      }
+    }
+
     return {
       schema: "clawkitchen.workflow-run.v1",
       id: typeof o.runId === "string" ? o.runId : runIdFallback,
@@ -480,6 +659,7 @@ function normalizeRunFile(teamId: string, workflowId: string, parsed: unknown, r
       status,
       summary: "Executed by workflow runner",
       nodes,
+      approval,
     };
   }
 
