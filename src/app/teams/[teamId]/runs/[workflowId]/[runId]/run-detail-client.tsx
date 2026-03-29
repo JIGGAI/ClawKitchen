@@ -1,6 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { fetchJson } from "@/lib/fetch-json";
+import { ConfirmationModal } from "@/components/ConfirmationModal";
 import type { WorkflowRunFileV1, WorkflowRunNodeResultV1 } from "@/lib/workflows/runs-types";
 
 function asPrettyJson(v: unknown) {
@@ -16,20 +19,98 @@ function statusColor(status?: string) {
   if (status === "error") return "border-red-400/30 bg-red-500/10 text-red-50";
   if (status === "running") return "border-sky-400/30 bg-sky-500/10 text-sky-50";
   if (status === "waiting_for_approval") return "border-amber-400/30 bg-amber-500/10 text-amber-50";
+  if (status === "canceled") return "border-gray-400/30 bg-gray-500/10 text-gray-50";
   return "border-white/10 bg-white/5 text-[color:var(--ck-text-secondary)]";
 }
 
-export default function RunDetailClient({ run }: { run: WorkflowRunFileV1 }) {
+export default function RunDetailClient({ 
+  run, 
+  teamId, 
+  workflowId 
+}: { 
+  run: WorkflowRunFileV1; 
+  teamId: string; 
+  workflowId: string; 
+}) {
+  const router = useRouter();
   const nodes = Array.isArray(run.nodes) ? run.nodes : [];
 
   // nodeId is not unique (a workflow can execute the same node multiple times).
   // Use timeline index for stable selection.
   const [selectedIdx, setSelectedIdx] = useState<number>(0);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showStopModal, setShowStopModal] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
+  const [actionError, setActionError] = useState<string>("");
 
   const selectedNode: WorkflowRunNodeResultV1 | undefined = useMemo(
     () => (nodes.length ? nodes[Math.min(Math.max(0, selectedIdx), nodes.length - 1)] : undefined),
     [nodes, selectedIdx]
   );
+
+  // Determine if actions are available
+  const canStop = ["running", "waiting_for_approval"].includes(run.status);
+  const canDelete = true; // Always allow delete
+
+  const handleStop = async () => {
+    try {
+      setActionBusy(true);
+      setActionError("");
+
+      const response = await fetchJson<{ ok: boolean; error?: string }>(`/api/teams/workflow-runs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          teamId,
+          workflowId,
+          runId: run.id,
+          action: "stop",
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(response.error || "Failed to stop run");
+      }
+
+      // Refresh the page to show updated state
+      router.refresh();
+    } catch (err) {
+      setActionError(String(err));
+    } finally {
+      setActionBusy(false);
+      setShowStopModal(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      setActionBusy(true);
+      setActionError("");
+
+      const response = await fetchJson<{ ok: boolean; error?: string }>(`/api/teams/workflow-runs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          teamId,
+          workflowId,
+          runId: run.id,
+          action: "delete",
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(response.error || "Failed to delete run");
+      }
+
+      // Navigate back to runs list
+      router.push(`/teams/${encodeURIComponent(teamId)}/runs`);
+    } catch (err) {
+      setActionError(String(err));
+    } finally {
+      setActionBusy(false);
+      setShowDeleteModal(false);
+    }
+  };
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -50,6 +131,28 @@ export default function RunDetailClient({ run }: { run: WorkflowRunFileV1 }) {
                 </div>
               ) : null}
             </div>
+          </div>
+          <div className="flex flex-col gap-2">
+            {canStop && (
+              <button
+                type="button"
+                onClick={() => setShowStopModal(true)}
+                disabled={actionBusy}
+                className="rounded-[var(--ck-radius-sm)] border border-amber-500/50 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-100 hover:bg-amber-500/20 disabled:opacity-50"
+              >
+                Stop Run
+              </button>
+            )}
+            {canDelete && (
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(true)}
+                disabled={actionBusy}
+                className="rounded-[var(--ck-radius-sm)] border border-red-500/50 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-100 hover:bg-red-500/20 disabled:opacity-50"
+              >
+                Delete Run
+              </button>
+            )}
           </div>
         </div>
 
@@ -143,6 +246,50 @@ export default function RunDetailClient({ run }: { run: WorkflowRunFileV1 }) {
           <pre className="mt-3 overflow-auto text-xs text-[color:var(--ck-text-primary)]">{asPrettyJson(run)}</pre>
         </details>
       </div>
+
+      {/* Stop Run Confirmation Modal */}
+      <ConfirmationModal
+        open={showStopModal}
+        onClose={() => {
+          setShowStopModal(false);
+          setActionError("");
+        }}
+        title="Stop Workflow Run"
+        confirmLabel="Stop Run"
+        confirmBusyLabel="Stopping..."
+        onConfirm={handleStop}
+        busy={actionBusy}
+        error={actionError}
+        confirmButtonClassName="rounded-[var(--ck-radius-sm)] bg-amber-600 px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] transition-colors hover:bg-amber-700 disabled:opacity-50"
+      >
+        <div className="mt-3 text-sm text-[color:var(--ck-text-secondary)]">
+          <p>This will cancel the workflow run and set its status to <code className="bg-white/10 px-1 rounded">canceled</code>.</p>
+          <p className="mt-2">The run data will be preserved but execution will stop.</p>
+        </div>
+      </ConfirmationModal>
+
+      {/* Delete Run Confirmation Modal */}
+      <ConfirmationModal
+        open={showDeleteModal}
+        onClose={() => {
+          setShowDeleteModal(false);
+          setActionError("");
+        }}
+        title="Delete Workflow Run"
+        confirmLabel="Delete Run"
+        confirmBusyLabel="Deleting..."
+        onConfirm={handleDelete}
+        busy={actionBusy}
+        error={actionError}
+      >
+        <div className="mt-3 text-sm text-[color:var(--ck-text-secondary)]">
+          <p>This will permanently delete the workflow run and all its data.</p>
+          <p className="mt-2 font-medium text-[color:var(--ck-text-primary)]">This action cannot be undone.</p>
+          <div className="mt-3 rounded border border-white/10 bg-black/20 p-2 text-xs">
+            <span className="font-mono">{run.id}</span>
+          </div>
+        </div>
+      </ConfirmationModal>
     </div>
   );
 }
