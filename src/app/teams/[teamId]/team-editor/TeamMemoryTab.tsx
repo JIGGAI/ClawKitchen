@@ -244,12 +244,13 @@ export function TeamMemoryTab({ teamId }: { teamId: string }) {
 
   /* ---------- derived data ---------- */
 
-  const jsonlFiles = useMemo(() => fileList.filter((f) => f.kind === "jsonl" && f.name !== "pinned.jsonl"), [fileList]);
+  const jsonlFiles = useMemo(() => fileList.filter((f) => f.kind === "jsonl"), [fileList]);
+  const writableJsonlFiles = useMemo(() => jsonlFiles.filter((f) => f.name !== "pinned.jsonl"), [jsonlFiles]);
   const mdFileList = useMemo(() => fileList.filter((f) => f.kind === "md"), [fileList]);
 
   const allTypes = useMemo(() => {
     const types = new Set<string>();
-    for (const it of items) types.add(it.type);
+    for (const it of items) if (!it._parseError) types.add(it.type);
     for (const it of pinnedItems) types.add(it.type);
     return Array.from(types).sort();
   }, [items, pinnedItems]);
@@ -444,7 +445,7 @@ export function TeamMemoryTab({ teamId }: { teamId: string }) {
                   setViewMode("md-viewer");
                   setSelectedMd(f.name);
                   setEditingMd(false);
-                } else if (f.kind === "jsonl" && f.name !== "pinned.jsonl") {
+                } else if (f.kind === "jsonl") {
                   setViewMode("file");
                   setFilterFile(f.name);
                   setSelectedFile(f.name);
@@ -636,12 +637,15 @@ export function TeamMemoryTab({ teamId }: { teamId: string }) {
                   onChange={(e) => setNewTargetFile(e.target.value)}
                   className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
                 >
-                  {jsonlFiles.map((f) => (
-                    <option key={f.name} value={f.name}>
-                      {f.name}
-                    </option>
-                  ))}
-                  <option value="team.jsonl">team.jsonl</option>
+                  {writableJsonlFiles.length > 0 ? (
+                    writableJsonlFiles.map((f) => (
+                      <option key={f.name} value={f.name}>
+                        {f.name}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="team.jsonl">team.jsonl</option>
+                  )}
                 </select>
               </label>
 

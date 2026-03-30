@@ -172,8 +172,8 @@ function parseJsonlItems(lines: string[], fileName: string): MemoryItem[] {
       // Surface broken lines with error indicator
       items.push({
         ts: new Date().toISOString(),
-        author: "unknown",
-        type: "error",
+        author: "system",
+        type: "parse-error",
         content: line.slice(0, 500),
         _file: fileName,
         _line: i + 1,
@@ -213,7 +213,7 @@ export async function GET(req: Request) {
 
       // Load ALL jsonl files (not just team.jsonl)
       const allJsonlItems: MemoryItem[] = [];
-      const jsonlFiles = fileList.filter((f) => f.kind === "jsonl" && f.name !== PINNED_FILE);
+      const jsonlFiles = fileList.filter((f) => f.kind === "jsonl");
       for (const f of jsonlFiles) {
         const lines = await readJsonlFile(path.join(memoryDir, f.name));
         const items = parseJsonlItems(lines, f.name);
