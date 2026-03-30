@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ConfirmationModal } from "@/components/ConfirmationModal";
 import type { WorkflowFileV1 } from "@/lib/workflows/types";
 import { validateWorkflowFileV1 } from "@/lib/workflows/validate";
@@ -28,6 +29,7 @@ export default function WorkflowsEditorClient({
   draft: boolean;
   llmTaskEnabled?: boolean;
 }) {
+  const router = useRouter();
   const [view, setView] = useState<"canvas" | "json">("canvas");
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<LoadState>({ kind: "loading" });
@@ -1915,6 +1917,13 @@ export default function WorkflowsEditorClient({
                               const json = await res.json();
                               if (!res.ok || !json.ok) throw new Error(json.error || "Failed to create run");
 
+                              // Redirect to run page if runId is available
+                              const newRunId = String(json.runId ?? "").trim();
+                              if (newRunId) {
+                                router.push(`/teams/${teamId}/runs/${workflowId}/${newRunId}`);
+                                return;
+                              }
+
                               const listRes = await fetch(
                                 `/api/teams/workflow-runs?teamId=${encodeURIComponent(teamId)}&workflowId=${encodeURIComponent(wfId)}`,
                                 { cache: "no-store" }
@@ -2022,7 +2031,7 @@ export default function WorkflowsEditorClient({
 
                     <div className="mt-2 space-y-1">
                       {workflowRunsLoading ? (
-                        <div className="text-xs text-[color:var(--ck-text-secondary)]">Loading runs…</div>
+                        <div className="text-xs text-[color:var(--ck-text-secondary)]">Serving up hot…</div>
                       ) : workflowRuns.length ? (
                         workflowRuns.slice(0, 8).map((f) => {
                           const wfId = String(wf.id ?? "").trim();
