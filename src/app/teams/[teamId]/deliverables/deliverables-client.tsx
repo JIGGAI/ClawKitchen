@@ -191,7 +191,7 @@ export default function DeliverablesClient({
 
           {filteredDeliverables.length > 0 ? (
             <div className="space-y-2">
-              {filteredDeliverables.map((deliverable, idx) => {
+              {filteredDeliverables.map((deliverable) => {
                 const isSelected = selectedDeliverable?.absolutePath === deliverable.absolutePath;
                 const wfName = workflows[deliverable.workflowId]?.name || deliverable.workflowId;
                 
@@ -248,7 +248,7 @@ export default function DeliverablesClient({
                           onClick={(e) => e.stopPropagation()}
                           className="text-xs px-2 py-1 border border-white/10 rounded hover:bg-white/5 text-[color:var(--ck-text-secondary)]"
                         >
-                          Run →
+                          View Run →
                         </Link>
                       </div>
                     </div>
