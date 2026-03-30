@@ -22,7 +22,6 @@ import { TeamFilesTab } from "./TeamFilesTab";
 import { TeamMemoryTab } from "./TeamMemoryTab";
 import { OrchestratorPanel } from "../OrchestratorPanel";
 import WorkflowsClient from "../workflows/workflows-client";
-// import PluginTabs from "@/components/PluginTabs"; // Unused - plugins tab commented out
 import { DeliverablesTab } from "./DeliverablesTab";
 
 const BASE_TABS = [
@@ -96,10 +95,7 @@ export default function TeamEditor({ teamId, initialTab }: { teamId: string; ini
   const [teamAgents, setTeamAgents] = useState<TeamAgentEntry[]>([]);
   const [teamAgentsLoading, setTeamAgentsLoading] = useState(false);
   
-  // Extract team type from recipe frontmatter
-  const DEFAULT_TEAM_TYPE = 'marketing-team';
-  
-  const [teamType, setTeamType] = useState<string>(DEFAULT_TEAM_TYPE);
+
 
   const recipeAgents = useMemo(() => {
     const md = String(content ?? "");
@@ -119,24 +115,7 @@ export default function TeamEditor({ teamId, initialTab }: { teamId: string; ini
     }
   }, [content]);
 
-  const recipeTeamType = useMemo(() => {
-    const md = String(content ?? "");
-    if (!md.startsWith("---\n")) return DEFAULT_TEAM_TYPE;
-    const end = md.indexOf("\n---\n", 4);
-    if (end === -1) return DEFAULT_TEAM_TYPE;
-    const fmText = md.slice(4, end + 1);
-    try {
-      const fm = (parseYaml(fmText) ?? {}) as { teamType?: string; team?: { type?: string } };
-      return fm.teamType || fm.team?.type || DEFAULT_TEAM_TYPE;
-    } catch {
-      return DEFAULT_TEAM_TYPE;
-    }
-  }, [content]);
 
-  // Update teamType when recipe content changes
-  useEffect(() => {
-    setTeamType(recipeTeamType);
-  }, [recipeTeamType]);
 
   const [newRole, setNewRole] = useState<string>("");
   const [customRole, setCustomRole] = useState<string>("");
