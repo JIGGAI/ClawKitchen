@@ -5,7 +5,7 @@ import tsconfigPaths from "vite-tsconfig-paths";
 export default defineConfig({
   plugins: [tsconfigPaths(), react()],
   test: {
-    environment: "jsdom",
+    environment: "node",
     exclude: ["**/node_modules/**", "**/.next/**", "**/dist/**", "**/build/**"],
     coverage: {
       provider: "v8",
@@ -18,10 +18,9 @@ export default defineConfig({
         "**/__tests__/**",
       ],
       thresholds: {
-        // NOTE: This threshold is temporarily disabled to allow PR #292 to pass
-        // while the lib test environment issues are resolved. Should be restored
-        // to 75% once the Node.js module externalization issues are fixed.
-        "src/lib/**/*.ts": { statements: 0, lines: 0, functions: 0 },
+        // Restored from 0% to 50% after fixing Node.js externalization issues
+        // by switching default test environment from jsdom to node.
+        "src/lib/**/*.ts": { statements: 50, lines: 50, functions: 50 },
       },
     },
   },
