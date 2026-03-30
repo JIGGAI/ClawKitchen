@@ -206,8 +206,11 @@ export default function WorkflowsEditorClient({
   }, []);
 
   const refreshCronMap = useCallback(async (): Promise<Record<string, boolean>> => {
-    // Preflight helper: determine whether each agent has any cron job installed/enabled.
-    // (Used to warn/block enqueue when the assigned worker has no cron heartbeat.)
+    // Preflight helper: determine whether each workflow-assigned agent has a
+    // workflow worker-tick cron installed and enabled.  Safe-idle or other
+    // generic crons do NOT satisfy this requirement — only crons whose name
+    // starts with "workflow-worker:" or whose payload message contains
+    // "worker-tick" count.
     setCronError("");
     setCronLoading(true);
     try {
@@ -218,21 +221,41 @@ export default function WorkflowsEditorClient({
 
       const map: Record<string, boolean> = {};
       for (const j of jobs) {
-        // openclaw cron list returns `agentId` on the job when scoped to an agent.
-        // We also enrich jobs with `scope`, but that may be team-scoped for worker-cron grouping.
-        const job = j as { enabled?: unknown; agentId?: unknown; scope?: { kind?: unknown; id?: unknown } };
+        const job = j as {
+          enabled?: unknown;
+          name?: unknown;
+          agentId?: unknown;
+          payload?: { message?: unknown; kind?: unknown };
+          scope?: { kind?: unknown; id?: unknown };
+        };
         if (!job || !Boolean(job.enabled)) continue;
 
-        const agentId = String(job.agentId ?? "").trim();
-        if (agentId) {
-          map[agentId] = true;
+        // Only match workflow worker-tick crons, not safe-idle or other agent crons.
+        const jobName = String(job.name ?? "");
+        const payloadMsg = String(job.payload?.message ?? "");
+        const isWorkerTick = jobName.startsWith("workflow-worker:") || payloadMsg.includes("worker-tick");
+        if (!isWorkerTick) continue;
+
+        // Worker-tick crons run as agentId "main" but reference the target
+        // agent in the name (workflow-worker:<teamId>:<agentId>) and message.
+        // Extract the target agent from the name or payload.
+        const nameMatch = jobName.match(/^workflow-worker:[^:]+:(.+)$/);
+        if (nameMatch?.[1]) {
+          map[nameMatch[1]] = true;
           continue;
         }
 
-        // Back-compat: if we don't have agentId, fall back to enriched scope.
-        if (job.scope && String(job.scope.kind) === "agent") {
-          const id = String(job.scope.id ?? "").trim();
-          if (id) map[id] = true;
+        // Fallback: extract from payload message pattern "worker-tick ... --agent-id <id>"
+        const msgMatch = payloadMsg.match(/--agent-id\s+(\S+)/);
+        if (msgMatch?.[1]) {
+          map[msgMatch[1]] = true;
+          continue;
+        }
+
+        // Last resort: if the cron runs as a non-main agent, use that.
+        const agentId = String(job.agentId ?? "").trim();
+        if (agentId && agentId !== "main") {
+          map[agentId] = true;
         }
       }
       setAgentHasCron(map);

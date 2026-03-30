@@ -101,6 +101,14 @@ describe("scaffold helpers", () => {
       // Mock fs.stat to simulate workspace exists (resolves successfully) 
       vi.mocked(fs.stat).mockResolvedValue({} as never);
       
+      // Mock runOpenClaw for the agents list call (even though we won't reach it)
+      vi.mocked(runOpenClaw).mockResolvedValue({
+        ok: true,
+        stdout: JSON.stringify([]),
+        stderr: "",
+        exitCode: 0,
+      });
+      
       const result = await validateTeamId("team1", new Set());
       expect(result).not.toBeNull();
       expect((result as Response).status).toBe(409);
