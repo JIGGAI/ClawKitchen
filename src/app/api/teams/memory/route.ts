@@ -28,7 +28,7 @@ type PinnedOp =
       ts: string;
       actor: string;
       key: MemoryPointer;
-      item: Omit<MemoryItem, "_file" | "_line" | "_parseError">;
+      item: BaseMemoryItem;
     }
   | {
       op: "unpin";
@@ -51,6 +51,9 @@ type MarkdownFile = {
   modifiedAt: string;
 };
 
+type BaseMemoryItem = Omit<MemoryItem, "_file" | "_line" | "_parseError">;
+type BaseMemoryItemOrNull = BaseMemoryItem | null;
+
 const TEAM_FILE = "team.jsonl" as const;
 const PINNED_FILE = "pinned.jsonl" as const;
 
@@ -66,7 +69,7 @@ function safeParseJsonLine(line: string): { parsed: unknown; error?: string } {
   }
 }
 
-function asMemoryItem(x: unknown): Omit<MemoryItem, "_file" | "_line" | "_parseError"> | null {
+function asMemoryItem(x: unknown): BaseMemoryItemOrNull {
   if (!x || typeof x !== "object" || Array.isArray(x)) return null;
   const o = x as Record<string, unknown>;
   const ts = String(o.ts ?? "").trim();
@@ -227,7 +230,7 @@ export async function GET(req: Request) {
         string,
         {
           key: MemoryPointer;
-          item: Omit<MemoryItem, "_file" | "_line" | "_parseError">;
+          item: BaseMemoryItem;
           pinnedAt: string;
           pinnedBy: string;
         }
@@ -335,7 +338,7 @@ export async function POST(req: Request) {
         }
 
         const full = path.join(memoryDir, file);
-        const item: Omit<MemoryItem, "_file" | "_line" | "_parseError"> = {
+        const item: BaseMemoryItem = {
           ts,
           author,
           type,
