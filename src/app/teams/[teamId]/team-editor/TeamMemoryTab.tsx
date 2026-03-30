@@ -545,7 +545,6 @@ export function TeamMemoryTab({ teamId }: { teamId: string }) {
               <div className="prose prose-invert prose-sm max-w-none text-sm text-[color:var(--ck-text-primary)]">
                 <ReactMarkdown 
                   remarkPlugins={[remarkGfm]}
-                  className="text-[color:var(--ck-text-primary)]"
                   components={{
                     // Style links for dark theme
                     a: ({ href, children, ...props }) => (
