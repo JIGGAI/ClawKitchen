@@ -22,7 +22,7 @@ import { TeamFilesTab } from "./TeamFilesTab";
 import { TeamMemoryTab } from "./TeamMemoryTab";
 import { OrchestratorPanel } from "../OrchestratorPanel";
 import WorkflowsClient from "../workflows/workflows-client";
-import PluginTabs from "@/components/PluginTabs";
+// import PluginTabs from "@/components/PluginTabs"; // Unused - plugins tab commented out
 import { DeliverablesTab } from "./DeliverablesTab";
 
 const BASE_TABS = [
