@@ -76,8 +76,7 @@ async function scanRunDeliverables(
         const relativePath = path.join(relativeBase, entry.name);
         
         if (entry.isDirectory()) {
-          // Skip node-outputs directory as it contains internal node results
-          if (entry.name === "node-outputs") continue;
+          // Include all directories, including node-outputs
           await scanDirectory(fullPath, relativePath);
         } else if (entry.isFile()) {
           // Skip the main run.json file as it's internal
