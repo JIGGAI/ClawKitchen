@@ -44,7 +44,7 @@ export const MEDIA_NODE_TYPES = {
       size: '1024x1024',
       quality: 'standard',
       style: 'natural',
-      outputPath: 'node-outputs/{{node.id}}.json'
+      outputPath: 'shared-context/media/{{run.id}}_{{node.id}}.png'
     } as MediaGenerationConfig
   },
   'media-video': {
@@ -60,7 +60,7 @@ export const MEDIA_NODE_TYPES = {
       provider: 'auto',
       prompt: '',
       duration: '5s',
-      outputPath: 'node-outputs/{{node.id}}.json'
+      outputPath: 'shared-context/media/{{run.id}}_{{node.id}}.mp4'
     } as MediaGenerationConfig
   }
 } as const;
