@@ -1293,6 +1293,7 @@ export default function WorkflowsEditorClient({
                               }}
                               teamId={teamId}
                               workflowNodeIds={wf.nodes.map((n) => n.id)}
+                              workflowEdges={(wf.edges ?? []).map((e) => ({ from: e.from, to: e.to }))}
                               currentNodeId={node.id}
                             />
                           </div>
@@ -1638,6 +1639,7 @@ export default function WorkflowsEditorClient({
                                     }}
                                     teamId={teamId}
                                     workflowNodeIds={wf.nodes.map((n) => n.id)}
+                                    workflowEdges={(wf.edges ?? []).map((e) => ({ from: e.from, to: e.to }))}
                                     currentNodeId={node.id}
                                   />
                                 </div>

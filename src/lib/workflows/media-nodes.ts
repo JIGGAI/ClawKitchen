@@ -110,13 +110,33 @@ export const TEMPLATE_VARIABLES = [
 ];
 
 /**
- * Build dynamic template variable list including prior node outputs.
+ * Build dynamic template variable list including only upstream node outputs.
+ * Walks the edge graph backwards from currentNodeId to find all ancestors.
+ *
  * @param allNodeIds - all node IDs in the workflow
+ * @param edges - workflow edges (each has `from` and `to`)
  * @param currentNodeId - the node being edited (excluded from suggestions)
  */
-export function buildTemplateVariables(allNodeIds: string[], currentNodeId: string): string[] {
+export function buildTemplateVariables(
+  allNodeIds: string[],
+  edges: { from: string; to: string }[],
+  currentNodeId: string
+): string[] {
+  // BFS backwards from currentNodeId to find all upstream ancestors
+  const upstream = new Set<string>();
+  const queue = [currentNodeId];
+  while (queue.length > 0) {
+    const nodeId = queue.shift()!;
+    for (const edge of edges) {
+      if (edge.to === nodeId && !upstream.has(edge.from)) {
+        upstream.add(edge.from);
+        queue.push(edge.from);
+      }
+    }
+  }
+
   const nodeVars = allNodeIds
-    .filter((id) => id !== currentNodeId && id !== 'start' && id !== 'end')
+    .filter((id) => upstream.has(id) && id !== 'start' && id !== 'end')
     .map((id) => `{{${id}.output}}`);
   return [...nodeVars, ...TEMPLATE_VARIABLES];
 }

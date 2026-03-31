@@ -9,11 +9,13 @@ interface MediaGenerationConfigProps {
   teamId: string;
   /** All node IDs in the workflow (for building {{nodeId.output}} variable suggestions) */
   workflowNodeIds?: string[];
+  /** Workflow edges for determining upstream nodes */
+  workflowEdges?: { from: string; to: string }[];
   /** The current node's ID (excluded from variable suggestions) */
   currentNodeId?: string;
 }
 
-export function MediaGenerationConfigComponent({ config, onChange, teamId, workflowNodeIds, currentNodeId }: MediaGenerationConfigProps) {
+export function MediaGenerationConfigComponent({ config, onChange, teamId, workflowNodeIds, workflowEdges, currentNodeId }: MediaGenerationConfigProps) {
   const [providers, setProviders] = useState<MediaProvider[]>([]);
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<string[]>([]);
@@ -188,7 +190,7 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId, workf
               className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 px-1 py-0.5 text-[10px] text-[color:var(--ck-text-secondary)]"
             >
               <option value="">+ Variables</option>
-              {buildTemplateVariables(workflowNodeIds ?? [], currentNodeId ?? '').map(variable => (
+              {buildTemplateVariables(workflowNodeIds ?? [], workflowEdges ?? [], currentNodeId ?? '').map(variable => (
                 <option key={variable} value={variable}>{variable}</option>
               ))}
             </select>
