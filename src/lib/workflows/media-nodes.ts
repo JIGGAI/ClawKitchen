@@ -1,30 +1,28 @@
 /**
  * Media Generation Node Types for ClawKitchen Workflows
- * Integrates with the vendor-agnostic media generation backend system
+ *
+ * Providers are skill-driven — only installed skills with media generation
+ * capabilities appear in the dropdown. No hardcoded provider list.
  */
 
 export interface MediaGenerationConfig {
   mediaType: 'image' | 'video';
-  provider: 'auto' | 'openai' | 'skill' | 'http' | string;
-  prompt: string;
+  provider: string;        // skill ID from media-providers API (e.g. "skill-openai-image-gen")
+  prompt: string;          // prompt template, supports {{nodeId.output}} vars
   size?: string;
   quality?: 'standard' | 'hd';
   style?: 'natural' | 'vivid';
-  model?: string;
   outputPath?: string;
-  duration?: string; // For video
-  // Provider-specific configs
-  skillId?: string;
-  httpEndpoint?: string;
-  httpHeaders?: Record<string, string>;
+  duration?: string;       // For video (e.g. "5s")
 }
 
 export interface MediaProvider {
   id: string;
   name: string;
-  supportedTypes: ('image' | 'video')[];
+  description: string;
+  supportedTypes: ('image' | 'video' | 'audio')[];
   available: boolean;
-  models?: string[];
+  skillPath?: string;
   error?: string;
 }
 
@@ -33,13 +31,13 @@ export const MEDIA_NODE_TYPES = {
     type: 'tool',
     tool: 'media.generate',
     label: 'Generate Image',
-    description: 'Generate images using AI providers (DALL-E, Skills, etc.)',
+    description: 'Generate images using installed skills',
     icon: '🎨',
     color: '#9333EA',
     category: 'media',
     defaultConfig: {
       mediaType: 'image',
-      provider: 'auto',
+      provider: '',
       prompt: '',
       size: '1024x1024',
       quality: 'standard',
@@ -48,16 +46,16 @@ export const MEDIA_NODE_TYPES = {
     } as MediaGenerationConfig
   },
   'media-video': {
-    type: 'tool', 
+    type: 'tool',
     tool: 'media.generate',
     label: 'Generate Video',
-    description: 'Generate videos using AI providers',
+    description: 'Generate videos using installed skills',
     icon: '🎬',
     color: '#DC2626',
     category: 'media',
     defaultConfig: {
       mediaType: 'video',
-      provider: 'auto',
+      provider: '',
       prompt: '',
       duration: '5s',
       outputPath: 'shared-context/media/{{run.id}}_{{node.id}}.mp4'
@@ -77,23 +75,27 @@ export function getMediaNodeConfig(nodeType: MediaNodeType): MediaGenerationConf
 
 export function validateMediaConfig(config: Partial<MediaGenerationConfig>): string[] {
   const errors: string[] = [];
-  
+
   if (!config.prompt?.trim()) {
     errors.push('Prompt is required');
   }
-  
+
+  if (!config.provider?.trim()) {
+    errors.push('Select a provider skill');
+  }
+
   if (config.mediaType === 'image') {
     if (config.size && !['256x256', '512x512', '1024x1024', '1792x1024', '1024x1792'].includes(config.size)) {
       errors.push('Invalid image size');
     }
   }
-  
+
   if (config.mediaType === 'video') {
     if (config.duration && !config.duration.match(/^\d+s?$/)) {
       errors.push('Invalid video duration format (e.g., "5s")');
     }
   }
-  
+
   return errors;
 }
 
@@ -112,17 +114,12 @@ export const TEMPLATE_VARIABLES = [
 /**
  * Build dynamic template variable list including only upstream node outputs.
  * Walks the edge graph backwards from currentNodeId to find all ancestors.
- *
- * @param allNodeIds - all node IDs in the workflow
- * @param edges - workflow edges (each has `from` and `to`)
- * @param currentNodeId - the node being edited (excluded from suggestions)
  */
 export function buildTemplateVariables(
   allNodeIds: string[],
   edges: { from: string; to: string }[],
   currentNodeId: string
 ): string[] {
-  // BFS backwards from currentNodeId to find all upstream ancestors
   const upstream = new Set<string>();
   const queue = [currentNodeId];
   while (queue.length > 0) {
@@ -145,9 +142,7 @@ export function buildTemplateVariables(
  * Common prompt templates for different media types
  */
 export const PROMPT_TEMPLATES = {
-  'social-media': 'Professional social media image for: {{content}}',
-  'blog-header': 'Blog header image representing: {{title}}',
-  'product-shot': 'Product photography style image of: {{product}}',
-  'illustration': 'Clean vector illustration of: {{concept}}',
-  'marketing': 'Marketing banner image for: {{campaign}}'
+  'social-media': 'Create a professional social media image for: {{content}}',
+  'blog-header': 'Create a blog header image representing: {{title}}',
+  'marketing': 'Create a marketing image for: {{campaign}}',
 } as const;

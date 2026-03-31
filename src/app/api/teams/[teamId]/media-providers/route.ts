@@ -1,293 +1,152 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import fs from 'fs/promises';
 import path from 'path';
-
-const execAsync = promisify(exec);
 
 export interface MediaProvider {
   id: string;
   name: string;
-  supportedTypes: ('image' | 'video')[];
+  description: string;
+  supportedTypes: ('image' | 'video' | 'audio')[];
   available: boolean;
-  models?: string[];
+  skillPath?: string;
   error?: string;
-  priority?: number;
+}
+
+interface SkillMeta {
+  name: string;
+  description: string;
+  supportedTypes: ('image' | 'video' | 'audio')[];
+  requiresEnv: string[];
+  skillPath: string;
 }
 
 /**
  * GET /api/teams/[teamId]/media-providers
- * 
- * Detects available media generation providers by:
- * 1. Checking for API keys (OPENAI_API_KEY, etc.)
- * 2. Scanning installed skills for media generation capabilities
- * 3. Testing local endpoints (Stable Diffusion, ComfyUI, etc.)
- * 4. Returning prioritized list of providers
+ *
+ * Detects available media generation providers by scanning installed skills.
+ * Only skills with media generation capabilities are returned.
+ * No hardcoded providers — everything comes from installed skills.
  */
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ teamId: string }> }
 ): Promise<NextResponse<MediaProvider[] | { error: string }>> {
   try {
-    await params; // Await the params (required by Next.js 15+)
+    await params;
     const providers: MediaProvider[] = [];
 
-    // 1. Check OpenAI Provider
-    const openaiProviders = await checkOpenAIProvider();
-    providers.push(...openaiProviders);
+    const skillsDirs = [
+      path.join(process.env.HOME || '/home/control', '.openclaw', 'skills'),
+      path.join(process.env.HOME || '/home/control', '.openclaw', 'workspace', 'skills'),
+    ];
 
-    // 2. Check Skill-based Providers
-    const skillProviders = await checkSkillProviders();
-    providers.push(...skillProviders);
+    for (const skillsDir of skillsDirs) {
+      let entries: string[];
+      try {
+        entries = await fs.readdir(skillsDir);
+      } catch {
+        continue;
+      }
 
-    // 3. Check HTTP/Local Providers
-    const httpProviders = await checkHTTPProviders();
-    providers.push(...httpProviders);
+      for (const entry of entries) {
+        const skillPath = path.join(skillsDir, entry);
+        const meta = await parseSkillMedia(skillPath);
+        if (!meta) continue;
 
-    // Sort by priority (available providers first, then by priority score)
+        // Check if required env vars are present
+        const missingEnv = meta.requiresEnv.filter((e) => !process.env[e]);
+        const available = missingEnv.length === 0;
+
+        // Dedupe by skill name (first found wins)
+        if (providers.some((p) => p.id === `skill-${entry}`)) continue;
+
+        providers.push({
+          id: `skill-${entry}`,
+          name: meta.name,
+          description: meta.description,
+          supportedTypes: meta.supportedTypes,
+          available,
+          skillPath: meta.skillPath,
+          error: available ? undefined : `Missing: ${missingEnv.join(', ')}`,
+        });
+      }
+    }
+
+    // Sort: available first, then alphabetical
     providers.sort((a, b) => {
       if (a.available && !b.available) return -1;
       if (!a.available && b.available) return 1;
-      return (b.priority || 0) - (a.priority || 0);
+      return a.name.localeCompare(b.name);
     });
 
     return NextResponse.json(providers);
   } catch (error) {
     console.error('Failed to detect media providers:', error);
-    return NextResponse.json(
-      { error: 'Failed to detect media providers' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to detect media providers' }, { status: 500 });
   }
 }
 
-async function checkOpenAIProvider(): Promise<MediaProvider[]> {
-  const providers: MediaProvider[] = [];
-  
+/**
+ * Parse a skill directory to detect media generation capabilities.
+ * Returns null if the skill doesn't support media generation.
+ */
+async function parseSkillMedia(skillPath: string): Promise<SkillMeta | null> {
+  let skillMd: string;
   try {
-    // Read OpenClaw config to get models
-    const configPath = path.join(process.env.HOME || '/home/control', '.openclaw', 'openclaw.json');
-    const configData = await fs.readFile(configPath, 'utf-8');
-    const config = JSON.parse(configData);
-    
-    // Extract models from config
-    const fallbackModels = config.agents?.defaults?.model?.fallbacks || [];
-    const primaryModel = config.agents?.defaults?.model?.primary;
-    const allModels = [primaryModel, ...fallbackModels].filter(Boolean);
-    
-    // Group models by provider
-    const modelsByProvider: Record<string, string[]> = {};
-    allModels.forEach((model: string) => {
-      if (typeof model === 'string' && model.includes('/')) {
-        const [provider, modelName] = model.split('/');
-        if (!modelsByProvider[provider]) {
-          modelsByProvider[provider] = [];
-        }
-        modelsByProvider[provider].push(modelName);
-      }
-    });
-    
-    // Check OpenAI models (supports image generation)
-    if (modelsByProvider['openai'] || modelsByProvider['openai-codex']) {
-      const openaiModels = [...(modelsByProvider['openai'] || []), ...(modelsByProvider['openai-codex'] || [])];
-      const hasApiKey = !!process.env.OPENAI_API_KEY;
-      
-      providers.push({
-        id: 'openai-models',
-        name: 'OpenAI Models (Image Generation)',
-        supportedTypes: ['image'],
-        available: hasApiKey,
-        models: openaiModels,
-        error: hasApiKey ? undefined : 'OPENAI_API_KEY not configured',
-        priority: 100
-      });
-    }
-    
-    // Check for DALL-E specifically
-    const hasApiKey = !!process.env.OPENAI_API_KEY;
-    providers.push({
-      id: 'dalle',
-      name: 'OpenAI DALL-E',
-      supportedTypes: ['image'],
-      available: hasApiKey,
-      models: ['dall-e-2', 'dall-e-3'],
-      error: hasApiKey ? undefined : 'OPENAI_API_KEY not configured',
-      priority: 90
-    });
-    
-  } catch (error) {
-    console.warn('Failed to read OpenClaw config:', error);
-    
-    // Fallback OpenAI provider
-    const hasApiKey = !!process.env.OPENAI_API_KEY;
-    providers.push({
-      id: 'openai-fallback',
-      name: 'OpenAI DALL-E (fallback)',
-      supportedTypes: ['image'],
-      available: hasApiKey,
-      models: ['dall-e-3'],
-      error: hasApiKey ? undefined : 'OPENAI_API_KEY not configured',
-      priority: 80
-    });
+    skillMd = await fs.readFile(path.join(skillPath, 'SKILL.md'), 'utf-8');
+  } catch {
+    return null;
   }
-  
-  return providers;
-}
 
-async function checkSkillProviders(): Promise<MediaProvider[]> {
-  const providers: MediaProvider[] = [];
-  
-  try {
-    // Scan multiple skills directories
-    const skillsDirs = [
-      path.join(process.env.HOME || '/home/control', '.openclaw/workspace/skills'),
-      path.join(process.env.HOME || '/home/control', '.openclaw/skills')
-    ];
-    
-    const allSkills: { name: string; description: string; hasMedia: boolean; supportedTypes: string[]; available: boolean; error?: string }[] = [];
-    
-    for (const skillsDir of skillsDirs) {
-      try {
-        const skillDirs = await fs.readdir(skillsDir);
-        
-        for (const skillDir of skillDirs) {
-          try {
-            const skillPath = path.join(skillsDir, skillDir);
-            const skillMd = await fs.readFile(path.join(skillPath, 'SKILL.md'), 'utf-8');
-            
-            // Extract skill name and description
-            let skillName = skillDir.replace(/-/g, ' ');
-            let description = '';
-            
-            // Parse frontmatter or description
-            const nameMatch = skillMd.match(/^name:\s*(.+)$/m);
-            if (nameMatch) skillName = nameMatch[1];
-            
-            const descMatch = skillMd.match(/^description:\s*(.+)$/m);
-            if (descMatch) description = descMatch[1].replace(/"/g, '');
-            
-            // Check for media generation capabilities
-            const hasImageGen = /\b(image|picture|photo|visual|media|video|audio)\b.*\b(generat|creat|make|produc)\b/i.test(skillMd) ||
-                               /\b(generat|creat|make|produc)\b.*\b(image|picture|photo|visual|media|video|audio)\b/i.test(skillMd) ||
-                               /dall.?e|stable.?diffusion|midjourney|cellcog|any.?to.?any/i.test(skillMd);
-            
-            if (hasImageGen) {
-              const supportedTypes: string[] = [];
-              if (/\b(image|picture|photo|visual)\b/i.test(skillMd)) supportedTypes.push('image');
-              if (/\bvideo\b/i.test(skillMd)) supportedTypes.push('video');
-              if (/\baudio\b/i.test(skillMd)) supportedTypes.push('audio');
-              if (supportedTypes.length === 0) supportedTypes.push('image'); // default
-              
-              // Check for API key requirements
-              let available = true;
-              let error: string | undefined;
-              
-              if (skillMd.includes('OPENAI_API_KEY') && !process.env.OPENAI_API_KEY) {
-                available = false;
-                error = 'OPENAI_API_KEY required';
-              }
-              if (skillMd.includes('CELLCOG_API_KEY') && !process.env.CELLCOG_API_KEY) {
-                available = false;
-                error = 'CELLCOG_API_KEY required';
-              }
-              if (skillMd.includes('EVOLINK_API_KEY') && !process.env.EVOLINK_API_KEY) {
-                available = false;
-                error = 'EVOLINK_API_KEY required';
-              }
-              
-              allSkills.push({
-                name: skillName,
-                description: description || `${skillName} skill`,
-                hasMedia: true,
-                supportedTypes,
-                available,
-                error
-              });
-            }
-          } catch {
-            // Skip invalid skills
-          }
-        }
-      } catch {
-        // Skills directory doesn't exist or is inaccessible
-      }
-    }
-    
-    // Create providers from detected skills
-    allSkills.forEach((skill, index) => {
-      providers.push({
-        id: `skill-${skill.name.toLowerCase().replace(/\s+/g, '-')}`,
-        name: skill.name,
-        supportedTypes: skill.supportedTypes as ('image' | 'video')[],
-        available: skill.available,
-        error: skill.error,
-        priority: 70 + index // Give different priorities to different skills
-      });
-    });
-    
-    // Add fallback skill provider entry if no skills found
-    if (providers.length === 0) {
-      providers.push({
-        id: 'skills-empty',
-        name: 'OpenClaw Skills',
-        supportedTypes: ['image'],
-        available: false,
-        error: 'No media generation skills installed',
-        priority: 60
-      });
-    }
-    
-  } catch (error) {
-    console.warn('Skill detection failed:', error);
-  }
-  
-  return providers;
-}
+  // Must have media generation keywords
+  const hasMediaGen =
+    /\b(image|picture|photo|visual)\b.*\b(generat|creat|produc)\b/i.test(skillMd) ||
+    /\b(generat|creat|produc)\b.*\b(image|picture|photo|visual)\b/i.test(skillMd) ||
+    /\bvideo\b.*\b(generat|creat|produc)\b/i.test(skillMd) ||
+    /\b(generat|creat|produc)\b.*\bvideo\b/i.test(skillMd) ||
+    /\baudio\b.*\b(generat|creat|produc)\b/i.test(skillMd) ||
+    /dall.?e|stable.?diffusion|text.?to.?image|image.?gen/i.test(skillMd) ||
+    /cellcog.*any.?to.?any|any.?to.?any.*cellcog/i.test(skillMd);
 
-async function checkHTTPProviders(): Promise<MediaProvider[]> {
-  const providers: MediaProvider[] = [];
-  
-  // Check common local endpoints
-  const endpoints = [
-    { 
-      url: 'http://localhost:7860',
-      name: 'Stable Diffusion WebUI',
-      priority: 90
-    },
-    { 
-      url: 'http://localhost:8188', 
-      name: 'ComfyUI',
-      priority: 85
-    }
-  ];
-  
-  for (const endpoint of endpoints) {
-    try {
-      // Quick health check with timeout
-      const response = await fetch(`${endpoint.url}/`, { 
-        method: 'HEAD',
-        signal: AbortSignal.timeout(2000)
-      });
-      
-      providers.push({
-        id: `http-${endpoint.url.replace(/[^\w]/g, '-')}`,
-        name: endpoint.name,
-        supportedTypes: ['image'],
-        available: response.ok,
-        priority: endpoint.priority
-      });
-    } catch {
-      providers.push({
-        id: `http-${endpoint.url.replace(/[^\w]/g, '-')}`,
-        name: endpoint.name,
-        supportedTypes: ['image'],
-        available: false,
-        error: `${endpoint.name} not running`,
-        priority: endpoint.priority
-      });
+  if (!hasMediaGen) return null;
+
+  // Detect supported types
+  const supportedTypes: ('image' | 'video' | 'audio')[] = [];
+  if (/\b(image|picture|photo|visual|dall.?e)\b/i.test(skillMd)) supportedTypes.push('image');
+  if (/\bvideo\b/i.test(skillMd)) supportedTypes.push('video');
+  if (/\baudio\b/i.test(skillMd)) supportedTypes.push('audio');
+  if (supportedTypes.length === 0) supportedTypes.push('image');
+
+  // Parse name from frontmatter or directory name
+  const nameMatch = skillMd.match(/^name:\s*(.+)$/m);
+  const name = nameMatch ? nameMatch[1].replace(/^["']|["']$/g, '') : path.basename(skillPath);
+
+  // Parse description
+  const descMatch = skillMd.match(/^description:\s*"?(.+?)"?\s*$/m);
+  const description = descMatch ? descMatch[1] : `${name} skill`;
+
+  // Parse required env vars from frontmatter
+  const requiresEnv: string[] = [];
+  const envMatch = skillMd.match(/env:\s*\[([^\]]+)\]/);
+  if (envMatch) {
+    envMatch[1].split(',').forEach((e) => {
+      const trimmed = e.trim().replace(/^["']|["']$/g, '');
+      if (trimmed) requiresEnv.push(trimmed);
+    });
+  }
+  // Also check body for explicit env var mentions
+  const bodyEnvMatches = skillMd.match(/\b([A-Z][A-Z0-9_]+_(?:API_KEY|KEY|TOKEN|SECRET))\b/g);
+  if (bodyEnvMatches) {
+    for (const envVar of bodyEnvMatches) {
+      if (!requiresEnv.includes(envVar)) requiresEnv.push(envVar);
     }
   }
-  
-  return providers;
+
+  return {
+    name,
+    description,
+    supportedTypes,
+    requiresEnv,
+    skillPath,
+  };
 }
