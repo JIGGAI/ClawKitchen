@@ -168,6 +168,10 @@ export async function updateCronJob(id: string, data: CronJobData): Promise<Open
     throw new Error(validationError);
   }
 
-  const args = ["cron", "update", "--id", id, ...buildCronJobArgs(data)];
+  // IMPORTANT:
+  // OpenClaw CLI uses `cron edit <id> [flags...]` for patch-style updates.
+  // The `cron update` subcommand does not accept our `--payload-*` flag set,
+  // so edits like `payload.model` would silently fail to persist.
+  const args = ["cron", "edit", id, ...buildCronJobArgs(data)];
   return await runOpenClaw(args);
 }
