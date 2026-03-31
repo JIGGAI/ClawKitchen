@@ -1281,7 +1281,6 @@ export default function WorkflowsEditorClient({
                                 mediaType: 'image',
                                 provider: 'auto',
                                 prompt: '',
-                                outputPath: './output',
                                 ...((node.config as Record<string, unknown>) || {})
                               } as MediaGenerationConfig}
                               onChange={(newConfig) => {
@@ -1293,6 +1292,8 @@ export default function WorkflowsEditorClient({
                                 });
                               }}
                               teamId={teamId}
+                              workflowNodeIds={wf.nodes.map((n) => n.id)}
+                              currentNodeId={node.id}
                             />
                           </div>
                         </div>
@@ -1625,7 +1626,6 @@ export default function WorkflowsEditorClient({
                                       mediaType: 'image',
                                       provider: 'auto',
                                       prompt: '',
-                                      outputPath: './output',
                                       ...((node.config as Record<string, unknown>) || {})
                                     } as MediaGenerationConfig}
                                     onChange={(newConfig) => {
@@ -1637,6 +1637,8 @@ export default function WorkflowsEditorClient({
                                       });
                                     }}
                                     teamId={teamId}
+                                    workflowNodeIds={wf.nodes.map((n) => n.id)}
+                                    currentNodeId={node.id}
                                   />
                                 </div>
                               </div>
