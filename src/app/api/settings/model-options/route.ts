@@ -1,17 +1,19 @@
 import { NextResponse } from "next/server";
 import { errorMessage } from "@/lib/errors";
-import { gatewayConfigGet } from "@/lib/gateway";
+import { readOpenClawConfigRaw } from "@/lib/openclaw-config";
+import { isRecord } from "@/lib/type-guards";
 
 export async function GET() {
   try {
-    const { raw } = await gatewayConfigGet();
-    const cfg = JSON.parse(raw) as {
-      agents?: { defaults?: { model?: { primary?: unknown; fallbacks?: unknown[] } } };
-    };
+    const cfg = await readOpenClawConfigRaw();
+    const root = isRecord(cfg.json) ? cfg.json : {};
+    const agents = isRecord(root.agents) ? root.agents : {};
+    const defaults = isRecord(agents.defaults) ? agents.defaults : {};
+    const model = isRecord(defaults.model) ? defaults.model : {};
 
-    const primary = typeof cfg.agents?.defaults?.model?.primary === "string" ? cfg.agents.defaults.model.primary.trim() : "";
-    const fallbacks = Array.isArray(cfg.agents?.defaults?.model?.fallbacks)
-      ? cfg.agents.defaults.model.fallbacks.map((m) => String(m ?? "").trim()).filter(Boolean)
+    const primary = typeof model.primary === "string" ? model.primary.trim() : "";
+    const fallbacks = Array.isArray(model.fallbacks)
+      ? model.fallbacks.map((m) => String(m ?? "").trim()).filter(Boolean)
       : [];
 
     const models = Array.from(new Set([primary, ...fallbacks].filter(Boolean)));
