@@ -8,6 +8,7 @@ import type { WorkflowFileV1 } from "@/lib/workflows/types";
 import { validateWorkflowFileV1 } from "@/lib/workflows/validate";
 import { getMediaNodeConfig, isMediaNode, type MediaGenerationConfig } from "@/lib/workflows/media-nodes";
 import { MediaGenerationConfigComponent } from "@/components/media/MediaGenerationConfig";
+import { gatewayConfigGet } from "@/lib/gateway";
 
 type LoadState =
   | { kind: "loading" }
@@ -61,6 +62,8 @@ export default function WorkflowsEditorClient({
 
   const [approvalBindings, setApprovalBindings] = useState<Array<{ id: string; label: string; channel: string; target: string }>>([]);
   const [approvalBindingsError, setApprovalBindingsError] = useState<string>("");
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [availableModelsError, setAvailableModelsError] = useState<string>("");
 
   const approvalBindingsNeedsKitchenUpdate = useMemo(() => {
     return /Tool not available:\s*gateway/i.test(String(approvalBindingsError || ""));
@@ -203,6 +206,27 @@ export default function WorkflowsEditorClient({
       } catch (e: unknown) {
         setApprovalBindingsError(e instanceof Error ? e.message : String(e));
         setApprovalBindings([]);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      setAvailableModelsError("");
+      try {
+        const { raw } = await gatewayConfigGet();
+        const cfg = JSON.parse(raw) as {
+          agents?: { defaults?: { model?: { primary?: unknown; fallbacks?: unknown[] } } };
+        };
+        const primary = typeof cfg.agents?.defaults?.model?.primary === "string" ? cfg.agents.defaults.model.primary.trim() : "";
+        const fallbacks = Array.isArray(cfg.agents?.defaults?.model?.fallbacks)
+          ? cfg.agents.defaults.model.fallbacks.map((m) => String(m ?? "").trim()).filter(Boolean)
+          : [];
+        const deduped = Array.from(new Set([primary, ...fallbacks].filter(Boolean)));
+        setAvailableModels(deduped);
+      } catch (e: unknown) {
+        setAvailableModelsError(e instanceof Error ? e.message : String(e));
+        setAvailableModels([]);
       }
     })();
   }, []);
@@ -1146,6 +1170,7 @@ export default function WorkflowsEditorClient({
                 const y = typeof node.y === "number" ? node.y : 80;
                 const cfg = node.config && typeof node.config === "object" && !Array.isArray(node.config) ? (node.config as Record<string, unknown>) : {};
                 const agentId = String(cfg.agentId ?? "").trim();
+                const model = String(cfg.model ?? "").trim();
 
                 return (
                   <div
@@ -1213,6 +1238,30 @@ export default function WorkflowsEditorClient({
                           placeholder="(drag an agent onto the node or type)"
                         />
                       </label>
+
+                      {node.type === "llm" ? (
+                        <label className="block">
+                          <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">model</div>
+                          <select
+                            value={model}
+                            onChange={(e) => {
+                              const nextModel = String(e.target.value || "").trim();
+                              const nextCfg = { ...cfg, ...(nextModel ? { model: nextModel } : {}) };
+                              if (!nextModel) delete (nextCfg as Record<string, unknown>).model;
+                              setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
+                            }}
+                            className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                          >
+                            <option value="">Default (inherit global)</option>
+                            {availableModels.map((m) => (
+                              <option key={m} value={m}>{m}</option>
+                            ))}
+                          </select>
+                          {availableModelsError ? (
+                            <div className="mt-1 text-[10px] text-amber-300">Could not load model list: {availableModelsError}</div>
+                          ) : null}
+                        </label>
+                      ) : null}
 
                       {node.type === "human_approval" ? (
                         <div className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-2">
