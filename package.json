@@ -1,6 +1,6 @@
 {
   "name": "@jiggai/kitchen",
-  "version": "0.3.30",
+  "version": "0.3.31",
   "main": "openclaw/index.ts",
   "description": "ClawKitchen - Web-based dashboard for OpenClaw agent teams, workflows, and automation",
   "author": "@rjdjohnston · rjdjohnston",
