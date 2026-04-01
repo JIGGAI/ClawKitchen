@@ -22,6 +22,7 @@ import { TeamFilesTab } from "./TeamFilesTab";
 import { TeamMemoryTab } from "./TeamMemoryTab";
 import { OrchestratorPanel } from "../OrchestratorPanel";
 import WorkflowsClient from "../workflows/workflows-client";
+
 import { DeliverablesTab } from "./DeliverablesTab";
 
 const BASE_TABS = [
@@ -114,6 +115,8 @@ export default function TeamEditor({ teamId, initialTab }: { teamId: string; ini
       return [] as Array<{ role: string; name?: string }>;
     }
   }, [content]);
+
+
 
 
 
