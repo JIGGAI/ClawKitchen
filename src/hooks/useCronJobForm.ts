@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 export interface CronJobFormData {
   name: string;
@@ -59,12 +59,12 @@ export function useCronJobForm(options: UseCronJobFormOptions = {}) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const updateField = <K extends keyof CronJobFormData>(
-    field: K,
-    value: CronJobFormData[K]
-  ) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
+  const updateField = useCallback(
+    <K extends keyof CronJobFormData>(field: K, value: CronJobFormData[K]) => {
+      setFormData((prev) => ({ ...prev, [field]: value }));
+    },
+    [],
+  );
 
   const reset = () => {
     setFormData({

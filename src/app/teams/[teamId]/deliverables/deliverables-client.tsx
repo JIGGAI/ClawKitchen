@@ -1,10 +1,22 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import type { WorkflowDeliverable } from "@/app/api/teams/workflow-deliverables/route";
+
+const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg"]);
+
+function isImageFile(fileName: string): boolean {
+  const ext = fileName.toLowerCase().split(".").pop() ?? "";
+  return IMAGE_EXTENSIONS.has(ext);
+}
+
+function deliverableFileUrl(teamId: string, d: WorkflowDeliverable): string {
+  return `/api/teams/workflow-deliverables/file?teamId=${encodeURIComponent(teamId)}&runId=${encodeURIComponent(d.runId)}&path=${encodeURIComponent(d.relativePath)}`;
+}
 
 function formatBytes(bytes: number) {
   if (bytes === 0) return "0 B";
@@ -106,16 +118,21 @@ export default function DeliverablesClient({
 
   const downloadDeliverable = async (deliverable: WorkflowDeliverable) => {
     try {
-      // For now, we'll copy the content to clipboard or show it in a modal
-      // In a full implementation, you'd want a download endpoint
       if (deliverable.isText && deliverable.contentPreview) {
         await navigator.clipboard.writeText(deliverable.contentPreview);
         alert("Content copied to clipboard!");
       } else {
-        alert("Download functionality for binary files not implemented in this demo");
+        // Download binary files via the file API
+        const url = deliverableFileUrl(teamId, deliverable);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = deliverable.fileName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
       }
     } catch {
-      alert("Failed to copy to clipboard");
+      alert("Failed to download file");
     }
   };
 
@@ -206,6 +223,18 @@ export default function DeliverablesClient({
                     onClick={() => setSelectedDeliverable(deliverable)}
                   >
                     <div className="flex items-start justify-between gap-3">
+                      {isImageFile(deliverable.fileName) && (
+                        <div className="flex-shrink-0 w-12 h-12 rounded overflow-hidden bg-black/20 border border-white/10">
+                          <Image
+                            src={deliverableFileUrl(teamId, deliverable)}
+                            alt={deliverable.fileName}
+                            width={48}
+                            height={48}
+                            className="w-full h-full object-cover"
+                            unoptimized
+                          />
+                        </div>
+                      )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-lg">{getFileIcon(deliverable.fileName)}</span>
@@ -241,7 +270,7 @@ export default function DeliverablesClient({
                           }}
                           className="text-xs px-2 py-1 border border-white/10 rounded hover:bg-white/5 text-[color:var(--ck-text-secondary)]"
                         >
-                          Copy
+                          {deliverable.isText ? "Copy" : "Download"}
                         </button>
                         <Link
                           href={`/teams/${teamId}/runs/${deliverable.workflowId}/${deliverable.runId}`}
@@ -295,7 +324,37 @@ export default function DeliverablesClient({
                 </div>
               </div>
 
-              {selectedDeliverable.isText && selectedDeliverable.contentPreview ? (
+              {isImageFile(selectedDeliverable.fileName) ? (
+                <div>
+                  <div className="text-xs text-[color:var(--ck-text-tertiary)] mb-2">Image Preview:</div>
+                  <div className="bg-black/20 border border-white/10 rounded-[var(--ck-radius-sm)] p-2 overflow-hidden">
+                    <Image
+                      src={deliverableFileUrl(teamId, selectedDeliverable)}
+                      alt={selectedDeliverable.fileName}
+                      width={800}
+                      height={600}
+                      className="w-full h-auto rounded-[var(--ck-radius-sm)] object-contain max-h-[500px]"
+                      unoptimized
+                    />
+                  </div>
+                  <div className="mt-2 flex gap-2">
+                    <a
+                      href={deliverableFileUrl(teamId, selectedDeliverable)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs px-2 py-1 border border-white/10 rounded hover:bg-white/5 text-[color:var(--ck-text-secondary)]"
+                    >
+                      Open full size ↗
+                    </a>
+                    <button
+                      onClick={() => downloadDeliverable(selectedDeliverable)}
+                      className="text-xs px-2 py-1 border border-white/10 rounded hover:bg-white/5 text-[color:var(--ck-text-secondary)]"
+                    >
+                      Download
+                    </button>
+                  </div>
+                </div>
+              ) : selectedDeliverable.isText && selectedDeliverable.contentPreview ? (
                 <div>
                   <div className="text-xs text-[color:var(--ck-text-tertiary)] mb-2">Content Preview:</div>
                   <div className="bg-black/20 border border-white/10 rounded-[var(--ck-radius-sm)] p-3 max-h-[400px] overflow-auto">
@@ -305,11 +364,17 @@ export default function DeliverablesClient({
                   </div>
                 </div>
               ) : (
-                <div className="text-xs text-[color:var(--ck-text-secondary)] italic">
-                  {selectedDeliverable.isText 
-                    ? "Text file preview not available"
-                    : "Binary file - no preview available"
-                  }
+                <div className="text-center py-6">
+                  <div className="text-3xl mb-2">{getFileIcon(selectedDeliverable.fileName)}</div>
+                  <div className="text-xs text-[color:var(--ck-text-secondary)] mb-2">
+                    {formatBytes(selectedDeliverable.size)} · {selectedDeliverable.fileName.split(".").pop()?.toUpperCase()} file
+                  </div>
+                  <button
+                    onClick={() => downloadDeliverable(selectedDeliverable)}
+                    className="text-xs px-3 py-1.5 border border-white/10 rounded hover:bg-white/5 text-[color:var(--ck-text-secondary)]"
+                  >
+                    Download file
+                  </button>
                 </div>
               )}
             </div>

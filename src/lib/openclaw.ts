@@ -166,6 +166,18 @@ export async function runOpenClaw(args: string[]): Promise<OpenClawExecResult> {
   // specifically we prefer a local exec (host OpenClaw).
   if (args[0] === "cron") return runOpenClawLocal(args);
 
+  // Workflow runner/worker commands are long-running orchestration processes that
+  // acquire locks and claims. The runtime command wrapper (runCommandWithTimeout)
+  // has a 120s hard timeout that can kill these mid-execution, orphaning locks and
+  // leaving runs stuck in waiting_workers. Route them through local exec instead.
+  if (
+    args[0] === "recipes" &&
+    args[1] === "workflows" &&
+    ["runner-once", "runner-tick", "worker-tick"].includes(args[2])
+  ) {
+    return runOpenClawLocal(args);
+  }
+
   const api = getKitchenApi();
   try {
     const res = (await api.runtime.system.runCommandWithTimeout(["openclaw", ...args], { timeoutMs: 120000 })) as {

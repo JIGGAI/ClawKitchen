@@ -64,6 +64,11 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
     });
   }, [jobs]);
 
+  const liveEditJob = useMemo(() => {
+    if (!editJob) return null;
+    return jobs.find((job) => job.id === editJob.id) ?? editJob;
+  }, [jobs, editJob]);
+
   async function refresh() {
     setLoading(true);
     setMsg("");
@@ -273,7 +278,7 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
       />
 
       <EditCronJobModal
-        job={editJob}
+        job={liveEditJob}
         open={editOpen}
         onClose={() => setEditOpen(false)}
         onSaved={refresh}

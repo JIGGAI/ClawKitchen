@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { Modal } from "@/components/Modal";
+import { ConfirmationModal } from "@/components/ConfirmationModal";
 import { CronJobForm } from "@/components/CronJobForm";
 import { useCronJobForm } from "@/hooks/useCronJobForm";
 import { fetchJson } from "@/lib/fetch-json";
@@ -153,46 +153,32 @@ export function EditCronJobModal({ job, open, onClose, onSaved }: EditCronJobMod
   if (!job) return null;
 
   return (
-    <Modal open={open} onClose={onClose} title="Edit Cron Job" size="lg">
-      <div className="max-h-[70vh] overflow-y-auto">
+    <ConfirmationModal
+      open={open}
+      onClose={onClose}
+      title="Edit Cron Job"
+      error={error}
+      confirmLabel="Save changes"
+      confirmBusyLabel="Saving…"
+      confirmDisabled={!formData.name}
+      busy={loading}
+      onConfirm={handleSave}
+    >
+      <div className="mt-4 max-h-[70vh] overflow-y-auto">
         <CronJobForm formData={formData} updateField={updateField} />
-        
-        {error && (
-          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
-            {error}
-          </div>
-        )}
       </div>
-      
-      <div className="flex justify-between mt-6 pt-4 border-t">
+
+      <div className="mt-6 flex items-center justify-between gap-2 border-t border-white/10 pt-4">
         <button
           type="button"
           onClick={handleDelete}
           disabled={loading}
-          className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="rounded-[var(--ck-radius-sm)] border border-[color:rgba(255,59,48,0.45)] bg-[color:rgba(255,59,48,0.08)] px-3 py-2 text-sm font-medium text-[color:var(--ck-accent-red)] transition-colors hover:bg-[color:rgba(255,59,48,0.12)] disabled:opacity-50"
         >
-          {loading ? "Deleting..." : "Delete Job"}
+          Delete job
         </button>
-        
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-gray-600 hover:text-gray-800"
-            disabled={loading}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={loading || !formData.name}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? "Saving..." : "Save Changes"}
-          </button>
-        </div>
+        <div className="text-xs text-[color:var(--ck-text-tertiary)]">Tip: use dryRun=true to test safely.</div>
       </div>
-    </Modal>
+    </ConfirmationModal>
   );
 }

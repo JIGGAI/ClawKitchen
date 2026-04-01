@@ -1,15 +1,21 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { MediaGenerationConfig, MediaProvider, validateMediaConfig, TEMPLATE_VARIABLES, PROMPT_TEMPLATES } from '@/lib/workflows/media-nodes';
+import { MediaGenerationConfig, MediaProvider, validateMediaConfig, buildTemplateVariables, PROMPT_TEMPLATES } from '@/lib/workflows/media-nodes';
 
 interface MediaGenerationConfigProps {
   config: MediaGenerationConfig;
   onChange: (config: MediaGenerationConfig) => void;
   teamId: string;
+  /** All node IDs in the workflow (for building {{nodeId.output}} variable suggestions) */
+  workflowNodeIds?: string[];
+  /** Workflow edges for determining upstream nodes */
+  workflowEdges?: { from: string; to: string }[];
+  /** The current node's ID (excluded from variable suggestions) */
+  currentNodeId?: string;
 }
 
-export function MediaGenerationConfigComponent({ config, onChange, teamId }: MediaGenerationConfigProps) {
+export function MediaGenerationConfigComponent({ config, onChange, teamId, workflowNodeIds, workflowEdges, currentNodeId }: MediaGenerationConfigProps) {
   const [providers, setProviders] = useState<MediaProvider[]>([]);
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<string[]>([]);
@@ -184,7 +190,7 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId }: Med
               className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 px-1 py-0.5 text-[10px] text-[color:var(--ck-text-secondary)]"
             >
               <option value="">+ Variables</option>
-              {TEMPLATE_VARIABLES.map(variable => (
+              {buildTemplateVariables(workflowNodeIds ?? [], workflowEdges ?? [], currentNodeId ?? '').map(variable => (
                 <option key={variable} value={variable}>{variable}</option>
               ))}
             </select>
@@ -272,21 +278,6 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId }: Med
           </div>
         </label>
       )}
-
-      {/* Output Path */}
-      <label className="block">
-        <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">outputPath</div>
-        <input
-          type="text"
-          value={config.outputPath}
-          onChange={(e) => updateConfig({ outputPath: e.target.value })}
-          placeholder="shared-context/media/{{run.id}}_image.png"
-          className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
-        />
-        <div className="mt-1 text-[10px] text-[color:var(--ck-text-tertiary)]">
-          File path where the generated media will be saved. Use template variables for dynamic naming.
-        </div>
-      </label>
 
       {/* Validation Errors */}
       {errors.length > 0 && (

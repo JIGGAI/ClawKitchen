@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ConfirmationModal } from "@/components/ConfirmationModal";
 import type { WorkflowFileV1 } from "@/lib/workflows/types";
 import { validateWorkflowFileV1 } from "@/lib/workflows/validate";
@@ -28,6 +29,7 @@ export default function WorkflowsEditorClient({
   draft: boolean;
   llmTaskEnabled?: boolean;
 }) {
+  const router = useRouter();
   const [view, setView] = useState<"canvas" | "json">("canvas");
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<LoadState>({ kind: "loading" });
@@ -59,6 +61,8 @@ export default function WorkflowsEditorClient({
 
   const [approvalBindings, setApprovalBindings] = useState<Array<{ id: string; label: string; channel: string; target: string }>>([]);
   const [approvalBindingsError, setApprovalBindingsError] = useState<string>("");
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [availableModelsError, setAvailableModelsError] = useState<string>("");
 
   const approvalBindingsNeedsKitchenUpdate = useMemo(() => {
     return /Tool not available:\s*gateway/i.test(String(approvalBindingsError || ""));
@@ -205,9 +209,31 @@ export default function WorkflowsEditorClient({
     })();
   }, []);
 
+  useEffect(() => {
+    (async () => {
+      setAvailableModelsError("");
+      try {
+        const res = await fetch("/api/settings/model-options", { cache: "no-store" });
+        const json = (await res.json()) as { ok?: boolean; models?: unknown[]; error?: string };
+        if (!res.ok || json.ok === false) throw new Error(json.error || "Failed to load model options");
+
+        const deduped = Array.isArray(json.models)
+          ? Array.from(new Set(json.models.map((m) => String(m ?? "").trim()).filter(Boolean)))
+          : [];
+        setAvailableModels(deduped);
+      } catch (e: unknown) {
+        setAvailableModelsError(e instanceof Error ? e.message : String(e));
+        setAvailableModels([]);
+      }
+    })();
+  }, []);
+
   const refreshCronMap = useCallback(async (): Promise<Record<string, boolean>> => {
-    // Preflight helper: determine whether each agent has any cron job installed/enabled.
-    // (Used to warn/block enqueue when the assigned worker has no cron heartbeat.)
+    // Preflight helper: determine whether each workflow-assigned agent has a
+    // workflow worker-tick cron installed and enabled.  Safe-idle or other
+    // generic crons do NOT satisfy this requirement — only crons whose name
+    // starts with "workflow-worker:" or whose payload message contains
+    // "worker-tick" count.
     setCronError("");
     setCronLoading(true);
     try {
@@ -218,21 +244,41 @@ export default function WorkflowsEditorClient({
 
       const map: Record<string, boolean> = {};
       for (const j of jobs) {
-        // openclaw cron list returns `agentId` on the job when scoped to an agent.
-        // We also enrich jobs with `scope`, but that may be team-scoped for worker-cron grouping.
-        const job = j as { enabled?: unknown; agentId?: unknown; scope?: { kind?: unknown; id?: unknown } };
+        const job = j as {
+          enabled?: unknown;
+          name?: unknown;
+          agentId?: unknown;
+          payload?: { message?: unknown; kind?: unknown };
+          scope?: { kind?: unknown; id?: unknown };
+        };
         if (!job || !Boolean(job.enabled)) continue;
 
-        const agentId = String(job.agentId ?? "").trim();
-        if (agentId) {
-          map[agentId] = true;
+        // Only match workflow worker-tick crons, not safe-idle or other agent crons.
+        const jobName = String(job.name ?? "");
+        const payloadMsg = String(job.payload?.message ?? "");
+        const isWorkerTick = jobName.startsWith("workflow-worker:") || payloadMsg.includes("worker-tick");
+        if (!isWorkerTick) continue;
+
+        // Worker-tick crons run as agentId "main" but reference the target
+        // agent in the name (workflow-worker:<teamId>:<agentId>) and message.
+        // Extract the target agent from the name or payload.
+        const nameMatch = jobName.match(/^workflow-worker:[^:]+:(.+)$/);
+        if (nameMatch?.[1]) {
+          map[nameMatch[1]] = true;
           continue;
         }
 
-        // Back-compat: if we don't have agentId, fall back to enriched scope.
-        if (job.scope && String(job.scope.kind) === "agent") {
-          const id = String(job.scope.id ?? "").trim();
-          if (id) map[id] = true;
+        // Fallback: extract from payload message pattern "worker-tick ... --agent-id <id>"
+        const msgMatch = payloadMsg.match(/--agent-id\s+(\S+)/);
+        if (msgMatch?.[1]) {
+          map[msgMatch[1]] = true;
+          continue;
+        }
+
+        // Last resort: if the cron runs as a non-main agent, use that.
+        const agentId = String(job.agentId ?? "").trim();
+        if (agentId && agentId !== "main") {
+          map[agentId] = true;
         }
       }
       setAgentHasCron(map);
@@ -1121,6 +1167,7 @@ export default function WorkflowsEditorClient({
                 const y = typeof node.y === "number" ? node.y : 80;
                 const cfg = node.config && typeof node.config === "object" && !Array.isArray(node.config) ? (node.config as Record<string, unknown>) : {};
                 const agentId = String(cfg.agentId ?? "").trim();
+                const model = String(cfg.model ?? "").trim();
 
                 return (
                   <div
@@ -1189,6 +1236,30 @@ export default function WorkflowsEditorClient({
                         />
                       </label>
 
+                      {node.type === "llm" ? (
+                        <label className="block">
+                          <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">model</div>
+                          <select
+                            value={model}
+                            onChange={(e) => {
+                              const nextModel = String(e.target.value || "").trim();
+                              const nextCfg = { ...cfg, ...(nextModel ? { model: nextModel } : {}) };
+                              if (!nextModel) delete (nextCfg as Record<string, unknown>).model;
+                              setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
+                            }}
+                            className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                          >
+                            <option value="">Default (inherit global)</option>
+                            {availableModels.map((m) => (
+                              <option key={m} value={m}>{m}</option>
+                            ))}
+                          </select>
+                          {availableModelsError ? (
+                            <div className="mt-1 text-[10px] text-amber-300">Could not load model list: {availableModelsError}</div>
+                          ) : null}
+                        </label>
+                      ) : null}
+
                       {node.type === "human_approval" ? (
                         <div className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-2">
                           <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">approval config</div>
@@ -1256,7 +1327,6 @@ export default function WorkflowsEditorClient({
                                 mediaType: 'image',
                                 provider: 'auto',
                                 prompt: '',
-                                outputPath: './output',
                                 ...((node.config as Record<string, unknown>) || {})
                               } as MediaGenerationConfig}
                               onChange={(newConfig) => {
@@ -1268,6 +1338,9 @@ export default function WorkflowsEditorClient({
                                 });
                               }}
                               teamId={teamId}
+                              workflowNodeIds={wf.nodes.map((n) => n.id)}
+                              workflowEdges={(wf.edges ?? []).map((e) => ({ from: e.from, to: e.to }))}
+                              currentNodeId={node.id}
                             />
                           </div>
                         </div>
@@ -1600,7 +1673,6 @@ export default function WorkflowsEditorClient({
                                       mediaType: 'image',
                                       provider: 'auto',
                                       prompt: '',
-                                      outputPath: './output',
                                       ...((node.config as Record<string, unknown>) || {})
                                     } as MediaGenerationConfig}
                                     onChange={(newConfig) => {
@@ -1612,6 +1684,9 @@ export default function WorkflowsEditorClient({
                                       });
                                     }}
                                     teamId={teamId}
+                                    workflowNodeIds={wf.nodes.map((n) => n.id)}
+                                    workflowEdges={(wf.edges ?? []).map((e) => ({ from: e.from, to: e.to }))}
+                                    currentNodeId={node.id}
                                   />
                                 </div>
                               </div>
@@ -1892,6 +1967,13 @@ export default function WorkflowsEditorClient({
                               const json = await res.json();
                               if (!res.ok || !json.ok) throw new Error(json.error || "Failed to create run");
 
+                              // Redirect to run page if runId is available
+                              const newRunId = String(json.runId ?? "").trim();
+                              if (newRunId) {
+                                router.push(`/teams/${teamId}/runs/${workflowId}/${newRunId}`);
+                                return;
+                              }
+
                               const listRes = await fetch(
                                 `/api/teams/workflow-runs?teamId=${encodeURIComponent(teamId)}&workflowId=${encodeURIComponent(wfId)}`,
                                 { cache: "no-store" }
@@ -1999,7 +2081,7 @@ export default function WorkflowsEditorClient({
 
                     <div className="mt-2 space-y-1">
                       {workflowRunsLoading ? (
-                        <div className="text-xs text-[color:var(--ck-text-secondary)]">Loading runs…</div>
+                        <div className="text-xs text-[color:var(--ck-text-secondary)]">Serving up hot…</div>
                       ) : workflowRuns.length ? (
                         workflowRuns.slice(0, 8).map((f) => {
                           const wfId = String(wf.id ?? "").trim();

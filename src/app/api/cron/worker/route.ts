@@ -28,6 +28,10 @@ function workerKey(teamId: string, agentId: string) {
   return `team:${teamId}:recipe:workflow-worker:cron:${agentId}`;
 }
 
+function runnerKey(teamId: string) {
+  return `team:${teamId}:recipe:workflow-runner:cron:main`;
+}
+
 function cronName(teamId: string, agentId: string) {
   return `workflow-worker:${teamId}:${agentId}`;
 }
@@ -144,6 +148,51 @@ async function installWorkerCron(teamId: string, agentId: string): Promise<{
   return { alreadyInstalled: false, installedCronId, mappingPath: mp, key };
 }
 
+async function installRunnerCron(teamId: string): Promise<{
+  alreadyInstalled: boolean;
+  installedCronId: string;
+  mappingPath: string;
+  key: string;
+}> {
+  const teamDir = await getTeamWorkspaceDir(teamId);
+  const mp = teamMappingPath(teamDir);
+  const key = runnerKey(teamId);
+  const mapping = await readMapping(mp);
+
+  // Check if already installed
+  const existing = mapping.entries[key];
+  if (existing && !existing.orphaned) {
+    return { alreadyInstalled: true, installedCronId: existing.installedCronId, mappingPath: mp, key };
+  }
+
+  // Install new runner-tick cron
+  const cronName = `workflow-runner-tick:${teamId}`;
+  const message = `Runner tick (workflow executor): openclaw recipes workflows runner-tick --team-id ${teamId} --concurrency 4 --lease-seconds 900`;
+  
+  const result = await runOpenClaw([
+    "cron", "add",
+    "--name", cronName,
+    "--agent", "main",
+    "--session", "isolated", 
+    "--cron", "*/15 * * * *",
+    "--tz", "America/New_York",
+    "--no-deliver",
+    "--message", message,
+    "--model", "anthropic/claude-sonnet-4-20250514",
+    "--timeout-seconds", "900",
+    "--json"
+  ]);
+
+  const cronData = JSON.parse(result.stdout) as { id: string };
+  const installedCronId = cronData.id;
+  const now = Date.now();
+
+  mapping.entries[key] = { installedCronId, updatedAtMs: now };
+  await writeMapping(mp, mapping);
+
+  return { alreadyInstalled: false, installedCronId, mappingPath: mp, key };
+}
+
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as { action?: string; teamId?: string; agentId?: string };
@@ -164,10 +213,22 @@ export async function POST(req: Request) {
       const mp = teamMappingPath(teamDir);
       const requiredAgentIds = await listTeamWorkflowAgentIds(teamId);
 
+      // Install worker-tick crons for each agent
       const installed: Array<{ agentId: string; installedCronId: string; alreadyInstalled: boolean }> = [];
       for (const a of requiredAgentIds) {
         const res = await installWorkerCron(teamId, a);
         installed.push({ agentId: a, installedCronId: res.installedCronId, alreadyInstalled: res.alreadyInstalled });
+      }
+
+      // Install runner-tick cron for the team (only if there are workflows with agents)
+      let runnerInstalled = null;
+      if (requiredAgentIds.length > 0) {
+        const runnerRes = await installRunnerCron(teamId);
+        runnerInstalled = {
+          agentId: "main",
+          installedCronId: runnerRes.installedCronId,
+          alreadyInstalled: runnerRes.alreadyInstalled
+        };
       }
 
       // Disable orphaned entries for this team in the single team mapping.
@@ -189,7 +250,15 @@ export async function POST(req: Request) {
       }
       if (changed) await writeMapping(mp, mapping);
 
-      return NextResponse.json({ ok: true, action, teamId, requiredAgentIds, installed, disabled });
+      return NextResponse.json({ 
+        ok: true, 
+        action, 
+        teamId, 
+        requiredAgentIds, 
+        installed, 
+        runnerInstalled,
+        disabled 
+      });
     }
 
     return NextResponse.json({ ok: false, error: "action must be install|reconcile" }, { status: 400 });

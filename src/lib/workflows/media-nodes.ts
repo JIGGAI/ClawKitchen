@@ -11,7 +11,7 @@ export interface MediaGenerationConfig {
   quality?: 'standard' | 'hd';
   style?: 'natural' | 'vivid';
   model?: string;
-  outputPath: string;
+  outputPath?: string;
   duration?: string; // For video
   // Provider-specific configs
   skillId?: string;
@@ -44,7 +44,7 @@ export const MEDIA_NODE_TYPES = {
       size: '1024x1024',
       quality: 'standard',
       style: 'natural',
-      outputPath: 'shared-context/media/{{run.id}}_image.png'
+      outputPath: 'shared-context/media/{{run.id}}_{{node.id}}.png'
     } as MediaGenerationConfig
   },
   'media-video': {
@@ -60,7 +60,7 @@ export const MEDIA_NODE_TYPES = {
       provider: 'auto',
       prompt: '',
       duration: '5s',
-      outputPath: 'shared-context/media/{{run.id}}_video.mp4'
+      outputPath: 'shared-context/media/{{run.id}}_{{node.id}}.mp4'
     } as MediaGenerationConfig
   }
 } as const;
@@ -82,10 +82,6 @@ export function validateMediaConfig(config: Partial<MediaGenerationConfig>): str
     errors.push('Prompt is required');
   }
   
-  if (!config.outputPath?.trim()) {
-    errors.push('Output path is required');
-  }
-  
   if (config.mediaType === 'image') {
     if (config.size && !['256x256', '512x512', '1024x1024', '1792x1024', '1024x1792'].includes(config.size)) {
       errors.push('Invalid image size');
@@ -102,17 +98,48 @@ export function validateMediaConfig(config: Partial<MediaGenerationConfig>): str
 }
 
 /**
- * Template variable suggestions for media generation prompts
+ * Built-in template variable suggestions for media generation prompts.
+ * Prior node outputs (e.g. {{research.output}}) are added dynamically
+ * by the UI component based on the current workflow.
  */
 export const TEMPLATE_VARIABLES = [
   '{{run.id}}',
-  '{{team.id}}',
   '{{workflow.name}}',
-  '{{node.name}}',
-  '{{timestamp}}',
+  '{{workflow.id}}',
   '{{date}}',
-  '{{user.name}}'
 ];
+
+/**
+ * Build dynamic template variable list including only upstream node outputs.
+ * Walks the edge graph backwards from currentNodeId to find all ancestors.
+ *
+ * @param allNodeIds - all node IDs in the workflow
+ * @param edges - workflow edges (each has `from` and `to`)
+ * @param currentNodeId - the node being edited (excluded from suggestions)
+ */
+export function buildTemplateVariables(
+  allNodeIds: string[],
+  edges: { from: string; to: string }[],
+  currentNodeId: string
+): string[] {
+  // BFS backwards from currentNodeId to find all upstream ancestors
+  const upstream = new Set<string>();
+  const queue = [currentNodeId];
+  while (queue.length > 0) {
+    const nodeId = queue.shift()!;
+    for (const edge of edges) {
+      if (edge.to === nodeId && !upstream.has(edge.from)) {
+        upstream.add(edge.from);
+        queue.push(edge.from);
+      }
+    }
+  }
+
+  const nodeVars = allNodeIds
+    .filter((id) => upstream.has(id) && id !== 'start' && id !== 'end')
+    .map((id) => `{{${id}.output}}`);
+  return [...nodeVars, ...TEMPLATE_VARIABLES];
+}
 
 /**
  * Common prompt templates for different media types

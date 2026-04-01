@@ -64,87 +64,68 @@ export function validateCronJobData(data: CronJobData): string | null {
 
 function buildCronJobArgs(data: CronJobData): string[] {
   const args: string[] = [];
-  
+
   if (data.name) {
     args.push("--name", data.name);
   }
-  
+
   if (data.description) {
     args.push("--description", data.description);
   }
-  
+
   if (data.enabled !== undefined) {
-    args.push("--enabled", data.enabled.toString());
+    args.push(data.enabled ? "--enable" : "--disable");
   }
-  
+
   // Schedule
-  args.push("--schedule-kind", data.schedule.kind);
-  
-  if (data.schedule.expr) {
-    args.push("--schedule-expr", data.schedule.expr);
+  if (data.schedule.kind === "cron" && data.schedule.expr) {
+    args.push("--cron", data.schedule.expr);
+    if (data.schedule.tz) args.push("--tz", data.schedule.tz);
   }
-  
-  if (data.schedule.everyMs) {
-    args.push("--schedule-every-ms", data.schedule.everyMs.toString());
+
+  if (data.schedule.kind === "every" && data.schedule.everyMs) {
+    const ms = data.schedule.everyMs;
+    if (ms % 86400000 === 0) args.push("--every", `${ms / 86400000}d`);
+    else if (ms % 3600000 === 0) args.push("--every", `${ms / 3600000}h`);
+    else if (ms % 60000 === 0) args.push("--every", `${ms / 60000}m`);
+    else args.push("--every", `${Math.round(ms / 1000)}s`);
   }
-  
-  if (data.schedule.tz) {
-    args.push("--schedule-tz", data.schedule.tz);
+
+  if (data.schedule.kind === "at" && data.schedule.at) {
+    args.push("--at", data.schedule.at);
   }
-  
-  if (data.schedule.at) {
-    args.push("--schedule-at", data.schedule.at);
-  }
-  
+
   // Delivery
-  if (data.delivery?.mode) {
-    args.push("--delivery-mode", data.delivery.mode);
-    
-    if (data.delivery.channel) {
-      args.push("--delivery-channel", data.delivery.channel);
-    }
-    
-    if (data.delivery.to) {
-      args.push("--delivery-to", data.delivery.to);
-    }
-    
+  if (data.delivery?.mode === "none") {
+    args.push("--no-deliver");
+  } else if (data.delivery?.mode === "announce") {
+    args.push("--announce");
+    if (data.delivery.channel) args.push("--channel", data.delivery.channel);
+    if (data.delivery.to) args.push("--to", data.delivery.to);
     if (data.delivery.bestEffort !== undefined) {
-      args.push("--delivery-best-effort", data.delivery.bestEffort.toString());
+      args.push(data.delivery.bestEffort ? "--best-effort-deliver" : "--no-best-effort-deliver");
     }
   }
-  
+
   // Payload
-  args.push("--payload-kind", data.payload.kind);
-  
-  if (data.payload.text) {
-    args.push("--payload-text", data.payload.text);
+  if (data.payload.kind === "systemEvent") {
+    args.push("--system-event", data.payload.text ?? "");
+  } else {
+    args.push("--message", data.payload.message ?? "");
+    if (data.payload.model) args.push("--model", data.payload.model);
+    if (data.payload.thinking) args.push("--thinking", data.payload.thinking);
+    if (data.payload.timeoutSeconds) args.push("--timeout-seconds", data.payload.timeoutSeconds.toString());
   }
-  
-  if (data.payload.message) {
-    args.push("--payload-message", data.payload.message);
-  }
-  
-  if (data.payload.model) {
-    args.push("--payload-model", data.payload.model);
-  }
-  
-  if (data.payload.thinking) {
-    args.push("--payload-thinking", data.payload.thinking);
-  }
-  
-  if (data.payload.timeoutSeconds) {
-    args.push("--payload-timeout-seconds", data.payload.timeoutSeconds.toString());
-  }
-  
+
   // Advanced
   if (data.agentId) {
-    args.push("--agent-id", data.agentId);
+    args.push("--agent", data.agentId);
   }
-  
+
   if (data.sessionTarget) {
-    args.push("--session-target", data.sessionTarget);
+    args.push("--session", data.sessionTarget);
   }
-  
+
   if (data.sessionKey) {
     args.push("--session-key", data.sessionKey);
   }
@@ -168,6 +149,10 @@ export async function updateCronJob(id: string, data: CronJobData): Promise<Open
     throw new Error(validationError);
   }
 
-  const args = ["cron", "update", "--id", id, ...buildCronJobArgs(data)];
+  // IMPORTANT:
+  // OpenClaw CLI uses `cron edit <id> [flags...]` for patch-style updates.
+  // The `cron update` subcommand does not accept our `--payload-*` flag set,
+  // so edits like `payload.model` would silently fail to persist.
+  const args = ["cron", "edit", id, ...buildCronJobArgs(data)];
   return await runOpenClaw(args);
 }
