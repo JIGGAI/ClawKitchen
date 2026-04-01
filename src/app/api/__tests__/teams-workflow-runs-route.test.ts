@@ -6,6 +6,7 @@ vi.mock("@/lib/workflows/runs-storage", () => ({
   listWorkflowRuns: vi.fn(),
   readWorkflowRun: vi.fn(),
   writeWorkflowRun: vi.fn(),
+  appendWorkflowRunEvent: vi.fn(),
 }));
 vi.mock("@/lib/workflows/storage", () => ({
   readWorkflow: vi.fn(),
