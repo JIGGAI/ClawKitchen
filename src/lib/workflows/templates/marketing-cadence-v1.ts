@@ -55,7 +55,7 @@ export function marketingCadenceWorkflowV1(opts?: { id?: string; approvalProvide
         config: {
           agentId: "marketing-writer",
           promptTemplate:
-            "Using the research output, draft platform-specific variants applying proven viral psychology:\n\n**EMOTIONAL TRIGGER (REQUIRED):** Every post must trigger one of these emotions:\n- NSFW (\"That's crazy!\") - shocking/surprising\n- LOL (\"That's funny!\") - humor/entertainment\n- OHHH (\"Now I get it!\") - aha moments/simplification\n- WOW (\"That's amazing!\") - success stories\n- FINALLY (\"Someone said it!\") - validating opinions\n- WTF (\"That pisses me off!\") - frustration with status quo\n\n**IDENTITY TARGETING:** Use 'There are two types of...' or 'This is for founders who...'\n**US vs THEM:** Position against inefficient alternatives (not competitors)\n\nState which emotion you're targeting and why. Output JSON: {emotion:'OHHH',platforms:{x:{hook,body},instagram:{hook,body,assetNotes},tiktok:{hook,script,assetNotes},youtube:{hook,script,assetNotes}}}",
+            "Using the research output, draft platform-specific variants applying proven viral psychology:\n\n**EMOTIONAL TRIGGER (REQUIRED):** Every post must trigger one of these emotions:\n- NSFW (\"That's crazy!\") - shocking/surprising\n- LOL (\"That's funny!\") - humor/entertainment\n- OHHH (\"Now I get it!\") - aha moments/simplification\n- WOW (\"That's amazing!\") - success stories\n- FINALLY (\"Someone said it!\") - validating opinions\n- WTF (\"That pisses me off!\") - frustration with status quo\n\n**IDENTITY TARGETING:** Use 'There are two types of...' or 'This is for founders who...'\n**US vs THEM:** Position against inefficient alternatives (not competitors)\n\nState which emotion you're targeting and why.\n\nAlso include an `image_brief` field: a concise (under 1000 chars) visual concept description for DALL-E image generation. Describe the scene, composition, color palette, and mood — NO text/words in the image. This should capture the emotional hook visually without repeating the copy.\n\nOutput JSON: {emotion:'OHHH',image_brief:'A split-screen illustration showing...',platforms:{x:{hook,body},instagram:{hook,body,assetNotes},tiktok:{hook,script,assetNotes},youtube:{hook,script,assetNotes}}}",
         },
       },
       {
@@ -67,8 +67,8 @@ export function marketingCadenceWorkflowV1(opts?: { id?: string; approvalProvide
         config: {
           mediaType: "image",
           provider: "skill-openai-image-gen",
-          promptTemplate:
-            "Based on the marketing copy below, create a detailed visual concept for a social media image.\n\nMarketing copy: {{draft_assets.text}}\n\nDesign a professional social media image concept that visually represents the key theme. The image should:\n- Appeal to business/tech professionals\n- Use modern, clean design aesthetics\n- Have engaging but professional colors\n- NO text overlay (text will be added separately)\n- Square format (1024x1024)\n\nOutput detailed JSON with the DALL-E prompt and image concept:\n{\"image_prompt\": \"detailed prompt for DALL-E 3\", \"concept\": \"brief description of visual concept\", \"style_notes\": \"color scheme and design approach\"}",
+          prompt: "{{draft_assets.image_brief}}",
+          promptTemplate: "{{draft_assets.image_brief}}",
           outputPath: "node-outputs/generated_image.png",
         },
       },
