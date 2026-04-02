@@ -88,8 +88,8 @@ jobs:
           VERSION="${TAG#v}"
           PKG_NAME=$(node -p "require('./package.json').name")
 
-          # Truncate notes to 3900 chars (Discord embed description limit is 4096)
-          NOTES=$(head -c 3900 /tmp/release-notes.md)
+          # Strip PR links, clean up, and truncate for Discord (4096 char limit)
+          NOTES=$(sed 's| by @[^ ]* in https://github.com/[^ ]*||g; s| in https://github.com/[^ ]*||g' /tmp/release-notes.md | head -c 3900)
 
           # Build JSON payload with jq to handle escaping properly
           jq -n \
