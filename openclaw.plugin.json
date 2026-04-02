@@ -74,5 +74,11 @@
       "help": "on: require Basic auth; local: allow localhost unauthenticated; off: disable auth (not recommended)."
     }
   },
-  "main": "openclaw/index.ts"
+  "main": "openclaw/index.ts",
+  "compat": {
+    "pluginApi": "2026.3"
+  },
+  "build": {
+    "openclawVersion": "2026.3.28"
+  }
 }
