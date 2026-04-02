@@ -28,12 +28,6 @@
       "openclawVersion": "2026.3.28"
     }
   },
-  "compat": {
-    "pluginApi": "2026.3"
-  },
-  "build": {
-    "openclawVersion": "2026.3.28"
-  },
   "scripts": {
     "dev": "next dev",
     "build": "NODE_ENV=production next build",
