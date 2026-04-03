@@ -168,9 +168,23 @@ async function checkSkillProviders(): Promise<MediaProvider[]> {
             if (descMatch) description = descMatch[1].replace(/"/g, '');
             
             // Check for media generation capabilities
-            const hasImageGen = /\b(image|picture|photo|visual|media|video|audio)\b.*\b(generat|creat|make|produc)\b/i.test(skillMd) ||
-                               /\b(generat|creat|make|produc)\b.*\b(image|picture|photo|visual|media|video|audio)\b/i.test(skillMd) ||
-                               /dall.?e|stable.?diffusion|midjourney|cellcog|any.?to.?any/i.test(skillMd);
+            // Also check if skill has generate_video.py or generate_image.py scripts
+            let hasMediaScript = false;
+            try {
+              const scriptFiles = await fs.readdir(path.join(skillPath, 'scripts'));
+              hasMediaScript = scriptFiles.some(f => /^generate_(video|image|audio)\./i.test(f));
+            } catch { /* no scripts dir */ }
+            if (!hasMediaScript) {
+              try {
+                const topFiles = await fs.readdir(skillPath);
+                hasMediaScript = topFiles.some(f => /^generate_(video|image|audio)\./i.test(f));
+              } catch { /* ignore */ }
+            }
+            
+            const hasImageGen = hasMediaScript ||
+                               /\b(image|picture|photo|visual|media|video|audio)s?\b.*\b(generat|creat|make|produc)/i.test(skillMd) ||
+                               /\b(generat|creat|make|produc)\w*.*\b(image|picture|photo|visual|media|video|audio)/i.test(skillMd) ||
+                               /dall.?e|stable.?diffusion|midjourney|cellcog|any.?to.?any|runway|kling|luma/i.test(skillMd);
             
             if (hasImageGen) {
               const supportedTypes: string[] = [];
