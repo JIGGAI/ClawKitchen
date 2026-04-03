@@ -67,6 +67,7 @@ export default function WorkflowsEditorClient({
   const [approvalBindingsError, setApprovalBindingsError] = useState<string>("");
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [availableModelsError, setAvailableModelsError] = useState<string>("");
+  const [showRawConfig, setShowRawConfig] = useState<Record<string, boolean>>({});
 
   const approvalBindingsNeedsKitchenUpdate = useMemo(() => {
     return /Tool not available:\s*gateway/i.test(String(approvalBindingsError || ""));
@@ -1384,24 +1385,151 @@ export default function WorkflowsEditorClient({
                         </div>
                       ) : null}
 
-                      <label className="block">
-                        <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">config (json)</div>
-                        <textarea
-                          value={JSON.stringify(cfg, null, 2)}
-                          onChange={(e) => {
-                            try {
-                              const nextCfg = JSON.parse(e.target.value) as Record<string, unknown>;
-                              if (!nextCfg || typeof nextCfg !== "object" || Array.isArray(nextCfg)) return;
-                              setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
-                            } catch {
-                              // ignore invalid JSON while typing
-                            }
+                      {node.type === "llm" ? (
+                        <div className="space-y-2">
+                          {/* LLM-specific fields */}
+                          <label className="block">
+                            <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">prompt</div>
+                            <textarea
+                              value={String(cfg.promptTemplate ?? "")}
+                              onChange={(e) => {
+                                const nextPromptTemplate = e.target.value;
+                                const nextCfg = { ...cfg, promptTemplate: nextPromptTemplate };
+                                setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
+                              }}
+                              className="mt-1 min-h-[200px] w-full resize-y rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 p-2 font-mono text-xs text-[color:var(--ck-text-primary)]"
+                              placeholder="What should this node do? Use {{nodeId.output}} to reference upstream node outputs."
+                              spellCheck={false}
+                            />
+                          </label>
+
+                          {/* Output Fields */}
+                          <div>
+                            <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">output fields (optional)</div>
+                            <div className="text-[9px] text-[color:var(--ck-text-secondary)] mb-2">Define the structure of what this node should produce</div>
+                            {(() => {
+                              const outputFields = (cfg.outputFields as Array<{name: string, type: "text"|"list"|"json"}>) || [];
+                              return (
+                                <div className="space-y-1">
+                                  {outputFields.map((field, index) => (
+                                    <div key={index} className="flex items-center gap-2">
+                                      <input
+                                        value={field.name}
+                                        onChange={(e) => {
+                                          const newOutputFields = [...outputFields];
+                                          newOutputFields[index] = { ...field, name: e.target.value };
+                                          const nextCfg = { ...cfg, outputFields: newOutputFields };
+                                          setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
+                                        }}
+                                        className="flex-1 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                                        placeholder="Field name"
+                                      />
+                                      <select
+                                        value={field.type}
+                                        onChange={(e) => {
+                                          const newType = e.target.value as "text"|"list"|"json";
+                                          const newOutputFields = [...outputFields];
+                                          newOutputFields[index] = { ...field, type: newType };
+                                          const nextCfg = { ...cfg, outputFields: newOutputFields };
+                                          setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
+                                        }}
+                                        className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                                      >
+                                        <option value="text">text</option>
+                                        <option value="list">list</option>
+                                        <option value="json">json</option>
+                                      </select>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const newOutputFields = outputFields.filter((_, i) => i !== index);
+                                          const nextCfg = { ...cfg };
+                                          if (newOutputFields.length > 0) {
+                                            nextCfg.outputFields = newOutputFields;
+                                          } else {
+                                            delete (nextCfg as Record<string, unknown>).outputFields;
+                                          }
+                                          setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
+                                        }}
+                                        className="text-xs text-[color:var(--ck-text-tertiary)] hover:text-[color:var(--ck-text-primary)]"
+                                      >
+                                        ×
+                                      </button>
+                                    </div>
+                                  ))}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const newOutputFields = [...outputFields, { name: "", type: "text" as const }];
+                                      const nextCfg = { ...cfg, outputFields: newOutputFields };
+                                      setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
+                                    }}
+                                    className="text-xs text-[color:var(--ck-text-secondary)] hover:text-[color:var(--ck-text-primary)]"
+                                  >
+                                    + Add field
+                                  </button>
+                                </div>
+                              );
+                            })()}
+                          </div>
+
+                          {/* Timeout */}
+                          <label className="block">
+                            <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">timeout (seconds)</div>
+                            <input
+                              type="number"
+                              value={cfg.timeoutMs ? String(Number(cfg.timeoutMs) / 1000) : ""}
+                              onChange={(e) => {
+                                const seconds = e.target.value ? Number(e.target.value) : null;
+                                const nextCfg = { ...cfg };
+                                if (seconds && seconds > 0) {
+                                  nextCfg.timeoutMs = seconds * 1000;
+                                } else {
+                                  delete (nextCfg as Record<string, unknown>).timeoutMs;
+                                }
+                                setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
+                              }}
+                              className="mt-1 w-24 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                              placeholder="120"
+                              min="1"
+                            />
+                          </label>
+                        </div>
+                      ) : null}
+
+                      {/* Collapsible raw config section */}
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const currentState = showRawConfig[node.id] ?? (node.type !== "llm");
+                            setShowRawConfig({ ...showRawConfig, [node.id]: !currentState });
                           }}
-                          className="mt-1 h-[140px] w-full resize-none rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 p-2 font-mono text-[10px] text-[color:var(--ck-text-primary)]"
-                          spellCheck={false}
-                        />
-                        <div className="mt-1 text-[10px] text-[color:var(--ck-text-tertiary)]">(Edits apply when JSON is valid.)</div>
-                      </label>
+                          className="mb-2 text-[10px] text-[color:var(--ck-text-tertiary)] hover:text-[color:var(--ck-text-primary)]"
+                        >
+                          {(showRawConfig[node.id] ?? (node.type !== "llm")) ? "Hide" : "Show"} raw config
+                        </button>
+                        {(showRawConfig[node.id] ?? (node.type !== "llm")) ? (
+                          <label className="block">
+                            <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">config (json)</div>
+                            <textarea
+                              value={JSON.stringify(cfg, null, 2)}
+                              onChange={(e) => {
+                                try {
+                                  const nextCfg = JSON.parse(e.target.value) as Record<string, unknown>;
+                                  if (!nextCfg || typeof nextCfg !== "object" || Array.isArray(nextCfg)) return;
+                                  setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
+                                } catch {
+                                  // ignore invalid JSON while typing
+                                }
+                              }}
+                              className="mt-1 h-[140px] w-full resize-none rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 p-2 font-mono text-[10px] text-[color:var(--ck-text-primary)]"
+                              spellCheck={false}
+                            />
+                            <div className="mt-1 text-[10px] text-[color:var(--ck-text-tertiary)]">(Edits apply when JSON is valid.)</div>
+                          </label>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
                 );
