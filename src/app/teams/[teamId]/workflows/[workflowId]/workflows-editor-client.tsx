@@ -34,6 +34,10 @@ export default function WorkflowsEditorClient({
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<LoadState>({ kind: "loading" });
   const [actionError, setActionError] = useState<string>("");
+  const [triggerSyncStatus, setTriggerSyncStatus] = useState<"idle" | "syncing" | "success" | "error">(
+    "idle"
+  );
+  const [triggerSyncError, setTriggerSyncError] = useState<string>("");
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
   const [toolsCollapsed, setToolsCollapsed] = useState(false);
@@ -371,7 +375,11 @@ export default function WorkflowsEditorClient({
 
     setSaving(true);
     setActionError("");
+    setTriggerSyncStatus("idle");
+    setTriggerSyncError("");
+    
     try {
+      // Save workflow first
       const res = await fetch("/api/teams/workflows", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -385,6 +393,36 @@ export default function WorkflowsEditorClient({
         sessionStorage.removeItem(draftKey(teamId, workflowId));
       } catch {
         // ignore
+      }
+
+      // Sync triggers (don't block save flow on trigger sync errors)
+      if (parsed.wf.triggers?.length) {
+        try {
+          setTriggerSyncStatus("syncing");
+          const triggerRes = await fetch("/api/teams/workflow-triggers", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              action: "sync",
+              teamId,
+              workflowId: parsed.wf.id,
+              triggers: parsed.wf.triggers ?? [],
+            }),
+          });
+          const triggerJson = (await triggerRes.json()) as { ok?: boolean; error?: string };
+          
+          if (triggerRes.ok && triggerJson.ok) {
+            setTriggerSyncStatus("success");
+            // Clear success status after 3 seconds
+            setTimeout(() => setTriggerSyncStatus("idle"), 3000);
+          } else {
+            setTriggerSyncStatus("error");
+            setTriggerSyncError(triggerJson.error || "Failed to sync triggers");
+          }
+        } catch (e: unknown) {
+          setTriggerSyncStatus("error");
+          setTriggerSyncError(e instanceof Error ? e.message : "Failed to sync triggers");
+        }
       }
     } catch (e: unknown) {
       setActionError(e instanceof Error ? e.message : String(e));
@@ -1729,6 +1767,30 @@ export default function WorkflowsEditorClient({
                         + Add
                       </button>
                     </div>
+
+                    {/* Trigger sync status */}
+                    {triggerSyncStatus !== "idle" && (
+                      <div className="mt-2 flex items-center gap-2 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1">
+                        {triggerSyncStatus === "syncing" && (
+                          <>
+                            <div className="h-3 w-3 animate-spin rounded-full border border-blue-400 border-t-transparent"></div>
+                            <div className="text-xs text-blue-400">Syncing triggers...</div>
+                          </>
+                        )}
+                        {triggerSyncStatus === "success" && (
+                          <>
+                            <div className="text-green-400">✓</div>
+                            <div className="text-xs text-green-400">Triggers synced</div>
+                          </>
+                        )}
+                        {triggerSyncStatus === "error" && (
+                          <>
+                            <div className="text-red-400">✗</div>
+                            <div className="text-xs text-red-400">Trigger sync failed: {triggerSyncError}</div>
+                          </>
+                        )}
+                      </div>
+                    )}
 
                     <div className="mt-2 space-y-2">
                       {triggers.length ? (
