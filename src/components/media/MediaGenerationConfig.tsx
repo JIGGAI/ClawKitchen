@@ -1,12 +1,15 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { MediaGenerationConfig, MediaProvider, validateMediaConfig, buildTemplateVariables, PROMPT_TEMPLATES } from '@/lib/workflows/media-nodes';
+import type { WorkflowFileV1 } from '@/lib/workflows/types';
 
 interface MediaGenerationConfigProps {
   config: MediaGenerationConfig;
   onChange: (config: MediaGenerationConfig) => void;
   teamId: string;
+  /** Full workflow object for outputFields-aware variable insertion */
+  workflow?: WorkflowFileV1;
   /** All node IDs in the workflow (for building {{nodeId.output}} variable suggestions) */
   workflowNodeIds?: string[];
   /** Workflow edges for determining upstream nodes */
@@ -15,7 +18,7 @@ interface MediaGenerationConfigProps {
   currentNodeId?: string;
 }
 
-export function MediaGenerationConfigComponent({ config, onChange, teamId, workflowNodeIds, workflowEdges, currentNodeId }: MediaGenerationConfigProps) {
+export function MediaGenerationConfigComponent({ config, onChange, teamId, workflow, workflowNodeIds, workflowEdges, currentNodeId }: MediaGenerationConfigProps) {
   const [providers, setProviders] = useState<MediaProvider[]>([]);
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<string[]>([]);
@@ -28,8 +31,6 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId, workf
         if (response.ok) {
           const data = await response.json();
           setProviders(data);
-          
-
         }
       } catch (error) {
         console.error('Failed to load media providers:', error);
@@ -37,7 +38,6 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId, workf
         setLoading(false);
       }
     }
-    
     loadProviders();
   }, [teamId]);
 
@@ -53,6 +53,119 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId, workf
 
   const availableProviders = providers.filter(p => p.available);
   const selectedProvider = providers.find(p => p.id === config.provider);
+
+  // --- Variables dropdown logic ---
+  const promptRef = useRef<HTMLTextAreaElement>(null);
+  const [isVarsOpen, setIsVarsOpen] = useState(false);
+  const varsDropdownRef = useRef<HTMLDivElement>(null);
+
+  const globalVariables = useMemo(
+    () => [
+      { variable: '{{run.id}}', type: 'text' },
+      { variable: '{{workflow.name}}', type: 'text' },
+      { variable: '{{workflow.id}}', type: 'text' },
+      { variable: '{{node.id}}', type: 'text' },
+      { variable: '{{date}}', type: 'text' },
+    ],
+    []
+  );
+
+  const upstreamVariables = useMemo(() => {
+    if (!workflowNodeIds || !workflowEdges || !currentNodeId) return [];
+
+    // If we have the full workflow with nodes, use outputFields-aware logic
+    if (workflow && workflow.nodes) {
+      const upstream = new Set<string>();
+      const queue = [currentNodeId];
+      const visited = new Set<string>();
+      while (queue.length > 0) {
+        const cur = queue.shift()!;
+        if (visited.has(cur)) continue;
+        visited.add(cur);
+        for (const e of (workflow.edges ?? [])) {
+          if (e.to === cur && e.from !== currentNodeId && !upstream.has(e.from)) {
+            upstream.add(e.from);
+            queue.push(e.from);
+          }
+        }
+      }
+
+      const vars: Array<{ nodeId: string; nodeName: string; fieldName: string; fieldType: string }> = [];
+      for (const nId of upstream) {
+        if (nId === 'start' || nId === 'end') continue;
+        const node = workflow.nodes.find((n) => n.id === nId);
+        if (!node) continue;
+        const nodeName = String((node as Record<string, unknown>).name ?? node.id);
+
+        vars.push({ nodeId: nId, nodeName, fieldName: 'output', fieldType: 'text' });
+        vars.push({ nodeId: nId, nodeName, fieldName: 'text', fieldType: 'text' });
+
+        const cfg = (node as Record<string, unknown>).config as Record<string, unknown> | undefined;
+        const outputFields = cfg?.outputFields as Array<{ name?: string; type?: string }> | undefined;
+        if (Array.isArray(outputFields)) {
+          for (const f of outputFields) {
+            const name = String(f.name ?? '').trim();
+            if (!name || name === 'output' || name === 'text') continue;
+            vars.push({ nodeId: nId, nodeName, fieldName: name, fieldType: String(f.type ?? 'text') });
+          }
+        }
+      }
+      return vars;
+    }
+
+    // Fallback: use old buildTemplateVariables (just {{nodeId.output}} list)
+    return buildTemplateVariables(workflowNodeIds, workflowEdges, currentNodeId)
+      .filter(v => v.includes('.output') && v.startsWith('{{'))
+      .map(v => {
+        const inner = v.slice(2, -2); // strip {{ }}
+        const dotIdx = inner.indexOf('.');
+        const nodeId = inner.substring(0, dotIdx);
+        return { nodeId, nodeName: nodeId, fieldName: 'output', fieldType: 'text' };
+      });
+  }, [workflow, workflowNodeIds, workflowEdges, currentNodeId]);
+
+  const groupedUpstream = useMemo(() => {
+    const groups: Record<string, { nodeId: string; nodeName: string; fields: Array<{ name: string; type: string }> }> = {};
+    for (const v of upstreamVariables) {
+      const key = v.nodeId + '|' + v.nodeName;
+      if (!groups[key]) groups[key] = { nodeId: v.nodeId, nodeName: v.nodeName, fields: [] };
+      groups[key].fields.push({ name: v.fieldName, type: v.fieldType });
+    }
+    return Object.values(groups);
+  }, [upstreamVariables]);
+
+  useEffect(() => {
+    function onClickOutside(event: MouseEvent) {
+      if (varsDropdownRef.current && !varsDropdownRef.current.contains(event.target as Node)) {
+        setIsVarsOpen(false);
+      }
+    }
+    if (isVarsOpen) {
+      document.addEventListener('mousedown', onClickOutside);
+      return () => document.removeEventListener('mousedown', onClickOutside);
+    }
+  }, [isVarsOpen]);
+
+  const insertVariable = (variable: string) => {
+    const textarea = promptRef.current;
+    if (!textarea) {
+      // Fallback: just append
+      updateConfig({ prompt: config.prompt + (config.prompt ? ' ' : '') + variable });
+      setIsVarsOpen(false);
+      return;
+    }
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const currentValue = textarea.value;
+    const nextValue = currentValue.substring(0, start) + variable + currentValue.substring(end);
+    updateConfig({ prompt: nextValue });
+    setTimeout(() => {
+      textarea.focus();
+      const newPos = start + variable.length;
+      textarea.setSelectionRange(newPos, newPos);
+    }, 0);
+    setIsVarsOpen(false);
+  };
 
   return (
     <div className="space-y-3">
@@ -166,37 +279,91 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId, workf
         </label>
       )}
 
-      {/* Prompt */}
+      {/* Prompt with {{}} variables dropdown */}
       <label className="block">
         <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">prompt</div>
         <div className="relative">
           <textarea
+            ref={promptRef}
             value={config.prompt}
             onChange={(e) => updateConfig({ prompt: e.target.value })}
             placeholder="Describe the image or video you want to generate..."
             rows={3}
-            className="mt-1 w-full resize-none rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-2 text-xs text-[color:var(--ck-text-primary)]"
+            className="mt-1 w-full resize-none rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-2 pr-12 text-xs text-[color:var(--ck-text-primary)]"
           />
-          {/* Template variable selector */}
-          <div className="absolute top-1 right-1">
-            <select
-              onChange={(e) => {
-                if (e.target.value) {
-                  const newPrompt = config.prompt + (config.prompt ? ' ' : '') + e.target.value;
-                  updateConfig({ prompt: newPrompt });
-                  e.target.value = '';
-                }
-              }}
-              className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 px-1 py-0.5 text-[10px] text-[color:var(--ck-text-secondary)]"
+
+          {/* Variables dropdown */}
+          <div className="absolute top-1 right-1" ref={varsDropdownRef}>
+            <button
+              type="button"
+              onClick={() => setIsVarsOpen(!isVarsOpen)}
+              className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 px-2 py-1 text-[9px] text-[color:var(--ck-text-secondary)] hover:bg-white/10 hover:text-[color:var(--ck-text-primary)]"
+              title="Insert variable"
             >
-              <option value="">+ Variables</option>
-              {buildTemplateVariables(workflowNodeIds ?? [], workflowEdges ?? [], currentNodeId ?? '').map(variable => (
-                <option key={variable} value={variable}>{variable}</option>
-              ))}
-            </select>
+              {'{{}}'}
+            </button>
+
+            {isVarsOpen && (
+              <div className="absolute right-0 top-8 z-50 w-72 max-h-80 overflow-auto rounded-[var(--ck-radius-sm)] border border-white/15 bg-black/80 backdrop-blur shadow-[var(--ck-shadow-1)]">
+                <div className="p-1">
+                  <div>
+                    <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">
+                      Globals
+                    </div>
+                    {globalVariables.map(({ variable, type }) => (
+                      <button
+                        key={variable}
+                        type="button"
+                        onClick={() => insertVariable(variable)}
+                        className="w-full flex items-center justify-between gap-2 rounded-[var(--ck-radius-sm)] px-2 py-1 text-left text-xs text-[color:var(--ck-text-primary)] hover:bg-white/10 cursor-pointer"
+                      >
+                        <span className="font-mono">{variable}</span>
+                        <span className="text-[9px] px-1 py-0.5 rounded-sm bg-black/30 text-blue-400">
+                          {type}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {groupedUpstream.map(group => (
+                    <div key={group.nodeId}>
+                      <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">
+                        {group.nodeName}
+                      </div>
+                      {group.fields.map(field => {
+                        const variable = `{{${group.nodeId}.${field.name}}}`;
+                        const badgeColor = field.type === 'text' ? 'text-blue-400' :
+                                         field.type === 'list' ? 'text-green-400' :
+                                         field.type === 'json' ? 'text-amber-400' : 'text-gray-400';
+
+                        return (
+                          <button
+                            key={`${group.nodeId}.${field.name}`}
+                            type="button"
+                            onClick={() => insertVariable(variable)}
+                            className="w-full flex items-center justify-between gap-2 rounded-[var(--ck-radius-sm)] px-2 py-1 text-left text-xs text-[color:var(--ck-text-primary)] hover:bg-white/10 cursor-pointer"
+                          >
+                            <span className="font-mono">{variable}</span>
+                            <span className={`text-[9px] px-1 py-0.5 rounded-sm bg-black/30 ${badgeColor}`}>
+                              {field.type}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ))}
+
+                  {groupedUpstream.length === 0 && (
+                    <div className="px-2 py-3 text-xs text-[color:var(--ck-text-secondary)]">
+                      Tip: Add output fields to upstream nodes to see node-specific variables here.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
-        
+
         {/* Quick prompt templates */}
         <div className="mt-1 flex gap-1 flex-wrap">
           {Object.entries(PROMPT_TEMPLATES).map(([key, template]) => (
@@ -290,8 +457,6 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId, workf
           </div>
         </div>
       )}
-
-
     </div>
   );
 }

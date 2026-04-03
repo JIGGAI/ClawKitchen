@@ -83,6 +83,18 @@ function VariableInsertDropdown({
   const dropdownRef = useRef<HTMLDivElement>(null);
   
   const variables = useMemo(() => getUpstreamVariables(workflow, currentNodeId), [workflow, currentNodeId]);
+
+  // Always-available globals (these work across node types)
+  const globalVariables = useMemo(
+    () => [
+      { variable: "{{run.id}}", type: "text" },
+      { variable: "{{workflow.name}}", type: "text" },
+      { variable: "{{workflow.id}}", type: "text" },
+      { variable: "{{node.id}}", type: "text" },
+      { variable: "{{date}}", type: "text" },
+    ],
+    []
+  );
   
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -130,21 +142,6 @@ function VariableInsertDropdown({
     return groups;
   }, {} as Record<string, { nodeId: string; nodeName: string; fields: Array<{ name: string; type: string }> }>);
   
-  if (variables.length === 0) {
-    return (
-      <div className="absolute top-1 right-1">
-        <button
-          type="button"
-          disabled
-          className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 px-2 py-1 text-[9px] text-[color:var(--ck-text-tertiary)] opacity-50"
-          title="Tip: Add output fields to upstream nodes to see available variables here"
-        >
-          {'{{}}'}
-        </button>
-      </div>
-    );
-  }
-  
   return (
     <div className="absolute top-1 right-1" ref={dropdownRef}>
       <button
@@ -159,6 +156,25 @@ function VariableInsertDropdown({
       {isOpen && (
         <div className="absolute right-0 top-8 z-50 w-72 max-h-80 overflow-auto rounded-[var(--ck-radius-sm)] border border-white/15 bg-black/80 backdrop-blur shadow-[var(--ck-shadow-1)]">
           <div className="p-1">
+            <div>
+              <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">
+                Globals
+              </div>
+              {globalVariables.map(({ variable, type }) => (
+                <button
+                  key={variable}
+                  type="button"
+                  onClick={() => insertVariable(variable)}
+                  className="w-full flex items-center justify-between gap-2 rounded-[var(--ck-radius-sm)] px-2 py-1 text-left text-xs text-[color:var(--ck-text-primary)] hover:bg-white/10 cursor-pointer"
+                >
+                  <span className="font-mono">{variable}</span>
+                  <span className="text-[9px] px-1 py-0.5 rounded-sm bg-black/30 text-blue-400">
+                    {type}
+                  </span>
+                </button>
+              ))}
+            </div>
+
             {Object.values(groupedVariables).map(group => (
               <div key={group.nodeId}>
                 <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">
@@ -189,7 +205,7 @@ function VariableInsertDropdown({
             
             {variables.length === 0 && (
               <div className="px-2 py-3 text-xs text-[color:var(--ck-text-secondary)]">
-                Tip: Add output fields to upstream nodes to see available variables here
+                Tip: Add output fields to upstream nodes to see node-specific variables here.
               </div>
             )}
           </div>
@@ -1679,6 +1695,7 @@ export default function WorkflowsEditorClient({
                                 });
                               }}
                               teamId={teamId}
+                              workflow={wf}
                               workflowNodeIds={wf.nodes.map((n) => n.id)}
                               workflowEdges={(wf.edges ?? []).map((e) => ({ from: e.from, to: e.to }))}
                               currentNodeId={node.id}
@@ -2216,6 +2233,7 @@ export default function WorkflowsEditorClient({
                                       });
                                     }}
                                     teamId={teamId}
+                                    workflow={wf}
                                     workflowNodeIds={wf.nodes.map((n) => n.id)}
                                     workflowEdges={(wf.edges ?? []).map((e) => ({ from: e.from, to: e.to }))}
                                     currentNodeId={node.id}
