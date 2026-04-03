@@ -1709,14 +1709,15 @@ export default function WorkflowsEditorClient({
                           {/* LLM-specific fields */}
                           <label className="block">
                             <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">prompt</div>
-                            <textarea
+                            <TemplateTextareaWithVars
                               value={String(cfg.promptTemplate ?? "")}
-                              onChange={(e) => {
-                                const nextPromptTemplate = e.target.value;
-                                const nextCfg = { ...cfg, promptTemplate: nextPromptTemplate };
+                              workflow={wf}
+                              currentNodeId={node.id}
+                              onChangeValue={(nextValue) => {
+                                const nextCfg = { ...cfg, promptTemplate: nextValue };
                                 setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
                               }}
-                              className="mt-1 min-h-[200px] w-full resize-y rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 p-2 font-mono text-xs text-[color:var(--ck-text-primary)]"
+                              className="mt-1 min-h-[200px] w-full resize-y rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 p-2 pr-12 font-mono text-xs text-[color:var(--ck-text-primary)]"
                               placeholder="What should this node do? Use {{nodeId.output}} to reference upstream node outputs."
                               spellCheck={false}
                             />
