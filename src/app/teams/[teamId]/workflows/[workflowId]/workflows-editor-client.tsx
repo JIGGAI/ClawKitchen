@@ -9,10 +9,311 @@ import { validateWorkflowFileV1 } from "@/lib/workflows/validate";
 import { getMediaNodeConfig, isMediaNode, type MediaGenerationConfig } from "@/lib/workflows/media-nodes";
 import { MediaGenerationConfigComponent } from "@/components/media/MediaGenerationConfig";
 
+// Helper function to collect upstream variables for template insertion
+function getUpstreamVariables(
+  wf: WorkflowFileV1, 
+  nodeId: string
+): Array<{nodeId: string, nodeName: string, fieldName: string, fieldType: string}> {
+  const variables: Array<{nodeId: string, nodeName: string, fieldName: string, fieldType: string}> = [];
+  
+  // BFS backwards from nodeId to find all upstream ancestors
+  const upstream = new Set<string>();
+  const queue = [nodeId];
+  const visited = new Set<string>();
+  
+  while (queue.length > 0) {
+    const currentId = queue.shift()!;
+    if (visited.has(currentId)) continue;
+    visited.add(currentId);
+    
+    for (const edge of (wf.edges ?? [])) {
+      if (edge.to === currentId && !upstream.has(edge.from) && edge.from !== nodeId) {
+        upstream.add(edge.from);
+        queue.push(edge.from);
+      }
+    }
+  }
+  
+  // For each upstream node, collect its output fields + standard outputs
+  for (const upstreamId of upstream) {
+    const upstreamNode = wf.nodes.find(n => n.id === upstreamId);
+    if (!upstreamNode) continue;
+    
+    const nodeName = upstreamNode.name || upstreamId;
+    const config = upstreamNode.config && typeof upstreamNode.config === 'object' && !Array.isArray(upstreamNode.config) ? upstreamNode.config as Record<string, unknown> : {};
+    
+    // Always include standard outputs for every upstream node
+    variables.push(
+      { nodeId: upstreamId, nodeName, fieldName: 'output', fieldType: 'text' },
+      { nodeId: upstreamId, nodeName, fieldName: 'text', fieldType: 'text' }
+    );
+    
+    // Include declared output fields if they exist
+    const outputFields = config.outputFields as Array<{name: string, type: string}> | undefined;
+    if (Array.isArray(outputFields)) {
+      for (const field of outputFields) {
+        if (field.name?.trim()) {
+          variables.push({
+            nodeId: upstreamId,
+            nodeName,
+            fieldName: field.name.trim(),
+            fieldType: field.type || 'text'
+          });
+        }
+      }
+    }
+  }
+  
+  return variables;
+}
+
+// Variable insertion dropdown component
+function VariableInsertDropdown({
+  targetTextareaRef,
+  workflow,
+  currentNodeId,
+  onInsert
+}: {
+  targetTextareaRef: React.RefObject<HTMLTextAreaElement | null>;
+  workflow: WorkflowFileV1;
+  currentNodeId: string;
+  onInsert?: (variable: string) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  
+  const variables = useMemo(() => getUpstreamVariables(workflow, currentNodeId), [workflow, currentNodeId]);
+  
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isOpen]);
+  
+  const insertVariable = (variable: string) => {
+    const textarea = targetTextareaRef.current;
+    if (textarea) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const currentValue = textarea.value;
+      const newValue = currentValue.substring(0, start) + variable + currentValue.substring(end);
+      
+      // Use the onInsert callback to update the parent component's state
+      if (onInsert) {
+        onInsert(newValue);
+        
+        // Set cursor position after the inserted variable
+        setTimeout(() => {
+          textarea.focus();
+          const newCursorPos = start + variable.length;
+          textarea.setSelectionRange(newCursorPos, newCursorPos);
+        }, 0);
+      }
+    }
+    setIsOpen(false);
+  };
+  
+  // Group variables by node
+  const groupedVariables = variables.reduce((groups, variable) => {
+    const key = `${variable.nodeId}|${variable.nodeName}`;
+    if (!groups[key]) {
+      groups[key] = { nodeId: variable.nodeId, nodeName: variable.nodeName, fields: [] };
+    }
+    groups[key].fields.push({ name: variable.fieldName, type: variable.fieldType });
+    return groups;
+  }, {} as Record<string, { nodeId: string; nodeName: string; fields: Array<{ name: string; type: string }> }>);
+  
+  if (variables.length === 0) {
+    return (
+      <div className="absolute top-1 right-1">
+        <button
+          type="button"
+          disabled
+          className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 px-2 py-1 text-[9px] text-[color:var(--ck-text-tertiary)] opacity-50"
+          title="Tip: Add output fields to upstream nodes to see available variables here"
+        >
+          {'{{}}'}
+        </button>
+      </div>
+    );
+  }
+  
+  return (
+    <div className="absolute top-1 right-1" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 px-2 py-1 text-[9px] text-[color:var(--ck-text-secondary)] hover:bg-white/10 hover:text-[color:var(--ck-text-primary)]"
+        title="Insert variable"
+      >
+        {'{{}}'}
+      </button>
+      
+      {isOpen && (
+        <div className="absolute right-0 top-8 z-50 w-72 max-h-80 overflow-auto rounded-[var(--ck-radius-sm)] border border-white/15 bg-black/80 backdrop-blur shadow-[var(--ck-shadow-1)]">
+          <div className="p-1">
+            {Object.values(groupedVariables).map(group => (
+              <div key={group.nodeId}>
+                <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">
+                  {group.nodeName}
+                </div>
+                {group.fields.map(field => {
+                  const variable = `{{${group.nodeId}.${field.name}}}`;
+                  const badgeColor = field.type === 'text' ? 'text-blue-400' : 
+                                   field.type === 'list' ? 'text-green-400' : 
+                                   field.type === 'json' ? 'text-amber-400' : 'text-gray-400';
+                  
+                  return (
+                    <button
+                      key={`${group.nodeId}.${field.name}`}
+                      type="button"
+                      onClick={() => insertVariable(variable)}
+                      className="w-full flex items-center justify-between gap-2 rounded-[var(--ck-radius-sm)] px-2 py-1 text-left text-xs text-[color:var(--ck-text-primary)] hover:bg-white/10 cursor-pointer"
+                    >
+                      <span className="font-mono">{variable}</span>
+                      <span className={`text-[9px] px-1 py-0.5 rounded-sm bg-black/30 ${badgeColor}`}>
+                        {field.type}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+            
+            {variables.length === 0 && (
+              <div className="px-2 py-3 text-xs text-[color:var(--ck-text-secondary)]">
+                Tip: Add output fields to upstream nodes to see available variables here
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TemplateTextareaWithVars({
+  value,
+  onChangeValue,
+  workflow,
+  currentNodeId,
+  className,
+  placeholder,
+  spellCheck,
+}: {
+  value: string;
+  onChangeValue: (next: string) => void;
+  workflow: WorkflowFileV1;
+  currentNodeId: string;
+  className: string;
+  placeholder?: string;
+  spellCheck?: boolean;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  return (
+    <div className="relative">
+      <textarea
+        ref={ref}
+        value={value}
+        onChange={(e) => onChangeValue(e.target.value)}
+        className={className}
+        placeholder={placeholder}
+        spellCheck={spellCheck}
+      />
+      <VariableInsertDropdown
+        targetTextareaRef={ref}
+        workflow={workflow}
+        currentNodeId={currentNodeId}
+        onInsert={(newValue) => onChangeValue(newValue)}
+      />
+    </div>
+  );
+}
+
+// Output fields editor component for all node types
+function OutputFieldsEditor({
+  outputFields,
+  onChange
+}: {
+  outputFields: OutputField[];
+  onChange: (fields: OutputField[]) => void;
+}) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">
+        output fields (optional)
+      </div>
+      <div className="text-[9px] text-[color:var(--ck-text-secondary)] mb-2">
+        Define what this node produces for downstream nodes
+      </div>
+      <div className="space-y-1">
+        {outputFields.map((field, index) => (
+          <div key={index} className="flex items-center gap-2">
+            <input
+              value={field.name}
+              onChange={(e) => {
+                const newOutputFields = [...outputFields];
+                newOutputFields[index] = { ...field, name: e.target.value };
+                onChange(newOutputFields);
+              }}
+              className="flex-1 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+              placeholder="Field name"
+            />
+            <select
+              value={field.type}
+              onChange={(e) => {
+                const newType = e.target.value as OutputFieldType;
+                const newOutputFields = [...outputFields];
+                newOutputFields[index] = { ...field, type: newType };
+                onChange(newOutputFields);
+              }}
+              className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+            >
+              <option value="text">text</option>
+              <option value="list">list</option>
+              <option value="json">json</option>
+            </select>
+            <button
+              type="button"
+              onClick={() => {
+                const newOutputFields = outputFields.filter((_, i) => i !== index);
+                onChange(newOutputFields);
+              }}
+              className="text-xs text-[color:var(--ck-text-tertiary)] hover:text-[color:var(--ck-text-primary)]"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={() => {
+            const newOutputFields = [...outputFields, { name: "", type: "text" as const }];
+            onChange(newOutputFields);
+          }}
+          className="text-xs text-[color:var(--ck-text-secondary)] hover:text-[color:var(--ck-text-primary)]"
+        >
+          + Add field
+        </button>
+      </div>
+    </div>
+  );
+}
+
 type LoadState =
   | { kind: "loading" }
   | { kind: "error"; error: string }
   | { kind: "ready"; jsonText: string };
+
+type OutputFieldType = "text" | "list" | "json";
+type OutputField = { name: string; type: OutputFieldType };
 
 function draftKey(teamId: string, workflowId: string) {
   return `ck-wf-draft:${teamId}:${workflowId}`;
@@ -1336,15 +1637,16 @@ export default function WorkflowsEditorClient({
 
                             <label className="block">
                               <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">messageTemplate (optional)</div>
-                              <textarea
+                              <TemplateTextareaWithVars
                                 value={String((cfg as Record<string, unknown>).messageTemplate ?? "")}
-                                onChange={(e) => {
-                                  const v = String(e.target.value || "");
-                                  const nextCfg = { ...cfg, ...(v.trim() ? { messageTemplate: v } : {}) };
-                                  if (!v.trim()) delete (nextCfg as Record<string, unknown>).messageTemplate;
+                                workflow={wf}
+                                currentNodeId={node.id}
+                                onChangeValue={(nextValue) => {
+                                  const nextCfg = { ...cfg, ...(nextValue.trim() ? { messageTemplate: nextValue } : {}) };
+                                  if (!nextValue.trim()) delete (nextCfg as Record<string, unknown>).messageTemplate;
                                   setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
                                 }}
-                                className="mt-1 h-[70px] w-full resize-none rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-2 font-mono text-[10px] text-[color:var(--ck-text-primary)]"
+                                className="mt-1 h-[70px] w-full resize-none rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-2 pr-12 font-mono text-[10px] text-[color:var(--ck-text-primary)]"
                                 placeholder="Approval needed for {{workflowName}} (run {{runId}})"
                                 spellCheck={false}
                               />
@@ -1701,6 +2003,70 @@ export default function WorkflowsEditorClient({
                               </label>
                             </div>
 
+                            {/* LLM Configuration */}
+                            {node.type === "llm" ? (
+                              <div className="space-y-3">
+                                <label className="block">
+                                  <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">prompt</div>
+                                  <TemplateTextareaWithVars
+                                    value={String(((node.config as Record<string, unknown>) || {}).promptTemplate ?? "")}
+                                    workflow={wf}
+                                    currentNodeId={node.id}
+                                    onChangeValue={(nextValue) => {
+                                      const nextCfg = { ...(node.config as Record<string, unknown>), promptTemplate: nextValue };
+                                      setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
+                                    }}
+                                    className="mt-1 min-h-[150px] w-full resize-y rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-2 pr-12 font-mono text-xs text-[color:var(--ck-text-primary)]"
+                                    placeholder="What should this node do? Use {{nodeId.output}} to reference upstream node outputs."
+                                    spellCheck={false}
+                                  />
+                                </label>
+
+                                <label className="block">
+                                  <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">model</div>
+                                  <select
+                                    value={String(((node.config as Record<string, unknown>) || {}).model ?? "")}
+                                    onChange={(e) => {
+                                      const nextModel = String(e.target.value || "").trim();
+                                      const nextCfg = { ...(node.config as Record<string, unknown>), ...(nextModel ? { model: nextModel } : {}) };
+                                      if (!nextModel) delete nextCfg.model;
+                                      setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
+                                    }}
+                                    className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                                  >
+                                    <option value="">Default (inherit global)</option>
+                                    {availableModels.map((m) => (
+                                      <option key={m} value={m}>{m}</option>
+                                    ))}
+                                  </select>
+                                  {availableModelsError ? (
+                                    <div className="mt-1 text-[10px] text-amber-300">Could not load model list: {availableModelsError}</div>
+                                  ) : null}
+                                </label>
+
+                                <label className="block">
+                                  <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">timeout (seconds)</div>
+                                  <input
+                                    type="number"
+                                    value={((node.config as Record<string, unknown>) || {}).timeoutMs ? String(Number(((node.config as Record<string, unknown>) || {}).timeoutMs) / 1000) : ""}
+                                    onChange={(e) => {
+                                      const seconds = e.target.value ? Number(e.target.value) : null;
+                                      const nextCfg = { ...(node.config as Record<string, unknown>) };
+                                      if (seconds && seconds > 0) {
+                                        nextCfg.timeoutMs = seconds * 1000;
+                                      } else {
+                                        delete nextCfg.timeoutMs;
+                                      }
+                                      setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
+                                    }}
+                                    className="mt-1 w-24 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                                    placeholder="120"
+                                    min="1"
+                                  />
+                                </label>
+                              </div>
+                            ) : null}
+
                             {/* Media Generation Configuration */}
                             {isMediaNode(node.type) ? (
                               <div>
@@ -1728,14 +2094,89 @@ export default function WorkflowsEditorClient({
                                   />
                                 </div>
                               </div>
-                            ) : (
-                              <div>
-                                <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">config</div>
-                                <pre className="mt-1 max-h-[200px] overflow-auto rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-2 text-[10px] text-[color:var(--ck-text-secondary)]">
+                            ) : null}
+
+                            {/* Human Approval Configuration */}
+                            {node.type === "human_approval" ? (
+                              <div className="space-y-2">
+                                <label className="block">
+                                  <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">provider</div>
+                                  <input
+                                    value={String(((node.config as Record<string, unknown>) || {}).provider ?? "")}
+                                    onChange={(e) => {
+                                      const v = String(e.target.value || "").trim();
+                                      const nextCfg = { ...(node.config as Record<string, unknown>), ...(v ? { provider: v } : {}) };
+                                      if (!v) delete nextCfg.provider;
+                                      setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
+                                    }}
+                                    className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                                    placeholder="telegram"
+                                  />
+                                </label>
+
+                                <label className="block">
+                                  <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">target</div>
+                                  <input
+                                    value={String(((node.config as Record<string, unknown>) || {}).target ?? "")}
+                                    onChange={(e) => {
+                                      const v = String(e.target.value || "").trim();
+                                      const nextCfg = { ...(node.config as Record<string, unknown>), ...(v ? { target: v } : {}) };
+                                      if (!v) delete nextCfg.target;
+                                      setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
+                                    }}
+                                    className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                                    placeholder="(e.g. Telegram chat id)"
+                                  />
+                                  <div className="mt-1 text-[10px] text-[color:var(--ck-text-tertiary)]">Overrides workflow-level default when set.</div>
+                                </label>
+
+                                <label className="block">
+                                  <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">messageTemplate (optional)</div>
+                                  <TemplateTextareaWithVars
+                                    value={String(((node.config as Record<string, unknown>) || {}).messageTemplate ?? "")}
+                                    workflow={wf}
+                                    currentNodeId={node.id}
+                                    onChangeValue={(nextValue) => {
+                                      const nextCfg = { ...(node.config as Record<string, unknown>), ...(nextValue.trim() ? { messageTemplate: nextValue } : {}) };
+                                      if (!nextValue.trim()) delete nextCfg.messageTemplate;
+                                      setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
+                                    }}
+                                    className="mt-1 h-[70px] w-full resize-none rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-2 pr-12 font-mono text-[10px] text-[color:var(--ck-text-primary)]"
+                                    placeholder="Approval needed for {{workflowName}} (run {{runId}})"
+                                    spellCheck={false}
+                                  />
+                                  <div className="mt-1 text-[10px] text-[color:var(--ck-text-tertiary)]">
+                                    Vars: {"{{workflowName}}"}, {"{{workflowId}}"}, {"{{runId}}"}, {"{{nodeId}}"}
+                                  </div>
+                                </label>
+                              </div>
+                            ) : null}
+
+                            {/* Output Fields for ALL node types */}
+                            <div>
+                              <OutputFieldsEditor
+                                outputFields={(((node.config as Record<string, unknown>) || {}).outputFields as OutputField[]) || []}
+                                onChange={(newOutputFields) => {
+                                  const nextCfg = { ...(node.config as Record<string, unknown>) };
+                                  if (newOutputFields.length > 0) {
+                                    nextCfg.outputFields = newOutputFields;
+                                  } else {
+                                    delete nextCfg.outputFields;
+                                  }
+                                  setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
+                                }}
+                              />
+                            </div>
+
+                            {/* Raw config section for debugging */}
+                            <details className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/10">
+                              <summary className="cursor-pointer list-none px-2 py-1 text-[10px] font-medium text-[color:var(--ck-text-secondary)]">Raw Config (debug)</summary>
+                              <div className="p-2">
+                                <pre className="mt-1 max-h-[150px] overflow-auto rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-2 text-[9px] text-[color:var(--ck-text-tertiary)]">
                                   {JSON.stringify(node.config ?? {}, null, 2)}
                                 </pre>
                               </div>
-                            )}
+                            </details>
                           </div>
                         );
                       })()
