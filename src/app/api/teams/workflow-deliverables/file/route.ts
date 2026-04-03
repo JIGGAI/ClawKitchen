@@ -10,12 +10,28 @@ import { getTeamWorkspaceDir } from "@/lib/paths";
  */
 
 const MIME_MAP: Record<string, string> = {
+  // Images
   ".png": "image/png",
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
   ".gif": "image/gif",
   ".webp": "image/webp",
   ".svg": "image/svg+xml",
+  // Video
+  ".mp4": "video/mp4",
+  ".webm": "video/webm",
+  ".mov": "video/quicktime",
+  ".avi": "video/x-msvideo",
+  ".mkv": "video/x-matroska",
+  ".ogv": "video/ogg",
+  // Audio
+  ".mp3": "audio/mpeg",
+  ".wav": "audio/wav",
+  ".ogg": "audio/ogg",
+  ".m4a": "audio/mp4",
+  ".aac": "audio/aac",
+  ".flac": "audio/flac",
+  // Documents / text
   ".pdf": "application/pdf",
   ".json": "application/json",
   ".md": "text/markdown",
@@ -62,13 +78,44 @@ export async function GET(req: Request) {
 
     const ext = path.extname(resolved).toLowerCase();
     const contentType = MIME_MAP[ext] || "application/octet-stream";
+    const fileSize = stat.size;
+
+    // Support HTTP Range requests for video/audio seeking
+    const rangeHeader = req.headers.get("range");
+    if (rangeHeader) {
+      const match = rangeHeader.match(/bytes=(\d+)-(\d*)/);
+      if (match) {
+        const start = parseInt(match[1], 10);
+        const end = match[2] ? parseInt(match[2], 10) : fileSize - 1;
+        const chunkSize = end - start + 1;
+
+        const { createReadStream } = await import("node:fs");
+        const stream = createReadStream(resolved, { start, end });
+        const chunks: Buffer[] = [];
+        for await (const chunk of stream) chunks.push(Buffer.from(chunk as Uint8Array));
+        const data = Buffer.concat(chunks);
+
+        return new NextResponse(data, {
+          status: 206,
+          headers: {
+            "Content-Type": contentType,
+            "Content-Range": `bytes ${start}-${end}/${fileSize}`,
+            "Accept-Ranges": "bytes",
+            "Content-Length": String(chunkSize),
+            "Cache-Control": "private, max-age=3600",
+          },
+        });
+      }
+    }
+
     const data = await fs.readFile(resolved);
 
     return new NextResponse(data, {
       status: 200,
       headers: {
         "Content-Type": contentType,
-        "Content-Length": String(data.length),
+        "Content-Length": String(fileSize),
+        "Accept-Ranges": "bytes",
         "Cache-Control": "private, max-age=3600",
       },
     });

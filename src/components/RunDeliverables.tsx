@@ -5,13 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchJson } from "@/lib/fetch-json";
 
 import type { WorkflowDeliverable, WorkflowDeliverablesResponse } from "@/app/api/teams/workflow-deliverables/route";
-
-const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg"]);
-
-function isImageFile(fileName: string): boolean {
-  const ext = fileName.toLowerCase().split(".").pop() ?? "";
-  return IMAGE_EXTENSIONS.has(ext);
-}
+import { isImageFile } from "@/lib/media-file-utils";
+import { DeliverablePreviewPanel } from "@/components/DeliverablePreviewPanel";
 
 function deliverableFileUrl(teamId: string, d: WorkflowDeliverable): string {
   return `/api/teams/workflow-deliverables/file?teamId=${encodeURIComponent(teamId)}&runId=${encodeURIComponent(d.runId)}&path=${encodeURIComponent(d.relativePath)}`;
@@ -274,81 +269,12 @@ export default function RunDeliverables({
                 Preview
               </h3>
 
-              {selectedDeliverable ? (
-                <div>
-                  <div className="mb-3 pb-3 border-b border-white/10">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-lg">{getFileIcon(selectedDeliverable.fileName)}</span>
-                      <span className="font-medium text-[color:var(--ck-text-primary)] text-sm break-all">
-                        {selectedDeliverable.fileName}
-                      </span>
-                    </div>
-                    <div className="text-xs text-[color:var(--ck-text-tertiary)] space-y-1">
-                      <div>Size: {formatBytes(selectedDeliverable.size)}</div>
-                      <div>Modified: {formatDate(selectedDeliverable.mtime)}</div>
-                      <div>Path: {selectedDeliverable.relativePath}</div>
-                    </div>
-                  </div>
-
-                  {isImageFile(selectedDeliverable.fileName) ? (
-                    <div>
-                      <div className="text-xs text-[color:var(--ck-text-tertiary)] mb-2">Image Preview:</div>
-                      <div className="bg-black/20 border border-white/10 rounded-[var(--ck-radius-sm)] p-2 overflow-hidden">
-                        <Image
-                          src={deliverableFileUrl(teamId, selectedDeliverable)}
-                          alt={selectedDeliverable.fileName}
-                          width={800}
-                          height={600}
-                          className="w-full h-auto rounded-[var(--ck-radius-sm)] object-contain max-h-[300px]"
-                          unoptimized
-                        />
-                      </div>
-                      <div className="mt-2 flex gap-2">
-                        <a
-                          href={deliverableFileUrl(teamId, selectedDeliverable)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs px-2 py-1 border border-white/10 rounded hover:bg-white/5 text-[color:var(--ck-text-secondary)]"
-                        >
-                          Open full size ↗
-                        </a>
-                        <button
-                          onClick={() => downloadDeliverable(selectedDeliverable)}
-                          className="text-xs px-2 py-1 border border-white/10 rounded hover:bg-white/5 text-[color:var(--ck-text-secondary)]"
-                        >
-                          Download
-                        </button>
-                      </div>
-                    </div>
-                  ) : selectedDeliverable.isText && selectedDeliverable.contentPreview ? (
-                    <div>
-                      <div className="text-xs text-[color:var(--ck-text-tertiary)] mb-2">Content Preview:</div>
-                      <div className="bg-black/20 border border-white/10 rounded-[var(--ck-radius-sm)] p-3 max-h-[300px] overflow-auto">
-                        <pre className="text-xs text-[color:var(--ck-text-primary)] whitespace-pre-wrap break-words">
-                          {selectedDeliverable.contentPreview}
-                        </pre>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-6">
-                      <div className="text-3xl mb-2">{getFileIcon(selectedDeliverable.fileName)}</div>
-                      <div className="text-xs text-[color:var(--ck-text-secondary)] mb-2">
-                        {formatBytes(selectedDeliverable.size)} · {selectedDeliverable.fileName.split(".").pop()?.toUpperCase()} file
-                      </div>
-                      <button
-                        onClick={() => downloadDeliverable(selectedDeliverable)}
-                        className="text-xs px-3 py-1.5 border border-white/10 rounded hover:bg-white/5 text-[color:var(--ck-text-secondary)]"
-                      >
-                        Download file
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-sm text-[color:var(--ck-text-secondary)] italic">
-                  Select a deliverable to preview
-                </div>
-              )}
+              <DeliverablePreviewPanel
+                deliverable={selectedDeliverable}
+                fileUrl={selectedDeliverable ? deliverableFileUrl(teamId, selectedDeliverable) : ""}
+                maxMediaHeight="300px"
+                onDownload={() => selectedDeliverable && downloadDeliverable(selectedDeliverable)}
+              />
             </div>
           </div>
         </div>
