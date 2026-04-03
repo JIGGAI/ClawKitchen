@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { fetchJson } from "@/lib/fetch-json";
 import { ConfirmationModal } from "@/components/ConfirmationModal";
+import RunDeliverables from "@/components/RunDeliverables";
 import type { WorkflowRunFileV1, WorkflowRunNodeResultV1 } from "@/lib/workflows/runs-types";
 
 function asPrettyJson(v: unknown) {
@@ -113,7 +114,8 @@ export default function RunDetailClient({
   };
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+    <>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
       <div className="lg:col-span-1 rounded-[var(--ck-radius-lg)] border border-white/10 bg-black/10 p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -290,6 +292,12 @@ export default function RunDetailClient({
           </div>
         </div>
       </ConfirmationModal>
-    </div>
+      </div>
+
+      {/* Run Deliverables Section */}
+      <div className="mt-8">
+        <RunDeliverables teamId={teamId} workflowId={workflowId} runId={run.id} />
+      </div>
+    </>
   );
 }

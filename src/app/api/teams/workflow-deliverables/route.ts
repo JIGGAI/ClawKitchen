@@ -116,21 +116,35 @@ async function scanRunDeliverables(
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const teamId = url.searchParams.get("teamId")?.trim();
+  const runId = url.searchParams.get("runId")?.trim();
+  const workflowId = url.searchParams.get("workflowId")?.trim();
   
   if (!teamId) {
     return NextResponse.json({ ok: false, error: "teamId is required" }, { status: 400 });
   }
   
+  // If runId is provided, require workflowId
+  if (runId && !workflowId) {
+    return NextResponse.json({ ok: false, error: "workflowId is required when runId is specified" }, { status: 400 });
+  }
+  
   try {
-    // Get all workflow runs for the team
-    const { runs } = await listAllWorkflowRuns(teamId);
+    let deliverables: WorkflowDeliverable[];
     
-    // Scan each run for deliverables
-    const deliverablesNested = await Promise.all(
-      runs.map(run => scanRunDeliverables(teamId, run.runId, run.workflowId))
-    );
-    
-    const deliverables = deliverablesNested.flat();
+    if (runId && workflowId) {
+      // Scan a specific run only
+      deliverables = await scanRunDeliverables(teamId, runId, workflowId);
+    } else {
+      // Get all workflow runs for the team
+      const { runs } = await listAllWorkflowRuns(teamId);
+      
+      // Scan each run for deliverables
+      const deliverablesNested = await Promise.all(
+        runs.map(run => scanRunDeliverables(teamId, run.runId, run.workflowId))
+      );
+      
+      deliverables = deliverablesNested.flat();
+    }
     
     // Sort by modification time (newest first)
     deliverables.sort((a, b) => new Date(b.mtime).getTime() - new Date(a.mtime).getTime());
