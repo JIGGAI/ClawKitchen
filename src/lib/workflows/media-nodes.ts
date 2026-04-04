@@ -4,7 +4,7 @@
  */
 
 export interface MediaGenerationConfig {
-  mediaType: 'image' | 'video';
+  mediaType: 'image' | 'video' | 'audio';
   provider: 'auto' | 'openai' | 'skill' | 'http' | string;
   prompt: string;
   size?: string;
@@ -13,6 +13,7 @@ export interface MediaGenerationConfig {
   model?: string;
   outputPath?: string;
   duration?: string; // For video
+  addRefinement?: boolean | string; // Opt-in LLM refinement pass
   // Provider-specific configs
   skillId?: string;
   httpEndpoint?: string;

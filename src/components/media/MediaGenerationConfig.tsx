@@ -456,6 +456,24 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId, workf
         </label>
       )}
 
+      {/* Prompt Refinement toggle — opt-in for video/audio */}
+      {(config.mediaType === 'video' || config.mediaType === 'audio') && (
+        <label className="flex items-center gap-2 py-1">
+          <input
+            type="checkbox"
+            checked={config.addRefinement === true || config.addRefinement === 'true'}
+            onChange={(e) => updateConfig({ addRefinement: e.target.checked })}
+            className="h-3.5 w-3.5 rounded border-white/20 bg-black/25 text-blue-500 accent-blue-500"
+          />
+          <div>
+            <span className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">Add LLM Refinement</span>
+            <div className="text-[10px] text-[color:var(--ck-text-tertiary)] opacity-60">
+              Run an extra LLM pass to refine the prompt before generation. Off by default.
+            </div>
+          </div>
+        </label>
+      )}
+
       {/* Validation Errors */}
       {errors.length > 0 && (
         <div className="mt-2 rounded-[var(--ck-radius-sm)] border border-red-400/30 bg-red-500/10 p-2 text-xs text-red-100">
