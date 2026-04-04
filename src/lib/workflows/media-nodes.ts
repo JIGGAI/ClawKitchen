@@ -13,6 +13,7 @@ export interface MediaGenerationConfig {
   model?: string;
   outputPath?: string;
   duration?: string; // For video
+  aspect_ratio?: string; // For video (e.g. '16:9', '9:16')
   addRefinement?: boolean | string; // Opt-in LLM refinement pass
   // Provider-specific configs
   skillId?: string;

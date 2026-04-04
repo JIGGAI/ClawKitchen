@@ -431,8 +431,24 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId, workf
 
       {/* Video-specific options */}
       {config.mediaType === 'video' && (
-        <label className="block">
-          <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">duration</div>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="block">
+            <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">aspect ratio</div>
+            <select
+              value={config.aspect_ratio || '16:9'}
+              onChange={(e) => updateConfig({ aspect_ratio: e.target.value })}
+              className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+            >
+              <option value="16:9">Landscape (16:9)</option>
+              <option value="9:16">Portrait (9:16)</option>
+              <option value="1:1">Square (1:1)</option>
+              <option value="4:3">Standard (4:3)</option>
+              <option value="3:4">Portrait (3:4)</option>
+              <option value="21:9">Ultrawide (21:9)</option>
+            </select>
+          </label>
+          <label className="block">
+            <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">duration</div>
           <input
             type="text"
             value={config.duration || '5s'}
@@ -453,7 +469,8 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId, workf
               Duration in seconds (e.g., &quot;5s&quot;, &quot;10s&quot;)
             </div>
           )}
-        </label>
+          </label>
+        </div>
       )}
 
       {/* Prompt Refinement toggle — opt-in for video/audio */}
