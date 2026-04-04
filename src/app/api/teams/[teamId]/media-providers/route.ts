@@ -52,7 +52,7 @@ export async function GET(
     providers.push(...driverProviders);
 
     // 2. Auto-discover unknown skills with generate_* scripts
-    const knownSlugs = new Set(driverProviders.map((p) => p.id.replace(/^skill-/, '')));
+    const knownSlugs = new Set(driverProviders.map((p) => p.id));
     const discovered = await discoverUnknownSkills(knownSlugs);
     providers.push(...discovered);
 
@@ -94,7 +94,7 @@ async function fetchDriverProviders(): Promise<MediaProvider[]> {
     };
 
     return drivers.map((d, i) => ({
-      id: `skill-${d.slug}`,
+      id: d.slug,
       name: d.displayName,
       supportedTypes: [d.mediaType],
       available: d.available,
@@ -170,7 +170,7 @@ async function probeSkillDir(
 
   if (types.length === 0) return null;
   return {
-    id: `skill-${name}`,
+    id: name,
     name: formatSkillName(name),
     supportedTypes: types,
     available: true,
