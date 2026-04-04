@@ -5,6 +5,13 @@ import { runOpenClaw } from '@/lib/openclaw';
 
 type MediaType = 'image' | 'video' | 'audio';
 
+export interface DurationConstraints {
+  minSeconds: number;
+  maxSeconds: number;
+  defaultSeconds: number;
+  stepSeconds?: number;
+}
+
 export interface MediaProvider {
   id: string;
   name: string;
@@ -12,6 +19,7 @@ export interface MediaProvider {
   available: boolean;
   error?: string;
   priority?: number;
+  durationConstraints?: DurationConstraints | null;
 }
 
 interface DriverInfo {
@@ -20,6 +28,7 @@ interface DriverInfo {
   mediaType: MediaType;
   available: boolean;
   missingEnvVars: string[];
+  durationConstraints?: DurationConstraints | null;
 }
 
 /**
@@ -93,6 +102,7 @@ async function fetchDriverProviders(): Promise<MediaProvider[]> {
         ? undefined
         : `Missing: ${d.missingEnvVars.join(', ')}`,
       priority: (priorityBase[d.mediaType] ?? 60) - i,
+      durationConstraints: d.durationConstraints ?? null,
     }));
   } catch (err) {
     console.warn('Failed to fetch media drivers from ClawRecipes:', err);

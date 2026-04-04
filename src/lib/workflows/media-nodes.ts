@@ -19,6 +19,13 @@ export interface MediaGenerationConfig {
   httpHeaders?: Record<string, string>;
 }
 
+export interface DurationConstraints {
+  minSeconds: number;
+  maxSeconds: number;
+  defaultSeconds: number;
+  stepSeconds?: number;
+}
+
 export interface MediaProvider {
   id: string;
   name: string;
@@ -26,6 +33,7 @@ export interface MediaProvider {
   available: boolean;
   models?: string[];
   error?: string;
+  durationConstraints?: DurationConstraints | null;
 }
 
 export const MEDIA_NODE_TYPES = {

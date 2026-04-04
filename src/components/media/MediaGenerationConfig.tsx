@@ -440,9 +440,19 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId, workf
             placeholder="e.g., 5s, 10s"
             className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
           />
-          <div className="mt-1 text-[10px] text-[color:var(--ck-text-tertiary)]">
-            Duration in seconds (e.g., &quot;5s&quot;, &quot;10s&quot;)
-          </div>
+          {selectedProvider?.durationConstraints ? (
+            <div className="mt-1 flex items-center gap-1 text-[10px] text-amber-400/80">
+              <span>ℹ️</span>
+              <span>
+                {selectedProvider.name}: {selectedProvider.durationConstraints.minSeconds}–{selectedProvider.durationConstraints.maxSeconds}s
+                (default {selectedProvider.durationConstraints.defaultSeconds}s)
+              </span>
+            </div>
+          ) : (
+            <div className="mt-1 text-[10px] text-[color:var(--ck-text-tertiary)]">
+              Duration in seconds (e.g., &quot;5s&quot;, &quot;10s&quot;)
+            </div>
+          )}
         </label>
       )}
 
