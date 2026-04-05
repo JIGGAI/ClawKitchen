@@ -2,7 +2,7 @@
   "id": "kitchen",
   "name": "ClawKitchen",
   "description": "Local UI for managing OpenClaw recipes, teams, agents, cron jobs, and skills.",
-  "version": "0.3.16",
+  "version": "0.3.33",
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
@@ -74,5 +74,11 @@
       "help": "on: require Basic auth; local: allow localhost unauthenticated; off: disable auth (not recommended)."
     }
   },
-  "main": "openclaw/index.ts"
+  "main": "openclaw/index.ts",
+  "compat": {
+    "pluginApi": "2026.3"
+  },
+  "build": {
+    "openclawVersion": "2026.3.28"
+  }
 }

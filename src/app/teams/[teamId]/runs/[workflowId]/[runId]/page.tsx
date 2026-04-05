@@ -56,7 +56,7 @@ export default async function TeamRunDetailPage({
         </div>
       </div>
 
-      <RunDetailClient run={run} />
+      <RunDetailClient run={run} teamId={teamId} workflowId={workflowId} />
     </div>
   );
 }

@@ -71,7 +71,9 @@ function sanitizeStdout(raw: string): string {
   return raw;
 }
 
-async function runOpenClawLocal(args: string[]): Promise<OpenClawExecResult> {
+async function runOpenClawLocal(args: string[], options: { sanitizeStdout?: boolean } = {}): Promise<OpenClawExecResult> {
+  const { sanitizeStdout: shouldSanitize = true } = options;
+  
   try {
     const isWindows = process.platform === "win32";
     const res = await execFileAsync("openclaw", args, {
@@ -83,10 +85,12 @@ async function runOpenClawLocal(args: string[]): Promise<OpenClawExecResult> {
       ...(isWindows ? { shell: true } : {}),
     });
 
+    const rawStdout = String(res.stdout ?? "");
+    
     return {
       ok: true,
       exitCode: 0,
-      stdout: sanitizeStdout(String(res.stdout ?? "")),
+      stdout: shouldSanitize ? sanitizeStdout(rawStdout) : rawStdout,
       stderr: String(res.stderr ?? ""),
     };
   } catch (e: unknown) {
@@ -145,6 +149,14 @@ export function extractJson<T = unknown>(stdout: string): T | null {
   return null;
 }
 
+/**
+ * Run OpenClaw without stdout sanitization (for raw text output like recipe markdown)
+ */
+export async function runOpenClawRaw(args: string[]): Promise<OpenClawExecResult> {
+  // Always use local exec for raw content to avoid Kitchen runtime restrictions
+  return runOpenClawLocal(args, { sanitizeStdout: false });
+}
+
 export async function runOpenClaw(args: string[]): Promise<OpenClawExecResult> {
   // In some Kitchen runtime contexts, `api.runtime.system.runCommandWithTimeout`
   // is executed with a restricted allowlist that does not include the `cron` tool,
@@ -153,6 +165,18 @@ export async function runOpenClaw(args: string[]): Promise<OpenClawExecResult> {
   // Cron routes need to work in the gateway-run Kitchen environment, so for cron
   // specifically we prefer a local exec (host OpenClaw).
   if (args[0] === "cron") return runOpenClawLocal(args);
+
+  // Workflow runner/worker commands are long-running orchestration processes that
+  // acquire locks and claims. The runtime command wrapper (runCommandWithTimeout)
+  // has a 120s hard timeout that can kill these mid-execution, orphaning locks and
+  // leaving runs stuck in waiting_workers. Route them through local exec instead.
+  if (
+    args[0] === "recipes" &&
+    args[1] === "workflows" &&
+    ["runner-once", "runner-tick", "worker-tick"].includes(args[2])
+  ) {
+    return runOpenClawLocal(args);
+  }
 
   const api = getKitchenApi();
   try {

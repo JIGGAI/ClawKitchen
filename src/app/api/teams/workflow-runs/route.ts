@@ -9,7 +9,7 @@ import { errorMessage } from "@/lib/errors";
 import { toolsInvoke } from "@/lib/gateway";
 import { runOpenClaw } from "@/lib/openclaw";
 import { assertSafeRelativeFileName, getTeamWorkspaceDir } from "@/lib/paths";
-import { listWorkflowRuns, readWorkflowRun, writeWorkflowRun } from "@/lib/workflows/runs-storage";
+import { listWorkflowRuns, readWorkflowRun, writeWorkflowRun, appendWorkflowRunEvent, writeApprovalFile } from "@/lib/workflows/runs-storage";
 import type { WorkflowRunFileV1, WorkflowRunNodeResultV1 } from "@/lib/workflows/runs-types";
 import { readWorkflow } from "@/lib/workflows/storage";
 import type { WorkflowFileV1 } from "@/lib/workflows/types";
@@ -374,11 +374,94 @@ export async function POST(req: Request) {
   if (!workflowId) return NextResponse.json({ ok: false, error: "workflowId is required" }, { status: 400 });
 
   try {
-    // Action mode: approve/request_changes/cancel (file-first) updates an existing run.
+    // Action mode: approve/request_changes/cancel/stop/delete updates an existing run.
     if (action) {
       if (!runIdFromBody) return NextResponse.json({ ok: false, error: "runId is required for action" }, { status: 400 });
-      if (!["approve", "request_changes", "cancel"].includes(action)) {
+      if (!["approve", "request_changes", "cancel", "stop", "delete"].includes(action)) {
         return NextResponse.json({ ok: false, error: `Unsupported action: ${action}` }, { status: 400 });
+      }
+
+      // Handle stop action
+      if (action === "stop") {
+        const existing = await readWorkflowRun(teamId, workflowId, runIdFromBody);
+        const run = existing.run;
+        
+        // Only allow stopping runs that are active
+        if (!["queued", "running", "waiting_for_approval", "waiting_workers"].includes(run.status)) {
+          return NextResponse.json({ ok: false, error: `Cannot stop run with status: ${run.status}` }, { status: 400 });
+        }
+
+        const stoppedAt = nowIso();
+        const stoppedNodes = Array.isArray(run.nodes)
+          ? run.nodes.map((n) => {
+              if (n.status === "pending" || n.status === "running") {
+                return {
+                  ...n,
+                  status: "skipped" as const,
+                  startedAt: n.startedAt ?? stoppedAt,
+                  endedAt: stoppedAt,
+                  output: n.output ?? { note: "skipped due to stop" },
+                };
+              }
+              return n;
+            })
+          : [];
+
+        const stoppedRun: WorkflowRunFileV1 = {
+          ...run,
+          status: "canceled",
+          endedAt: stoppedAt,
+          nodes: stoppedNodes,
+        };
+
+        const writeResult = await writeWorkflowRun(teamId, workflowId, stoppedRun);
+        
+        // Add event to ClawRecipes event log for audit trail
+        try {
+          await appendWorkflowRunEvent(teamId, workflowId, run.id, {
+            type: "workflow.stopped",
+            action: "stop",
+            stoppedAt,
+            reason: "manual_stop"
+          });
+        } catch (eventError) {
+          // Don't fail the request if event logging fails
+          console.warn("Failed to log stop event:", eventError);
+        }
+
+        return jsonOkRest({ ...writeResult, runId: run.id });
+      }
+
+      // Handle delete action
+      if (action === "delete") {
+        // Delete run directory entirely
+        const teamDir = await getTeamWorkspaceDir(teamId);
+        const runDir = path.join(teamDir, `shared-context/workflow-runs/${runIdFromBody}`);
+        
+        try {
+          await fs.rm(runDir, { recursive: true, force: true });
+        } catch {
+          // Directory doesn't exist, continue with cleanup
+        }
+        
+        // Also clean up legacy formats
+        try {
+          // Legacy flat file format
+          const flatFile = path.join(teamDir, `shared-context/workflow-runs/${runIdFromBody}.run.json`);
+          await fs.rm(flatFile, { force: true });
+        } catch {
+          // File doesn't exist, that's fine
+        }
+        
+        try {
+          // Legacy per-workflow directory
+          const legacyRunDir = path.join(teamDir, `shared-context/workflows/${workflowId}/runs/${runIdFromBody}`);
+          await fs.rm(legacyRunDir, { recursive: true, force: true });
+        } catch {
+          // Directory doesn't exist, that's fine
+        }
+
+        return jsonOkRest({ ok: true, deleted: true, runId: runIdFromBody });
       }
 
       const existing = await readWorkflowRun(teamId, workflowId, runIdFromBody);
@@ -465,7 +548,38 @@ export async function POST(req: Request) {
         }
       }
 
-      return jsonOkRest({ ...(await writeWorkflowRun(teamId, workflowId, finalRun)), runId: run.id });
+      const writeResult = await writeWorkflowRun(teamId, workflowId, finalRun);
+      
+      // Add event to ClawRecipes event log for audit trail
+      try {
+        await appendWorkflowRunEvent(teamId, workflowId, run.id, {
+          type: action === "approve" ? "approval.approved" : action === "request_changes" ? "approval.changes_requested" : "approval.canceled",
+          nodeId: approvalNodeId,
+          action,
+          decidedBy: decidedBy || "unknown",
+          note: note || undefined,
+          decision: nextState
+        });
+      } catch (eventError) {
+        // Don't fail the request if event logging fails
+        console.warn("Failed to log approval event:", eventError);
+      }
+
+      // Write approval file in ClawRecipes format
+      try {
+        await writeApprovalFile(teamId, workflowId, run.id, approvalNodeId, {
+          state: nextState,
+          requestedAt: run.approval?.requestedAt,
+          decidedAt: nextState === "changes_requested" ? undefined : decidedAt,
+          note,
+          decidedBy
+        });
+      } catch (approvalFileError) {
+        // Don't fail the request if approval file writing fails
+        console.warn("Failed to write approval file:", approvalFileError);
+      }
+
+      return jsonOkRest({ ...writeResult, runId: run.id });
     }
 
 
@@ -563,38 +677,36 @@ export async function POST(req: Request) {
           );
         }
 
-        // Try to claim the newly enqueued run before ticking workers.
-        for (let attempt = 0; attempt < 4; attempt++) {
-          const runnerRes = await runOpenClaw(["recipes", "workflows", "runner-once", "--team-id", teamId]);
-          if (!runnerRes.ok) throw new Error(runnerRes.stderr || runnerRes.stdout || "Failed to run runner-once");
+        // Claim specifically the run we just enqueued (--run-id prevents picking up stale runs).
+        const runnerRes = await runOpenClaw(["recipes", "workflows", "runner-once", "--team-id", teamId, "--run-id", enqRunId]);
+        if (!runnerRes.ok) throw new Error(runnerRes.stderr || runnerRes.stdout || "Failed to run runner-once");
 
+        // Fire-and-forget: kick workers in the background so the run advances.
+        // Cron workers will also pick up the work, so this is just best-effort acceleration.
+        // We do NOT await this — return the runId to the UI immediately for redirect.
+        const workerAgentIds = [...uniq];
+        void (async () => {
           try {
-            const { run } = await readWorkflowRun(teamId, workflowId, enqRunId);
-            const statusAny = (run as unknown as { status?: unknown }).status;
-            if (statusAny && String(statusAny) != "queued") break;
-          } catch {
-            // fall through
-          }
-
-          await new Promise((r) => setTimeout(r, 250));
-        }
-
-        for (const agentId of uniq) {
-          const workerRes = await runOpenClaw([
-            "recipes",
-            "workflows",
-            "worker-tick",
-            "--team-id",
-            teamId,
-            "--agent-id",
-            agentId,
-            "--limit",
-            "5",
-            "--worker-id",
-            "kitchen-run-now",
-          ]);
-          if (!workerRes.ok) throw new Error(workerRes.stderr || workerRes.stdout || `Failed worker-tick for ${agentId}`);
-        }
+            for (const agentId of workerAgentIds) {
+              await runOpenClaw([
+                "recipes", "workflows", "worker-tick",
+                "--team-id", teamId, "--agent-id", agentId,
+                "--limit", "5", "--worker-id", "kitchen-run-now",
+              ]);
+            }
+            const { run: postRun } = await readWorkflowRun(teamId, workflowId, enqRunId);
+            const postStatus = String((postRun as unknown as { status?: unknown }).status ?? "");
+            if (postStatus === "waiting_workers") {
+              for (const agentId of workerAgentIds) {
+                await runOpenClaw([
+                  "recipes", "workflows", "worker-tick",
+                  "--team-id", teamId, "--agent-id", agentId,
+                  "--limit", "5", "--worker-id", "kitchen-run-now-pass2",
+                ]);
+              }
+            }
+          } catch { /* best-effort — cron workers will pick up remaining work */ }
+        })();
       }
 
       return jsonOkRest({

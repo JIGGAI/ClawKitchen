@@ -1,11 +1,32 @@
 {
   "name": "@jiggai/kitchen",
-  "version": "0.3.16",
-  "private": false,
+  "version": "0.3.41",
+  "main": "openclaw/index.ts",
+  "description": "ClawKitchen - Web-based dashboard for OpenClaw agent teams, workflows, and automation",
+  "author": "@rjdjohnston · rjdjohnston",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JIGGAI/clawkitchen.git"
+  },
+  "keywords": [
+    "openclaw",
+    "clawkitchen",
+    "dashboard",
+    "agents",
+    "workflows",
+    "plugin"
+  ],
   "openclaw": {
     "extensions": [
       "./openclaw/index.ts"
-    ]
+    ],
+    "compat": {
+      "pluginApi": "2026.3"
+    },
+    "build": {
+      "openclawVersion": "2026.3.28"
+    }
   },
   "scripts": {
     "dev": "next dev",
@@ -25,6 +46,9 @@
     "sync:plugin-version": "node scripts/sync-openclaw-plugin-version.mjs",
     "check:plugin-version": "node scripts/check-openclaw-plugin-version.mjs",
     "prepublishOnly": "npm run -s sync:plugin-version && npm run -s check:plugin-version"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "files": [
     "openclaw/",
@@ -52,6 +76,8 @@
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "yaml": "^2.8.2"
   },
   "devDependencies": {
@@ -72,7 +98,7 @@
     "jsdom": "^28.1.0",
     "lint-staged": "^16.2.7",
     "tailwindcss": "^4",
-    "typescript": "^5",
+    "typescript": "5.9.3",
     "vite-tsconfig-paths": "^6.1.1",
     "vitest": "^4.0.18"
   },

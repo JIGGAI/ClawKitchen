@@ -24,6 +24,8 @@ import { OrchestratorPanel } from "../OrchestratorPanel";
 import WorkflowsClient from "../workflows/workflows-client";
 import PluginTabs from "@/components/PluginTabs";
 
+import { DeliverablesTab } from "./DeliverablesTab";
+
 const BASE_TABS = [
   { id: "recipe" as const, label: "Recipe" },
   { id: "agents" as const, label: "Agents" },
@@ -37,6 +39,7 @@ const BASE_TABS = [
 const EXPERIMENTAL_TABS = [
   { id: "memory" as const, label: "Memory" },
   { id: "workflows" as const, label: "Workflows" },
+  { id: "deliverables" as const, label: "Deliverables" },
 ] as const;
 
 
@@ -507,6 +510,12 @@ export default function TeamEditor({ teamId, initialTab }: { teamId: string; ini
       {activeTab === "workflows" && (
         <div className="mt-6">
           <WorkflowsClient teamId={teamId} />
+        </div>
+      )}
+
+      {activeTab === "deliverables" && (
+        <div className="mt-6">
+          <DeliverablesTab teamId={teamId} />
         </div>
       )}
 

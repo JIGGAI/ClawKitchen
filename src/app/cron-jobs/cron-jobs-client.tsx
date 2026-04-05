@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/ToastProvider";
 import { DeleteCronJobModal } from "@/components/delete-modals";
+import { EditCronJobModal } from "@/components/EditCronJobModal";
+import { CreateCronJobModal } from "@/components/CreateCronJobModal";
 import { errorMessage } from "@/lib/errors";
 import { fetchJson } from "@/lib/fetch-json";
 
@@ -14,6 +16,7 @@ type CronJob = {
   state?: { nextRunAtMs?: number };
   agentId?: string;
   sessionTarget?: string;
+  sessionKey?: string;
   // Optional enrichment from the API (which team/agent it belongs to)
   scope?: { kind: "team" | "agent"; id: string; label: string; href: string };
 };
@@ -47,6 +50,11 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  const [editOpen, setEditOpen] = useState(false);
+  const [editJob, setEditJob] = useState<CronJob | null>(null);
+
+  const [createOpen, setCreateOpen] = useState(false);
+
   const sorted = useMemo(() => {
     return [...jobs].sort((a, b) => {
       const ae = isEnabled(a);
@@ -55,6 +63,11 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
       return String(a.name ?? "").localeCompare(String(b.name ?? ""));
     });
   }, [jobs]);
+
+  const liveEditJob = useMemo(() => {
+    if (!editJob) return null;
+    return jobs.find((job) => job.id === editJob.id) ?? editJob;
+  }, [jobs, editJob]);
 
   async function refresh() {
     setLoading(true);
@@ -104,6 +117,11 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
     setDeleteOpen(true);
   }
 
+  function openEdit(job: CronJob) {
+    setEditJob(job);
+    setEditOpen(true);
+  }
+
   async function confirmDelete() {
     setDeleteBusy(true);
     setDeleteError(null);
@@ -137,14 +155,23 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
               {jobs.length} job{jobs.length !== 1 ? "s" : ""} total · {jobs.filter((j) => isEnabled(j)).length} enabled
             </p>
           </div>
-          <button
-            type="button"
-            onClick={refresh}
-            disabled={loading}
-            className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15"
-          >
-            Refresh
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setCreateOpen(true)}
+              className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--ck-accent-red-hover)] active:bg-[var(--ck-accent-red-active)]"
+            >
+              Create Job
+            </button>
+            <button
+              type="button"
+              onClick={refresh}
+              disabled={loading}
+              className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15"
+            >
+              Refresh
+            </button>
+          </div>
         </div>
       </div>
 
@@ -196,6 +223,14 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
                 <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                   <button
                     type="button"
+                    onClick={() => openEdit(j)}
+                    disabled={loading}
+                    className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium transition-colors hover:bg-white/10"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => act(j.id, isEnabled(j) ? "disable" : "enable")}
                     disabled={loading}
                     className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium transition-colors hover:bg-white/10"
@@ -240,6 +275,19 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
         error={deleteError}
         onClose={() => setDeleteOpen(false)}
         onConfirm={confirmDelete}
+      />
+
+      <EditCronJobModal
+        job={liveEditJob}
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        onSaved={refresh}
+      />
+
+      <CreateCronJobModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={refresh}
       />
     </>
   );

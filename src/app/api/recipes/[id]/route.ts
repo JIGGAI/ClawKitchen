@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { NextResponse } from "next/server";
-import { runOpenClaw } from "@/lib/openclaw";
 import { findRecipeById, parseFrontmatterId, resolveRecipePath, writeRecipeFile } from "@/lib/recipes";
 
 function sha256(text: string) {
@@ -16,12 +16,13 @@ export async function GET(
   const item = await findRecipeById(id);
   if (!item) return NextResponse.json({ error: `Recipe not found: ${id}` }, { status: 404 });
 
-  const shown = await runOpenClaw(["recipes", "show", id]);
   const filePath = await resolveRecipePath(item).catch(() => null);
+  if (!filePath) return NextResponse.json({ error: `Recipe file not found: ${id}` }, { status: 404 });
 
-  const recipeHash = sha256(shown.stdout);
+  const content = await readFile(filePath, "utf8");
+  const recipeHash = sha256(content);
 
-  return NextResponse.json({ recipe: { ...item, content: shown.stdout, filePath }, recipeHash, stderr: shown.stderr });
+  return NextResponse.json({ recipe: { ...item, content, filePath }, recipeHash });
 }
 
 export async function PUT(
