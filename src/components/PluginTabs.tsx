@@ -16,21 +16,28 @@ interface PluginTabsProps {
   teamId: string;
 }
 
+const ICON_MAP: Record<string, string> = {
+  library: '📚',
+  calendar: '📅',
+  chart: '📊',
+  users: '👥',
+  folder: '📁',
+};
+
 export default function PluginTabs({ teamType }: PluginTabsProps) {
   const [plugins, setPlugins] = useState<Plugin[]>([]);
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [loadedTabs, setLoadedTabs] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
+  /* ---- discover plugins ---- */
   useEffect(() => {
     async function loadPlugins() {
       try {
         const response = await fetch(`/api/plugins?teamType=${encodeURIComponent(teamType)}`);
         const data = await response.json();
-        
         if (data.success) {
           setPlugins(data.plugins);
-          // Auto-select first tab if available
           if (data.plugins.length > 0 && data.plugins[0].tabs.length > 0) {
             setActiveTab(`${data.plugins[0].id}:${data.plugins[0].tabs[0].id}`);
           }
@@ -41,44 +48,37 @@ export default function PluginTabs({ teamType }: PluginTabsProps) {
         setLoading(false);
       }
     }
-
     loadPlugins();
   }, [teamType]);
 
+  /* ---- expose KitchenPlugin global for tab bundles ---- */
   useEffect(() => {
-    // Ensure KitchenPlugin global is available
-    if (typeof window !== 'undefined') {
-      (window as unknown as { KitchenPlugin: { registeredTabs: Map<string, React.ComponentType>; registerTab: (pluginId: string, tabId: string, component: React.ComponentType) => void; getTab: (pluginId: string, tabId: string) => React.ComponentType | undefined } }).KitchenPlugin = {
-        registeredTabs: new Map(),
-        registerTab(pluginId: string, tabId: string, component: React.ComponentType) {
-          this.registeredTabs.set(`${pluginId}:${tabId}`, component);
-        },
-        getTab(pluginId: string, tabId: string) {
-          return this.registeredTabs.get(`${pluginId}:${tabId}`);
-        }
+    if (typeof window === 'undefined') return;
+    const w = window as unknown as {
+      KitchenPlugin: {
+        registeredTabs: Map<string, React.ComponentType>;
+        registerTab: (pluginId: string, tabId: string, component: React.ComponentType) => void;
+        getTab: (pluginId: string, tabId: string) => React.ComponentType | undefined;
       };
-
-      // Make React available globally for plugins
-      (window as unknown as { React: typeof React }).React = React;
-    }
+      React: typeof React;
+    };
+    w.KitchenPlugin = {
+      registeredTabs: new Map(),
+      registerTab(pluginId, tabId, component) { this.registeredTabs.set(`${pluginId}:${tabId}`, component); },
+      getTab(pluginId, tabId) { return this.registeredTabs.get(`${pluginId}:${tabId}`); },
+    };
+    w.React = React;
   }, []);
 
+  /* ---- lazy-load a tab bundle ---- */
   const loadPluginTab = async (pluginId: string, tabId: string) => {
     const tabKey = `${pluginId}:${tabId}`;
-    
-    if (loadedTabs.has(tabKey)) {
-      return; // Already loaded
-    }
-
+    if (loadedTabs.has(tabKey)) return;
     try {
-      // Dynamically load the plugin tab bundle
       const response = await fetch(`/api/plugins/${pluginId}/tabs/${tabId}`);
       const bundleCode = await response.text();
-      
-      // Execute the bundle code (using Function constructor as safer alternative to eval)
-      // eslint-disable-next-line no-new-func
+       
       new Function(bundleCode)();
-      
       setLoadedTabs(prev => new Set([...prev, tabKey]));
     } catch (error) {
       console.error(`Failed to load plugin tab ${pluginId}:${tabId}:`, error);
@@ -88,93 +88,105 @@ export default function PluginTabs({ teamType }: PluginTabsProps) {
   const handleTabClick = async (pluginId: string, tabId: string) => {
     const tabKey = `${pluginId}:${tabId}`;
     setActiveTab(tabKey);
-    
-    if (!loadedTabs.has(tabKey)) {
-      await loadPluginTab(pluginId, tabId);
-    }
+    if (!loadedTabs.has(tabKey)) await loadPluginTab(pluginId, tabId);
   };
 
+  /* ---- render active tab component ---- */
   const renderActiveTab = () => {
     if (!activeTab) return null;
-
     const [pluginId, tabId] = activeTab.split(':');
-    const TabComponent = (window as unknown as { KitchenPlugin?: { getTab: (pluginId: string, tabId: string) => React.ComponentType } }).KitchenPlugin?.getTab(pluginId, tabId);
+    const w = window as unknown as { KitchenPlugin?: { getTab: (p: string, t: string) => React.ComponentType | undefined } };
+    const TabComponent = w.KitchenPlugin?.getTab(pluginId, tabId);
 
     if (!TabComponent) {
       return (
-        <div className="p-6 text-center text-gray-500">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-          Loading plugin tab...
+        <div className="ck-glass p-4">
+          <div className="flex items-center justify-center gap-2 py-8 text-sm text-[color:var(--ck-text-tertiary)]">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-white/60" />
+            Loading…
+          </div>
         </div>
       );
     }
 
-    return React.createElement(TabComponent);
+    return (
+      <div className="ck-glass p-4">
+        {React.createElement(TabComponent)}
+      </div>
+    );
   };
 
+  /* ---- loading state ---- */
   if (loading) {
     return (
-      <div className="p-6 text-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-        <p className="text-gray-500">Loading plugins...</p>
+      <div className="ck-glass p-4">
+        <div className="flex items-center justify-center gap-2 py-8 text-sm text-[color:var(--ck-text-tertiary)]">
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-white/60" />
+          Loading plugins…
+        </div>
       </div>
     );
   }
 
+  /* ---- empty state ---- */
   if (plugins.length === 0) {
     return (
-      <div className="p-6 text-center text-gray-500">
-        <p>No plugins available for team type: {teamType}</p>
-        <p className="text-sm mt-2">
-          Install plugins with <code className="bg-gray-100 px-2 py-1 rounded">openclaw kitchen plugin add &lt;package&gt;</code>
-        </p>
+      <div className="ck-glass p-4">
+        <div className="py-8 text-center text-sm text-[color:var(--ck-text-tertiary)]">
+          <p>No plugins available for team type: <span className="font-mono">{teamType}</span></p>
+          <p className="mt-2">
+            Install plugins with{' '}
+            <code className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 font-mono text-xs">
+              openclaw kitchen plugins install &lt;package&gt;
+            </code>
+          </p>
+        </div>
       </div>
     );
   }
 
+  /* ---- collect all tabs across plugins ---- */
+  const allTabs = plugins.flatMap(plugin =>
+    plugin.tabs.map(tab => ({ plugin, tab }))
+  );
+
   return (
-    <div className="h-full flex flex-col">
-      {/* Plugin and tab navigation */}
-      <div className="border-b border-gray-200">
-        <div className="flex space-x-8 px-6">
-          {plugins.map(plugin => (
-            <div key={plugin.id} className="flex space-x-2">
-              <span className="text-sm font-medium text-gray-500 py-2">{plugin.name}:</span>
-              {plugin.tabs.map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => handleTabClick(plugin.id, tab.id)}
-                  className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
-                    activeTab === `${plugin.id}:${tab.id}`
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  <span className="mr-2">{getIconForTab(tab.icon)}</span>
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-          ))}
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="ck-glass p-4">
+        <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">
+          {plugins.length === 1 ? plugins[0].name : 'Plugins'}
+        </div>
+        <div className="mt-1 text-xs text-[color:var(--ck-text-tertiary)]">
+          {plugins.length === 1
+            ? `${allTabs.length} tabs available`
+            : `${plugins.length} plugins · ${allTabs.length} tabs`}
         </div>
       </div>
 
-      {/* Active tab content */}
-      <div className="flex-1 overflow-auto">
-        {renderActiveTab()}
+      {/* Pill tabs */}
+      <div className="flex flex-wrap gap-2">
+        {allTabs.map(({ plugin, tab }) => {
+          const tabKey = `${plugin.id}:${tab.id}`;
+          const isActive = activeTab === tabKey;
+          return (
+            <button
+              key={tabKey}
+              onClick={() => handleTabClick(plugin.id, tab.id)}
+              className={
+                isActive
+                  ? "rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)]"
+                  : "rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] hover:bg-white/10"
+              }
+            >
+              {ICON_MAP[tab.icon] || ICON_MAP.folder} {tab.label}
+            </button>
+          );
+        })}
       </div>
+
+      {/* Active tab content in glass card */}
+      {renderActiveTab()}
     </div>
   );
-}
-
-function getIconForTab(iconName: string): string {
-  const icons: Record<string, string> = {
-    library: '📚',
-    calendar: '📅',
-    chart: '📊',
-    users: '👥',
-    folder: '📁',
-  };
-  
-  return icons[iconName] || icons.folder;
 }
