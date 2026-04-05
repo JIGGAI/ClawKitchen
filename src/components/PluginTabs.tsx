@@ -44,7 +44,7 @@ function Section({
         </span>
         {title}
       </button>
-      {open && <div className="px-4 pb-4">{children}</div>}
+      {open && <div className="px-4 pb-4 pt-3">{children}</div>}
     </div>
   );
 }
@@ -52,7 +52,7 @@ function Section({
 /* ------------------------------------------------------------------ */
 /*  Main component                                                     */
 /* ------------------------------------------------------------------ */
-export default function PluginTabs({ teamType }: PluginTabsProps) {
+export default function PluginTabs({ teamType, teamId }: PluginTabsProps) {
   const [plugins, setPlugins] = useState<Plugin[]>([]);
   const [activeTab, setActiveTab] = useState<Record<string, string>>({});
   const [loadedTabs, setLoadedTabs] = useState<Set<string>>(new Set());
@@ -119,15 +119,13 @@ export default function PluginTabs({ teamType }: PluginTabsProps) {
   useEffect(() => {
     for (const plugin of plugins) {
       const tabId = activeTab[plugin.id];
-      if (tabId) {
-        const tabKey = `${plugin.id}:${tabId}`;
-        if (!loadedTabs.has(tabKey)) {
-          void loadPluginTab(plugin.id, tabId);
-        }
+      if (!tabId) continue;
+      const tabKey = `${plugin.id}:${tabId}`;
+      if (!loadedTabs.has(tabKey)) {
+        void loadPluginTab(plugin.id, tabId);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [plugins]);
+  }, [plugins, activeTab, loadedTabs, loadPluginTab]);
 
   const handleTabClick = useCallback(async (pluginId: string, tabId: string) => {
     setActiveTab(prev => ({ ...prev, [pluginId]: tabId }));
@@ -153,7 +151,8 @@ export default function PluginTabs({ teamType }: PluginTabsProps) {
       );
     }
 
-    return React.createElement(TabComponent);
+    // Pass team context into plugin tabs so they can call the plugin API.
+    return React.createElement(TabComponent, { teamId, teamType, pluginId: plugin.id });
   };
 
   /* ---- loading state ---- */
