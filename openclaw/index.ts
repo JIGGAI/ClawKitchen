@@ -247,44 +247,7 @@ const kitchenPlugin = {
       ({ program }) => {
         const cmd = program.command("kitchen").description("ClawKitchen UI");
 
-        cmd
-          .command("status")
-          .description("Print Kitchen status")
-          .action(async () => {
-            const host = String(cfg.host || "127.0.0.1").trim();
-            const port = Number(cfg.port || 7777);
-            const url = `http://${host}:${port}`;
-
-            const result: {
-              ok: boolean;
-              running: boolean;
-              url: string;
-              startedAt: string | null;
-              error?: string;
-            } = { ok: true, running: false, url, startedAt: null };
-
-            try {
-              result.running = Boolean(server);
-              result.startedAt = startedAt;
-            } catch (e: unknown) {
-              result.running = false;
-              result.startedAt = null;
-              result.error = e instanceof Error ? e.message : String(e);
-            }
-
-            console.log(JSON.stringify(result, null, 2));
-          });
-
-        cmd
-          .command("open")
-          .description("Print the Kitchen URL")
-          .action(() => {
-            const host = String(cfg.host || "127.0.0.1").trim();
-            const port = Number(cfg.port || 7777);
-            console.log(`http://${host}:${port}`);
-          });
-
-        // --- Kitchen plugin management CLI ---
+        // --- Plugin helpers (used by status + plugins subcommands) ---
         const pluginsDir = path.join(homedir(), '.openclaw', 'kitchen', 'plugins');
 
         function listInstalledPlugins(): { id: string; name: string; version: string; teamTypes: string[] }[] {
@@ -313,6 +276,93 @@ const kitchenPlugin = {
           return found;
         }
 
+        cmd
+          .command("status")
+          .description("Print Kitchen status")
+          .action(async () => {
+            const host = String(cfg.host || "127.0.0.1").trim();
+            const port = Number(cfg.port || 7777);
+            const url = `http://${host}:${port}`;
+
+            const result: {
+              ok: boolean;
+              running: boolean;
+              url: string;
+              startedAt: string | null;
+              plugins?: { id: string; name: string; version: string }[];
+              error?: string;
+            } = { ok: true, running: false, url, startedAt: null };
+
+            // Probe the live server's /healthz endpoint
+            try {
+              const controller = new AbortController();
+              const timer = setTimeout(() => controller.abort(), 3000);
+              const resp = await fetch(`http://127.0.0.1:${port}/healthz`, {
+                signal: controller.signal,
+              });
+              clearTimeout(timer);
+              if (resp.ok) {
+                const data = await resp.json();
+                result.running = true;
+                result.startedAt = data.startedAt || null;
+              }
+            } catch {
+              result.running = false;
+            }
+
+            // Also list installed plugins
+            result.plugins = listInstalledPlugins();
+
+            console.log(JSON.stringify(result, null, 2));
+          });
+
+        cmd
+          .command("restart")
+          .description("Restart Kitchen (clears plugin cache)")
+          .action(async () => {
+            const port = Number(cfg.port || 7777);
+
+            // If running in-process (same gateway), use direct stop/start
+            if (server) {
+              console.log("Restarting Kitchen (in-process)...");
+              await stopKitchen(api);
+              await startKitchen(api, cfg);
+              console.log("✅ Kitchen restarted.");
+              return;
+            }
+
+            // Otherwise, running as CLI — tell the user to restart the gateway
+            // First check if it's actually running
+            let running = false;
+            try {
+              const controller = new AbortController();
+              const timer = setTimeout(() => controller.abort(), 3000);
+              const resp = await fetch(`http://127.0.0.1:${port}/healthz`, {
+                signal: controller.signal,
+              });
+              clearTimeout(timer);
+              running = resp.ok;
+            } catch { /* not running */ }
+
+            if (!running) {
+              console.log("Kitchen is not running. Start the gateway to launch Kitchen.");
+              return;
+            }
+
+            console.log("Kitchen is running inside the gateway process.");
+            console.log("To restart, run: openclaw gateway restart");
+          });
+
+        cmd
+          .command("open")
+          .description("Print the Kitchen URL")
+          .action(() => {
+            const host = String(cfg.host || "127.0.0.1").trim();
+            const port = Number(cfg.port || 7777);
+            console.log(`http://${host}:${port}`);
+          });
+
+        // --- Kitchen plugin management CLI ---
         const pluginsCmd = cmd
           .command("plugins")
           .description("Manage Kitchen plugins");
