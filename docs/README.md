@@ -75,6 +75,19 @@ But once your setup starts to grow, Kitchen becomes the fastest way to understan
 
 ![ClawKitchen home](../public/images/clawkitchen/home.png)
 
+## CLI quick reference
+
+```bash
+openclaw kitchen status     # running state, uptime, installed plugins
+openclaw kitchen restart    # reload plugins without full gateway restart
+openclaw kitchen open       # print the Kitchen URL
+openclaw kitchen plugins list
+openclaw kitchen plugins install <package>
+openclaw kitchen plugins remove <package>
+```
+
+See [Install and access](/clawkitchen/install-and-access) for details.
+
 ## Start here
 
 If you are new to ClawKitchen, the best next pages are:
