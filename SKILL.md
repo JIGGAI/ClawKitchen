@@ -1,6 +1,6 @@
 ---
-name: clawkitchen
-version: 0.3.20
+name: ClawKitchen
+version: 0.3.44
 description: "Local-first web UI for OpenClaw. Visual recipe editor, team dashboards, workflow monitoring, and agent management."
 homepage: https://github.com/JIGGAI/clawkitchen  
 metadata:
