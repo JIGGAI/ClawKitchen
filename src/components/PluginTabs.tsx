@@ -98,6 +98,11 @@ export default function PluginTabs({ teamType, teamId }: PluginTabsProps) {
       getTab(pluginId, tabId) { return this.registeredTabs.get(`${pluginId}:${tabId}`); },
     };
     w.React = React;
+    // Expose ReactDOM so plugin tabs can use createPortal for fullscreen modals
+    import('react-dom').then((mod) => {
+       
+      (window as unknown as Record<string, unknown>).ReactDOM = mod;
+    }).catch(() => { /* fallback: plugins render in-place */ });
   }, []);
 
   /* ---- lazy-load a tab bundle ---- */
