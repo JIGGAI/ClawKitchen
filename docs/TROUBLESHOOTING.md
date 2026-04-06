@@ -54,6 +54,28 @@ If you are accessing Kitchen remotely, verify host and auth settings and avoid a
 
 For automated browser or test flows, use the documented QA auth path instead of fighting an interactive prompt.
 
+## Plugin tabs not showing or showing stale content
+
+Kitchen caches discovered plugins in memory. If you installed, updated, or removed a Kitchen plugin and the UI hasn't caught up:
+
+```bash
+openclaw kitchen restart
+```
+
+This clears the plugin cache and reloads all plugin bundles without restarting the full gateway.
+
+If `restart` reports Kitchen is not running, check `openclaw kitchen status` first.
+
+## Checking Kitchen health
+
+The quickest way to verify Kitchen state:
+
+```bash
+openclaw kitchen status
+```
+
+This tells you whether Kitchen is running, when it started, and which plugins are installed. If `startedAt` is recent, the server restarted recently. If `running` is false, Kitchen isn't serving — check gateway logs.
+
 ## Useful debugging mindset
 
 When something looks wrong in Kitchen, ask two questions:

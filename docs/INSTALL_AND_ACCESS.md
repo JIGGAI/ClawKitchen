@@ -63,15 +63,82 @@ Use the dedicated page for that flow:
 
 - [QA / auth](/clawkitchen/qa-auth)
 
+## CLI commands
+
+ClawKitchen registers several CLI commands under `openclaw kitchen`:
+
+```bash
+# Check if Kitchen is running, its URL, uptime, and installed plugins
+openclaw kitchen status
+
+# Restart Kitchen (clears plugin cache, reloads plugin bundles)
+openclaw kitchen restart
+
+# Print the Kitchen URL
+openclaw kitchen open
+
+# Manage Kitchen plugins
+openclaw kitchen plugins list
+openclaw kitchen plugins install <package>
+openclaw kitchen plugins remove <package>
+```
+
+### Status
+
+`openclaw kitchen status` probes the running Kitchen server and returns:
+
+- **running** — whether Kitchen is currently serving requests
+- **url** — the configured address
+- **startedAt** — when the current Kitchen process started (ISO timestamp)
+- **plugins** — list of installed Kitchen plugins with id, name, version, and supported team types
+
+Example output:
+
+```json
+{
+  "ok": true,
+  "running": true,
+  "url": "http://100.103.210.102:7777",
+  "startedAt": "2026-04-06T03:07:00.000Z",
+  "plugins": [
+    {
+      "id": "marketing",
+      "name": "Marketing Suite",
+      "version": "0.3.0",
+      "teamTypes": ["marketing-team", "claw-marketing-team"]
+    }
+  ]
+}
+```
+
+### Restart
+
+`openclaw kitchen restart` is the fastest way to pick up plugin updates without restarting the entire gateway.
+
+What it does:
+
+- Stops the running Kitchen HTTP server
+- Clears the in-memory plugin discovery cache
+- Starts Kitchen again with fresh plugin state
+
+If Kitchen is running inside the gateway process (the normal case), the restart happens in-place. If you run the command from a separate terminal, it will direct you to `openclaw gateway restart` instead.
+
+Common reasons to restart:
+
+- Installed or updated a Kitchen plugin (`openclaw kitchen plugins install ...`)
+- Changed plugin configuration
+- Plugin tabs showing stale content
+
 ## When a restart is needed
 
 ClawKitchen reflects live OpenClaw and plugin state, but some changes still require a restart, especially when you:
 
+- install, update, or remove Kitchen plugins
 - enable or disable plugins
 - change plugin allowlists or runtime config
 - change channel or binding config that the running process must reload
 
-If Kitchen and the underlying runtime seem out of sync, a gateway restart is one of the first things to verify.
+For plugin changes, use `openclaw kitchen restart`. For deeper config changes, use `openclaw gateway restart`.
 
 ## A good expectation to set
 
