@@ -384,6 +384,11 @@ export default function WorkflowsEditorClient({
   const [approvalBindingsError, setApprovalBindingsError] = useState<string>("");
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [availableModelsError, setAvailableModelsError] = useState<string>("");
+
+  // Handoff node: available teams & their workflows
+  const [handoffTeams, setHandoffTeams] = useState<string[]>([]);
+  const [handoffWorkflows, setHandoffWorkflows] = useState<Record<string, Array<{ id: string; name?: string }>>>({});
+  const [handoffTeamsLoading, setHandoffTeamsLoading] = useState(false);
   const [showRawConfig, setShowRawConfig] = useState<Record<string, boolean>>({});
 
   const approvalBindingsNeedsKitchenUpdate = useMemo(() => {
@@ -1194,6 +1199,22 @@ export default function WorkflowsEditorClient({
                             </svg>
                           ),
                         },
+                        {
+                          key: "handoff",
+                          label: "Handoff",
+                          active: activeTool.kind === "add-node" && activeTool.nodeType === "handoff",
+                          onClick: () => {
+                            setActiveTool({ kind: "add-node", nodeType: "handoff" });
+                            setConnectFromNodeId("");
+                          },
+                          icon: (
+                            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
+                              <path d="M5 12h14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                              <path d="M13 6l6 6-6 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                              <path d="M3 6v12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                            </svg>
+                          ),
+                        },
                       ] as const
                     ).map((b) => (
                       <button
@@ -1252,6 +1273,7 @@ export default function WorkflowsEditorClient({
                       { t: "human_approval", label: "Approve" },
                       { t: "media-image", label: "🎨 Image" },
                       { t: "media-video", label: "🎬 Video" },
+                      { t: "handoff", label: "↗ Handoff" },
                       { t: "end", label: "End" },
                     ] as Array<{ t: WorkflowFileV1["nodes"][number]["type"]; label: string }>).map((x) => (
                       <button
@@ -1477,6 +1499,9 @@ export default function WorkflowsEditorClient({
                           {n.type === 'media-image' ? '🎨' : '🎬'}
                         </span>
                       )}
+                      {n.type === 'handoff' && (
+                        <span className="text-lg">↗</span>
+                      )}
                       <div className="font-medium text-[color:var(--ck-text-primary)]">{n.name || n.id}</div>
                     </div>
                     <div className="mt-0.5 text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">{n.type}</div>
@@ -1501,6 +1526,17 @@ export default function WorkflowsEditorClient({
                         );
                       }
                       
+                      // Show handoff target
+                      if (n.type === 'handoff' && cfg) {
+                        const tgt = String(cfg.targetTeamId ?? "").trim();
+                        const tgtWf = String(cfg.targetWorkflowId ?? "").trim();
+                        return tgt ? (
+                          <div className="mt-1 text-[10px] text-[color:var(--ck-text-secondary)]">
+                            → {tgt}{tgtWf ? ` / ${tgtWf}` : ""}
+                          </div>
+                        ) : null;
+                      }
+
                       // Show agent for other nodes
                       const agentId = cfg ? String(cfg.agentId ?? "").trim() : "";
                       if (!agentId) return null;
@@ -1574,6 +1610,7 @@ export default function WorkflowsEditorClient({
                           <option value="human_approval">human_approval</option>
                           <option value="media-image">media-image</option>
                           <option value="media-video">media-video</option>
+                          <option value="handoff">handoff</option>
                         </select>
                       </label>
 
@@ -2119,6 +2156,7 @@ export default function WorkflowsEditorClient({
                                 <option value="human_approval">human_approval</option>
                                 <option value="media-image">media-image</option>
                                 <option value="media-video">media-video</option>
+                                <option value="handoff">handoff</option>
                               </select>
                             </label>
 
@@ -2298,6 +2336,164 @@ export default function WorkflowsEditorClient({
                                 </label>
                               </div>
                             ) : null}
+
+                            {/* Handoff Configuration */}
+                            {node.type === "handoff" ? (() => {
+                              const cfg = (node.config || {}) as Record<string, unknown>;
+                              const targetTeamId = String(cfg.targetTeamId ?? "");
+                              const targetWorkflowId = String(cfg.targetWorkflowId ?? "");
+                              const variableMapping = (cfg.variableMapping || {}) as Record<string, string>;
+
+                              const loadTeams = async () => {
+                                if (handoffTeams.length > 0 || handoffTeamsLoading) return;
+                                setHandoffTeamsLoading(true);
+                                try {
+                                  const res = await fetch("/api/teams/list");
+                                  const json = await res.json();
+                                  if (json.ok && Array.isArray(json.teamIds)) {
+                                    setHandoffTeams(json.teamIds);
+                                  }
+                                } catch { /* ignore */ }
+                                setHandoffTeamsLoading(false);
+                              };
+
+                              const loadWorkflows = async (tid: string) => {
+                                if (!tid || handoffWorkflows[tid]) return;
+                                try {
+                                  const res = await fetch(`/api/teams/workflows?teamId=${encodeURIComponent(tid)}`);
+                                  const json = await res.json();
+                                  if (json.ok && Array.isArray(json.files)) {
+                                    // files are like ["my-workflow.workflow.json"] — strip suffix to get id
+                                    const wfs = json.files.map((f: string) => ({
+                                      id: f.replace(/\.workflow\.json$/, ""),
+                                    }));
+                                    setHandoffWorkflows((prev) => ({ ...prev, [tid]: wfs }));
+                                  }
+                                } catch { /* ignore */ }
+                              };
+
+                              // Trigger data loading
+                              if (handoffTeams.length === 0 && !handoffTeamsLoading) {
+                                loadTeams();
+                              }
+                              if (targetTeamId && !handoffWorkflows[targetTeamId]) {
+                                loadWorkflows(targetTeamId);
+                              }
+
+                              const targetWfs = handoffWorkflows[targetTeamId] || [];
+                              const mappingEntries = Object.entries(variableMapping);
+
+                              const updateCfg = (patch: Record<string, unknown>) => {
+                                const nextCfg = { ...cfg, ...patch };
+                                setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
+                              };
+
+                              return (
+                                <div className="space-y-2">
+                                  <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">Handoff Target</div>
+
+                                  <label className="block">
+                                    <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">target team</div>
+                                    <select
+                                      value={targetTeamId}
+                                      onChange={(e) => {
+                                        const tid = e.target.value;
+                                        updateCfg({ targetTeamId: tid || undefined, targetWorkflowId: undefined });
+                                        if (tid && !handoffWorkflows[tid]) loadWorkflows(tid);
+                                      }}
+                                      className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                                    >
+                                      <option value="">— Select team —</option>
+                                      {handoffTeams.map((t) => (
+                                        <option key={t} value={t}>{t}{t === teamId ? " (current)" : ""}</option>
+                                      ))}
+                                    </select>
+                                  </label>
+
+                                  {targetTeamId ? (
+                                    <label className="block">
+                                      <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">target workflow</div>
+                                      <select
+                                        value={targetWorkflowId}
+                                        onChange={(e) => updateCfg({ targetWorkflowId: e.target.value || undefined })}
+                                        className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                                      >
+                                        <option value="">— Select workflow —</option>
+                                        {targetWfs.map((w) => (
+                                          <option key={w.id} value={w.id}>{w.name || w.id}</option>
+                                        ))}
+                                      </select>
+                                      {targetTeamId && !handoffWorkflows[targetTeamId] ? (
+                                        <div className="mt-1 text-[10px] text-[color:var(--ck-text-tertiary)]">Loading workflows…</div>
+                                      ) : null}
+                                    </label>
+                                  ) : null}
+
+                                  <div>
+                                    <div className="flex items-center justify-between">
+                                      <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">variable mapping</div>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const key = `var_${Date.now()}`;
+                                          updateCfg({ variableMapping: { ...variableMapping, [key]: "" } });
+                                        }}
+                                        className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
+                                      >
+                                        + Add
+                                      </button>
+                                    </div>
+                                    <div className="mt-1 text-[10px] text-[color:var(--ck-text-tertiary)]">
+                                      Map target workflow trigger inputs to upstream node outputs. Key = target variable name, Value = {"{{nodeId.field}}"} template.
+                                    </div>
+                                    {mappingEntries.length > 0 ? (
+                                      <div className="mt-2 space-y-1">
+                                        {mappingEntries.map(([key, value], idx) => (
+                                          <div key={idx} className="flex items-center gap-1">
+                                            <input
+                                              value={key}
+                                              onChange={(e) => {
+                                                const newKey = e.target.value;
+                                                const newMapping = { ...variableMapping };
+                                                delete newMapping[key];
+                                                newMapping[newKey] = value;
+                                                updateCfg({ variableMapping: newMapping });
+                                              }}
+                                              className="w-1/3 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-1.5 py-0.5 text-[10px] text-[color:var(--ck-text-primary)]"
+                                              placeholder="target_var"
+                                            />
+                                            <span className="text-[10px] text-[color:var(--ck-text-tertiary)]">→</span>
+                                            <input
+                                              value={value}
+                                              onChange={(e) => {
+                                                const newMapping = { ...variableMapping, [key]: e.target.value };
+                                                updateCfg({ variableMapping: newMapping });
+                                              }}
+                                              className="flex-1 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-1.5 py-0.5 text-[10px] text-[color:var(--ck-text-primary)]"
+                                              placeholder="{{nodeId.output}}"
+                                            />
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                const newMapping = { ...variableMapping };
+                                                delete newMapping[key];
+                                                updateCfg({ variableMapping: Object.keys(newMapping).length > 0 ? newMapping : undefined });
+                                              }}
+                                              className="text-[10px] text-red-400 hover:text-red-300"
+                                              title="Remove mapping"
+                                            >
+                                              ✕
+                                            </button>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <div className="mt-1 text-[10px] text-[color:var(--ck-text-tertiary)] italic">No mappings — target workflow will receive empty trigger input.</div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })() : null}
 
                             {/* Output Fields for ALL node types */}
                             <div>
@@ -2804,6 +3000,7 @@ export default function WorkflowsEditorClient({
                               <option value="human_approval">human_approval</option>
                               <option value="media-image">media-image</option>
                               <option value="media-video">media-video</option>
+                              <option value="handoff">handoff</option>
                             </select>
                           </label>
 

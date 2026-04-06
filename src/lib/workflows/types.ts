@@ -22,7 +22,8 @@ export type WorkflowNodeV1 = {
     | "delay"
     | "human_approval"
     | "media-image"
-    | "media-video";
+    | "media-video"
+    | "handoff";
   name?: string;
   /** UI layout hints (optional) */
   x?: number;
