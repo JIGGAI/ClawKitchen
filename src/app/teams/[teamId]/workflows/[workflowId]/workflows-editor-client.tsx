@@ -1530,9 +1530,11 @@ export default function WorkflowsEditorClient({
                       if (n.type === 'handoff' && cfg) {
                         const tgt = String(cfg.targetTeamId ?? "").trim();
                         const tgtWf = String(cfg.targetWorkflowId ?? "").trim();
+                        const mode = String(cfg.mode ?? 'fire-and-forget');
                         return tgt ? (
                           <div className="mt-1 text-[10px] text-[color:var(--ck-text-secondary)]">
                             → {tgt}{tgtWf ? ` / ${tgtWf}` : ""}
+                            {mode === 'wait-for-completion' ? <span className="ml-1 text-yellow-400" title="Waits for target to complete">⏳</span> : null}
                           </div>
                         ) : null;
                       }
@@ -2388,9 +2390,46 @@ export default function WorkflowsEditorClient({
                                 setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
                               };
 
+                              const handoffMode = String(cfg.mode ?? 'fire-and-forget');
+                              const waitTimeoutMs = typeof cfg.waitTimeoutMs === 'number' ? cfg.waitTimeoutMs as number : 300000;
+
                               return (
                                 <div className="space-y-2">
                                   <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">Handoff Target</div>
+
+                                  <label className="block">
+                                    <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">mode</div>
+                                    <select
+                                      value={handoffMode}
+                                      onChange={(e) => {
+                                        const m = e.target.value;
+                                        updateCfg({ mode: m === 'fire-and-forget' ? undefined : m });
+                                      }}
+                                      className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                                    >
+                                      <option value="fire-and-forget">Fire &amp; Forget</option>
+                                      <option value="wait-for-completion">Wait for Completion</option>
+                                    </select>
+                                  </label>
+
+                                  {handoffMode === 'wait-for-completion' ? (
+                                    <label className="block">
+                                      <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">wait timeout (seconds)</div>
+                                      <input
+                                        type="number"
+                                        min={30}
+                                        value={Math.round(waitTimeoutMs / 1000)}
+                                        onChange={(e) => {
+                                          const secs = Math.max(30, parseInt(e.target.value, 10) || 300);
+                                          updateCfg({ waitTimeoutMs: secs * 1000 });
+                                        }}
+                                        className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                                      />
+                                      <div className="mt-0.5 text-[9px] text-[color:var(--ck-text-tertiary)]">
+                                        Workflow will wait up to this long for the target to complete.
+                                      </div>
+                                    </label>
+                                  ) : null}
 
                                   <label className="block">
                                     <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">target team</div>
