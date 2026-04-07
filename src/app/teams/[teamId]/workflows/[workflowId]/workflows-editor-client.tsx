@@ -1858,6 +1858,101 @@ export default function WorkflowsEditorClient({
                         </div>
                       ) : null}
 
+                      {/* Handoff config in canvas inspector */}
+                      {node.type === "handoff" ? (() => {
+                        const targetTeamIdInsp = String(cfg.targetTeamId ?? "");
+                        const targetWorkflowIdInsp = String(cfg.targetWorkflowId ?? "");
+                        const variableMappingInsp = (cfg.variableMapping || {}) as Record<string, string>;
+                        const handoffModeInsp = String(cfg.mode ?? 'fire-and-forget');
+                        const kitchenTeamIdInsp = String(variableMappingInsp.kitchenTeamId ?? '').includes('{{') ? teamId : String(variableMappingInsp.kitchenTeamId ?? teamId);
+                        const igOptsInsp = handoffIgAccounts[kitchenTeamIdInsp] || [];
+                        const igLoadingInsp = !!handoffIgLoading[kitchenTeamIdInsp];
+                        const currentIdsInsp = String(variableMappingInsp.integrationIds ?? variableMappingInsp.integrationId ?? '').split(',').map((s: string) => s.trim()).filter(Boolean);
+                        const targetWfsInsp = handoffWorkflows[targetTeamIdInsp] || [];
+                        const showIgPickerInsp = targetWorkflowIdInsp.toLowerCase().includes('instagram') || Object.prototype.hasOwnProperty.call(variableMappingInsp, 'integrationId') || Object.prototype.hasOwnProperty.call(variableMappingInsp, 'integrationIds');
+
+                        const updateCfgInsp = (patch: Record<string, unknown>) => {
+                          const nextCfg = { ...cfg, ...patch };
+                          setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
+                        };
+
+                        // Auto-load data
+                        if (handoffTeams.length === 0 && !handoffTeamsLoading) {
+                          (async () => { try { const r = await fetch('/api/teams/list'); const j = await r.json(); if (j.ok) setHandoffTeams(j.teamIds); } catch {} })();
+                        }
+                        if (targetTeamIdInsp && !handoffWorkflows[targetTeamIdInsp]) {
+                          (async () => { try { const r = await fetch(`/api/teams/workflows?teamId=${encodeURIComponent(targetTeamIdInsp)}`); const j = await r.json(); if (j.ok && j.files) setHandoffWorkflows(prev => ({ ...prev, [targetTeamIdInsp]: j.files.map((f: string) => ({ id: f.replace(/\.workflow\.json$/, '') })) })); } catch {} })();
+                        }
+                        if (showIgPickerInsp && kitchenTeamIdInsp && !handoffIgAccounts[kitchenTeamIdInsp] && !handoffIgLoading[kitchenTeamIdInsp]) {
+                          (async () => {
+                            setHandoffIgLoading(prev => ({ ...prev, [kitchenTeamIdInsp]: true }));
+                            try {
+                              const pk = (() => { try { return JSON.parse(localStorage.getItem(`ck-postiz-${kitchenTeamIdInsp}`) || '{}').apiKey || ''; } catch { return ''; } })();
+                              const r = await fetch(`/api/plugins/marketing/drivers?team=${encodeURIComponent(kitchenTeamIdInsp)}`, { headers: pk ? { 'x-postiz-api-key': pk } : {} });
+                              const j = await r.json();
+                              const ig = (j.drivers || []).filter((d: Record<string, unknown>) => d.platform === 'instagram' && d.backend === 'postiz' && d.integrationId).map((d: Record<string, unknown>) => ({ integrationId: String(d.integrationId), displayName: String(d.displayName || 'Instagram'), username: d.username ? String(d.username) : undefined }));
+                              setHandoffIgAccounts(prev => ({ ...prev, [kitchenTeamIdInsp]: ig }));
+                            } catch {}
+                            setHandoffIgLoading(prev => ({ ...prev, [kitchenTeamIdInsp]: false }));
+                          })();
+                        }
+
+                        return (
+                          <div className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-2 space-y-2">
+                            <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">handoff config</div>
+
+                            <label className="block">
+                              <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">mode</div>
+                              <select value={handoffModeInsp} onChange={(e) => updateCfgInsp({ mode: e.target.value === 'fire-and-forget' ? undefined : e.target.value })} className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]">
+                                <option value="fire-and-forget">Fire &amp; Forget</option>
+                                <option value="wait-for-completion">Wait for Completion</option>
+                              </select>
+                            </label>
+
+                            <label className="block">
+                              <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">target team</div>
+                              <select value={targetTeamIdInsp} onChange={(e) => { updateCfgInsp({ targetTeamId: e.target.value || undefined, targetWorkflowId: undefined }); }} className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]">
+                                <option value="">— Select —</option>
+                                {handoffTeams.map((t) => <option key={t} value={t}>{t}{t === teamId ? ' (current)' : ''}</option>)}
+                              </select>
+                            </label>
+
+                            {targetTeamIdInsp ? (
+                              <label className="block">
+                                <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">target workflow</div>
+                                <select value={targetWorkflowIdInsp} onChange={(e) => updateCfgInsp({ targetWorkflowId: e.target.value || undefined })} className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]">
+                                  <option value="">— Select —</option>
+                                  {targetWfsInsp.map((w) => <option key={w.id} value={w.id}>{w.name || w.id}</option>)}
+                                </select>
+                              </label>
+                            ) : null}
+
+                            {showIgPickerInsp && igOptsInsp.length > 0 ? (
+                              <div>
+                                <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">instagram accounts</div>
+                                <div className="mt-1 space-y-1">
+                                  {igOptsInsp.map((opt) => {
+                                    const checked = currentIdsInsp.includes(opt.integrationId);
+                                    return (
+                                      <label key={opt.integrationId} className="flex items-center gap-2 cursor-pointer rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 hover:bg-white/10">
+                                        <input type="checkbox" checked={checked} onChange={() => {
+                                          const next = checked ? currentIdsInsp.filter((id: string) => id !== opt.integrationId) : [...currentIdsInsp, opt.integrationId];
+                                          const nextVm = { ...variableMappingInsp }; delete nextVm.integrationId;
+                                          if (next.length > 0) nextVm.integrationIds = next.join(','); else delete nextVm.integrationIds;
+                                          updateCfgInsp({ variableMapping: nextVm });
+                                        }} className="accent-[var(--ck-accent-red)]" />
+                                        <div><div className="text-xs text-[color:var(--ck-text-primary)]">{opt.displayName}</div>{opt.username ? <div className="text-[10px] text-[color:var(--ck-text-tertiary)]">{opt.username}</div> : null}</div>
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            ) : null}
+                            {showIgPickerInsp && igLoadingInsp ? <div className="text-[10px] text-[color:var(--ck-text-tertiary)]">Loading accounts…</div> : null}
+                          </div>
+                        );
+                      })() : null}
+
                       {/* Collapsible raw config section */}
                       <div>
                         <button
