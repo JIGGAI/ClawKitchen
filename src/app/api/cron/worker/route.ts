@@ -5,6 +5,20 @@ import { runOpenClaw } from "@/lib/openclaw";
 import { getTeamWorkspaceDir } from "@/lib/paths";
 import { errorMessage } from "@/lib/errors";
 
+async function cronJobExists(id: string): Promise<boolean> {
+  const cronId = String(id ?? "").trim();
+  if (!cronId) return false;
+  const res = await runOpenClaw(["cron", "list", "--json"]);
+  if (!res.ok) return false;
+  try {
+    const parsed = JSON.parse(String(res.stdout ?? "{}")) as { jobs?: Array<{ id?: unknown }> } | Array<{ id?: unknown }>;
+    const jobs = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.jobs) ? parsed.jobs : [];
+    return jobs.some((job) => String(job?.id ?? "").trim() === cronId);
+  } catch {
+    return false;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Provenance format — matches ClawRecipes CronMappingStateV1 so both systems
 // read/write the same file and never create duplicates.
@@ -109,8 +123,13 @@ async function installWorkerCron(teamId: string, agentId: string): Promise<{
   const mapping = await readMapping(mp);
   const existing = mapping.entries[key];
   if (existing && existing.installedCronId && !existing.orphaned) {
-    await runOpenClaw(["cron", "enable", String(existing.installedCronId)]);
-    return { alreadyInstalled: true, installedCronId: String(existing.installedCronId), mappingPath: mp, key };
+    const existingId = String(existing.installedCronId);
+    if (await cronJobExists(existingId)) {
+      await runOpenClaw(["cron", "enable", existingId]);
+      return { alreadyInstalled: true, installedCronId: existingId, mappingPath: mp, key };
+    }
+    delete mapping.entries[key];
+    await writeMapping(mp, mapping);
   }
 
   const name = cronName(teamId, agentId);
@@ -162,7 +181,12 @@ async function installRunnerCron(teamId: string): Promise<{
   // Check if already installed
   const existing = mapping.entries[key];
   if (existing && !existing.orphaned) {
-    return { alreadyInstalled: true, installedCronId: existing.installedCronId, mappingPath: mp, key };
+    const existingId = String(existing.installedCronId ?? "").trim();
+    if (await cronJobExists(existingId)) {
+      return { alreadyInstalled: true, installedCronId: existingId, mappingPath: mp, key };
+    }
+    delete mapping.entries[key];
+    await writeMapping(mp, mapping);
   }
 
   // Install new runner-tick cron
