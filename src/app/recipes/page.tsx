@@ -2,6 +2,7 @@ import Link from "next/link";
 import { unstable_noStore as noStore } from "next/cache";
 
 import { runOpenClaw } from "@/lib/openclaw";
+import { readManifest, isManifestStale, triggerManifestRegeneration } from "@/lib/manifest";
 import RecipesClient from "./recipes-client";
 
 export const dynamic = "force-dynamic";
@@ -46,9 +47,6 @@ async function getAgents(): Promise<{ agentIds: string[]; error: string | null }
 export default async function RecipesPage({
   searchParams,
 }: {
-  // Next.js versions differ on whether `searchParams` is sync or async.
-  // Some runtimes provide it as a Promise (sync-dynamic-apis) so we must
-  // unwrap before accessing properties.
   searchParams?:
     | Record<string, string | string[] | undefined>
     | Promise<Record<string, string | string[] | undefined>>;
@@ -57,7 +55,23 @@ export default async function RecipesPage({
 
   const sp = (await Promise.resolve(searchParams)) ?? {};
 
-  const [{ recipes, error }, { agentIds }] = await Promise.all([getRecipes(), getAgents()]);
+  // Fast path: read from manifest (single file read vs 2 subprocess calls ~10-15s)
+  const manifest = await readManifest();
+  let recipes: Recipe[] = [];
+  let agentIds: string[] = [];
+  let error: string | null = null;
+
+  if (manifest?.recipes?.length) {
+    if (isManifestStale(manifest)) triggerManifestRegeneration();
+    recipes = manifest.recipes as Recipe[];
+    agentIds = manifest.agents?.map((a) => a.id).filter(Boolean) ?? [];
+  } else {
+    // Fallback: subprocess calls
+    const [recipesResult, agentsResult] = await Promise.all([getRecipes(), getAgents()]);
+    recipes = recipesResult.recipes;
+    error = recipesResult.error;
+    agentIds = agentsResult.agentIds;
+  }
 
   const builtin = recipes.filter((r) => r.source === "builtin");
   const workspace = recipes.filter((r) => r.source === "workspace");

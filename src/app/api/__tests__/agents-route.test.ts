@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { GET } from "../agents/route";
 
 vi.mock("@/lib/openclaw", () => ({ runOpenClaw: vi.fn() }));
+vi.mock("@/lib/manifest", () => ({ readManifest: vi.fn().mockResolvedValue(null) }));
 
 import { runOpenClaw } from "@/lib/openclaw";
 

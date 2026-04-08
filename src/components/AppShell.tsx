@@ -161,10 +161,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     });
   }
 
-  // Minimal team list (for switcher). We rely on existing /api/recipes.
+  // Minimal team list (for switcher). Try manifest first, fall back to /api/agents.
   const [teamIds, setTeamIds] = useState<string[]>([]);
   useEffect(() => {
     (async () => {
+      try {
+        // Fast path: read pre-computed manifest
+        const manifest = await fetchJson<{ version?: number; teams?: Record<string, unknown> }>("/api/manifest", { cache: "no-store" });
+        if (manifest.version === 1 && manifest.teams) {
+          const ids = new Set<string>(["main", ...Object.keys(manifest.teams)]);
+          setTeamIds(Array.from(ids).sort());
+          return;
+        }
+      } catch {
+        // Manifest not available — fall through to legacy path
+      }
+
       try {
         const json = await fetchJson<{ agents?: Array<{ workspace?: string }> }>("/api/agents", { cache: "no-store" });
         const agents = Array.isArray(json.agents)
@@ -172,9 +184,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           : [];
 
         const s = new Set<string>();
-
-        // Always include the personal "main" scope so users can filter goals/tickets
-        // for the personal OpenClaw workspace (agents.defaults.workspace).
         s.add("main");
 
         for (const a of agents) {

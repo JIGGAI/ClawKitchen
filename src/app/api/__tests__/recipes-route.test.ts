@@ -4,6 +4,7 @@ import { GET } from "../recipes/route";
 vi.mock("@/lib/openclaw", () => ({
   runOpenClaw: vi.fn(),
 }));
+vi.mock("@/lib/manifest", () => ({ readManifest: vi.fn().mockResolvedValue(null) }));
 
 import { runOpenClaw } from "@/lib/openclaw";
 

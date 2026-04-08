@@ -2,9 +2,9 @@ import Link from "next/link";
 import { unstable_noStore as noStore } from "next/cache";
 
 import RunsClient from "@/app/teams/[teamId]/runs/runs-client";
-import { getTeamDisplayName } from "@/lib/recipes";
 import { listAllWorkflowRuns } from "@/lib/workflows/runs-storage";
 import { readWorkflow } from "@/lib/workflows/storage";
+import { readManifest } from "@/lib/manifest";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -14,22 +14,34 @@ export default async function RunsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  // Runs are live + file-backed; never serve cached HTML.
   noStore();
 
   const sp = await searchParams;
   const team = Array.isArray(sp.team) ? sp.team[0] : sp.team;
   const teamId = String(team ?? "").trim();
 
+  // Pre-load manifest for fast team name lookups (avoids ~8s subprocess per call)
+  const manifest = await readManifest();
+  const getTeamName = (tId: string): string | null => {
+    const entry = manifest?.teams?.[tId];
+    if (entry?.displayName) return entry.displayName;
+    const recipe = manifest?.recipes?.find((r) => r.kind === "team" && r.id === tId);
+    if (recipe?.name) return recipe.name;
+    // Return null rather than falling back to slow subprocess — the teamId
+    // is shown alongside the name anyway, so null is acceptable.
+    return null;
+  };
+
   if (!teamId) {
     const { listLocalTeamIds } = await import("@/lib/teams");
     const AllRunsClient = (await import("@/app/runs/AllRunsClient")).default;
 
-    const teamIds = await listLocalTeamIds();
+    // Use manifest for team list if available (avoids filesystem scan)
+    const teamIds = manifest ? Object.keys(manifest.teams).sort() : await listLocalTeamIds();
 
     const rowsNested = await Promise.all(
       teamIds.map(async (tId) => {
-        const teamName = await getTeamDisplayName(tId);
+        const teamName = getTeamName(tId);
         const { runs } = await listAllWorkflowRuns(tId);
         return runs.map((r) => ({
           teamId: tId,
@@ -60,7 +72,7 @@ export default async function RunsPage({
     );
   }
 
-  const name = await getTeamDisplayName(teamId);
+  const name = getTeamName(teamId);
   const { runs } = await listAllWorkflowRuns(teamId);
 
   const wfIds = Array.from(new Set(runs.map((r) => r.workflowId).filter(Boolean))).sort();
