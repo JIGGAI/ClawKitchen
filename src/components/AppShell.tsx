@@ -6,7 +6,6 @@ import { useEffect, useMemo, useState } from "react";
 import { dispatchSelectedTeamChanged } from "@/lib/selected-team";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { fetchJson } from "@/lib/fetch-json";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { ToastProvider } from "@/components/ToastProvider";
 
 function Icon({ children }: { children: React.ReactNode }) {
@@ -424,7 +423,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             >
               {collapsed ? "📖" : "Docs"}
             </a>
-            {collapsed ? null : <ThemeToggle />}
           </div>
         </aside>
 
