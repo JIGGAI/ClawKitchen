@@ -88,7 +88,7 @@ async function loadAgentFilesAndSkills(
   }
 }
 
-export default function AgentEditor({ agentId, returnTo }: { agentId: string; returnTo?: string }) {
+export default function AgentEditor({ agentId, returnTo, onClose }: { agentId: string; returnTo?: string; onClose?: () => void }) {
   const router = useRouter();
   const [agent, setAgent] = useState<AgentListItem | null>(null);
   const [loading, setLoading] = useState(true);
@@ -318,13 +318,20 @@ export default function AgentEditor({ agentId, returnTo }: { agentId: string; re
   return (
     <div className="w-full">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{agent.identityName || agent.id}</h1>
+        <div className="flex items-center gap-3">
+          {onClose ? (
+            <button type="button" onClick={onClose} className="text-[color:var(--ck-text-tertiary)] hover:text-[color:var(--ck-text-primary)]" title="Close">
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+            </button>
+          ) : null}
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">{agent.identityName || agent.id}</h1>
           <p className="mt-1 text-sm font-mono text-[color:var(--ck-text-tertiary)]">
             {agent.id}
             {agent.isDefault ? " · default" : ""}
             {agent.model ? ` · ${agent.model}` : ""}
           </p>
+          </div>
         </div>
         <button
           type="button"

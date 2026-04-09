@@ -1,5 +1,8 @@
 "use client";
 
+import { useState } from "react";
+import { Modal } from "@/components/Modal";
+import AgentEditor from "@/app/agents/[agentId]/agent-editor";
 import type { TeamAgentEntry } from "./types";
 
 type RecipeAgent = { role: string; name?: string };
@@ -22,8 +25,8 @@ type TeamAgentsTabProps = {
 };
 
 export function TeamAgentsTab(props: TeamAgentsTabProps) {
+  const [editAgentId, setEditAgentId] = useState<string | null>(null);
   const {
-    teamId,
     toId,
     recipeAgents,
     newRole,
@@ -123,12 +126,13 @@ export function TeamAgentsTab(props: TeamAgentsTabProps) {
                   </div>
                   <div className="text-xs text-[color:var(--ck-text-secondary)]">{a.id}</div>
                 </div>
-                <a
+                <button
+                  type="button"
                   className="text-sm font-medium text-[var(--ck-accent-red)] hover:text-[color:var(--ck-accent-red-hover)]"
-                  href={"/agents/" + encodeURIComponent(a.id) + "?returnTo=" + encodeURIComponent("/teams/" + teamId + "?tab=agents")}
+                  onClick={() => setEditAgentId(a.id)}
                 >
                   Edit
-                </a>
+                </button>
               </li>
             ))
           ) : null}
@@ -140,6 +144,21 @@ export function TeamAgentsTab(props: TeamAgentsTabProps) {
           )}
         </ul>
       </div>
+
+      <Modal
+        open={!!editAgentId}
+        onClose={() => setEditAgentId(null)}
+        title={editAgentId ?? "Agent"}
+        size="full"
+        hideTitle
+      >
+        {editAgentId ? (
+          <AgentEditor
+            agentId={editAgentId}
+            onClose={() => setEditAgentId(null)}
+          />
+        ) : null}
+      </Modal>
     </div>
   );
 }

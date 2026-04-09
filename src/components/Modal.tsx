@@ -7,21 +7,24 @@ export function Modal({
   onClose,
   title,
   children,
-  size = "md"
+  size = "md",
+  hideTitle = false,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: React.ReactNode;
-  size?: "sm" | "md" | "lg" | "xl";
+  size?: "sm" | "md" | "lg" | "xl" | "full";
+  hideTitle?: boolean;
 }) {
   if (!open) return null;
 
   const sizeClasses = {
     sm: "max-w-md",
-    md: "max-w-lg", 
+    md: "max-w-lg",
     lg: "max-w-2xl",
-    xl: "max-w-4xl"
+    xl: "max-w-4xl",
+    full: "max-w-6xl"
   };
 
   const titleId = "modal-title";
@@ -31,7 +34,7 @@ export function Modal({
       <div className="fixed inset-0 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby={titleId}>
         <div className="flex min-h-full items-center justify-center p-4">
           <div className={`w-full ${sizeClasses[size]} rounded-2xl border border-white/10 bg-[color:var(--ck-bg-soft)] p-6 shadow-[var(--ck-shadow-2)]`}>
-            <h2 id={titleId} className="text-lg font-semibold text-[color:var(--ck-text-primary)] mb-4">{title}</h2>
+            {hideTitle ? <h2 id={titleId} className="sr-only">{title}</h2> : <h2 id={titleId} className="text-lg font-semibold text-[color:var(--ck-text-primary)] mb-4">{title}</h2>}
             {children}
           </div>
         </div>
