@@ -5,6 +5,12 @@ export type WorkflowRunNodeResultV1 = {
   endedAt?: string;
   output?: unknown;
   error?: { message: string; stack?: string } | string;
+  /** Present when this node handed off to another team's workflow run */
+  handoff?: {
+    targetTeamId: string;
+    targetWorkflowId: string;
+    targetRunId: string;
+  };
 };
 
 export type WorkflowRunApprovalV1 = {

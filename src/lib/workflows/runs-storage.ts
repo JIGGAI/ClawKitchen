@@ -607,6 +607,25 @@ async function normalizeRunFile(
           .filter((x): x is WorkflowRunNodeResultV1 => x !== null)
       : undefined;
 
+    // Attach handoff metadata from events to matching node results
+    const eventsRaw = (parsed as { events?: unknown[] }).events;
+    if (nodes && Array.isArray(eventsRaw)) {
+      for (const ev of eventsRaw) {
+        if (!ev || typeof ev !== "object") continue;
+        const e = ev as { type?: string; nodeId?: string; targetTeamId?: string; targetWorkflowId?: string; targetRunId?: string };
+        if (e.type === "node.completed" && e.targetRunId && e.targetTeamId && e.targetWorkflowId) {
+          const match = nodes.find((n) => n.nodeId === e.nodeId);
+          if (match) {
+            match.handoff = {
+              targetTeamId: e.targetTeamId,
+              targetWorkflowId: e.targetWorkflowId,
+              targetRunId: e.targetRunId,
+            };
+          }
+        }
+      }
+    }
+
     // Read approval file from ClawRecipes format if available
     let approval: WorkflowRunFileV1["approval"] = undefined;
     if (runDirPath) {

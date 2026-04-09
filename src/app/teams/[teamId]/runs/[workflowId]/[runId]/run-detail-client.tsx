@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { fetchJson } from "@/lib/fetch-json";
 import { ConfirmationModal } from "@/components/ConfirmationModal";
@@ -209,6 +210,60 @@ export default function RunDetailClient({
                 <div className="mt-2 rounded border border-white/10 bg-white/5 p-2 text-[11px]">{run.approval.note}</div>
               ) : null}
             </div>
+            {run.approval.state === "pending" ? (
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  disabled={actionBusy}
+                  onClick={async () => {
+                    setActionBusy(true);
+                    setActionError("");
+                    try {
+                      await fetchJson(`/api/teams/workflow-runs?teamId=${encodeURIComponent(teamId)}&workflowId=${encodeURIComponent(workflowId)}`, {
+                        method: "POST",
+                        headers: { "content-type": "application/json" },
+                        body: JSON.stringify({ runId: run.id, action: "approve" }),
+                      });
+                      router.refresh();
+                    } catch (err) {
+                      setActionError(String(err));
+                    } finally {
+                      setActionBusy(false);
+                    }
+                  }}
+                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] transition hover:bg-emerald-500 disabled:opacity-50"
+                >
+                  {actionBusy ? "…" : "Approve"}
+                </button>
+                <button
+                  type="button"
+                  disabled={actionBusy}
+                  onClick={async () => {
+                    setActionBusy(true);
+                    setActionError("");
+                    try {
+                      const note = prompt("Reason for rejection (optional):");
+                      await fetchJson(`/api/teams/workflow-runs?teamId=${encodeURIComponent(teamId)}&workflowId=${encodeURIComponent(workflowId)}`, {
+                        method: "POST",
+                        headers: { "content-type": "application/json" },
+                        body: JSON.stringify({ runId: run.id, action: "request_changes", ...(note ? { note } : {}) }),
+                      });
+                      router.refresh();
+                    } catch (err) {
+                      setActionError(String(err));
+                    } finally {
+                      setActionBusy(false);
+                    }
+                  }}
+                  className="rounded-lg border border-amber-400/30 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-200 shadow-[var(--ck-shadow-1)] transition hover:bg-amber-500/20 disabled:opacity-50"
+                >
+                  Reject
+                </button>
+              </div>
+            ) : null}
+            {actionError ? (
+              <div className="mt-2 text-xs text-red-300">{actionError}</div>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -227,6 +282,21 @@ export default function RunDetailClient({
               <div className="mt-3 rounded-lg border border-red-400/30 bg-red-500/10 p-3">
                 <div className="text-xs font-semibold text-red-50">Error</div>
                 <pre className="mt-2 overflow-auto text-xs text-red-50">{asPrettyJson(selectedNode.error)}</pre>
+              </div>
+            ) : null}
+
+            {selectedNode.handoff ? (
+              <div className="mt-3 rounded-lg border border-sky-400/30 bg-sky-500/10 p-3">
+                <div className="text-xs font-semibold text-sky-50">Handed off to</div>
+                <Link
+                  href={`/teams/${encodeURIComponent(selectedNode.handoff.targetTeamId)}/runs/${encodeURIComponent(selectedNode.handoff.targetWorkflowId)}/${encodeURIComponent(selectedNode.handoff.targetRunId)}`}
+                  className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-sky-300 hover:text-sky-200 hover:underline"
+                >
+                  <span className="font-mono">{selectedNode.handoff.targetTeamId}</span>
+                  <span className="text-sky-400/60">/</span>
+                  <span className="font-mono">{selectedNode.handoff.targetWorkflowId}</span>
+                  <span className="text-[color:var(--ck-text-tertiary)]">→</span>
+                </Link>
               </div>
             ) : null}
 
