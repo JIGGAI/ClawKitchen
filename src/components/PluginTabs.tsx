@@ -30,7 +30,7 @@ function Section({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="ck-glass">
+    <div className="ck-card">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -165,7 +165,7 @@ export default function PluginTabs({ teamType, teamId }: PluginTabsProps) {
   /* ---- loading state ---- */
   if (loading) {
     return (
-      <div className="ck-glass p-4">
+      <div className="ck-card p-4">
         <div className="flex items-center justify-center gap-2 py-8 text-sm text-[color:var(--ck-text-tertiary)]">
           <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-white/60" />
           Loading plugins…
@@ -180,7 +180,7 @@ export default function PluginTabs({ teamType, teamId }: PluginTabsProps) {
       <Section title="Installing Plugins" defaultOpen={plugins.length === 0}>
         <div className="space-y-2 text-sm text-[color:var(--ck-text-secondary)]">
           <p>Install Kitchen plugins via the CLI:</p>
-          <code className="block rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 font-mono text-xs text-[color:var(--ck-text-primary)]">
+          <code className="block rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-mono text-xs text-[color:var(--ck-text-primary)]">
             openclaw kitchen plugins install &lt;package-name&gt;
           </code>
           <p className="text-xs text-[color:var(--ck-text-tertiary)]">
@@ -203,8 +203,8 @@ export default function PluginTabs({ teamType, teamId }: PluginTabsProps) {
                   onClick={() => handleTabClick(plugin.id, tab.id)}
                   className={
                     isActive
-                      ? "rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)]"
-                      : "rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] hover:bg-white/10"
+                      ? "rounded-lg bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)]"
+                      : "rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] hover:bg-white/10"
                   }
                 >
                   {tab.label}
@@ -220,7 +220,7 @@ export default function PluginTabs({ teamType, teamId }: PluginTabsProps) {
 
       {/* Empty state */}
       {plugins.length === 0 && (
-        <div className="ck-glass p-4">
+        <div className="ck-card p-4">
           <div className="py-8 text-center text-sm text-[color:var(--ck-text-tertiary)]">
             No plugins installed for this team type.
           </div>

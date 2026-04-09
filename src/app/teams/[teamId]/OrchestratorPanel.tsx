@@ -55,18 +55,18 @@ export function OrchestratorPanel({ teamId }: { teamId: string }) {
   }, [load]);
 
   if (loading) {
-    return <div className="mt-6 ck-glass-strong p-4">Loading orchestrator state…</div>;
+    return <div className="mt-6 ck-card p-4">Loading orchestrator state…</div>;
   }
 
   if (!state) {
-    return <div className="mt-6 ck-glass-strong p-4">No orchestrator state available.</div>;
+    return <div className="mt-6 ck-card p-4">No orchestrator state available.</div>;
   }
 
   if (!state.ok) {
     return (
-      <div className="mt-6 ck-glass-strong p-4">
+      <div className="mt-6 ck-card p-4">
         <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Orchestrator</div>
-        <div className="mt-3 rounded-[var(--ck-radius-sm)] border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">
+        <div className="mt-3 rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">
           {state.error}
         </div>
       </div>
@@ -75,7 +75,7 @@ export function OrchestratorPanel({ teamId }: { teamId: string }) {
 
   if (!state.present) {
     return (
-      <div className="mt-6 ck-glass-strong p-4">
+      <div className="mt-6 ck-card p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Orchestrator</div>
@@ -84,13 +84,13 @@ export function OrchestratorPanel({ teamId }: { teamId: string }) {
           <button
             type="button"
             onClick={() => setSetupOpen(true)}
-            className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] hover:bg-[var(--ck-accent-red-hover)]"
+            className="rounded-lg bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] hover:bg-[var(--ck-accent-red-hover)]"
           >
             Add Orchestrator
           </button>
         </div>
 
-        <div className="mt-3 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3 text-sm text-[color:var(--ck-text-secondary)]">
+        <div className="mt-3 rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-[color:var(--ck-text-secondary)]">
           <div className="text-xs font-medium text-[color:var(--ck-text-tertiary)]">Detection</div>
           <div className="mt-1 font-mono text-xs">{state.reason || "(no reason provided)"}</div>
         </div>
@@ -114,7 +114,7 @@ export function OrchestratorPanel({ teamId }: { teamId: string }) {
   }
 
   return (
-    <div className="mt-6 ck-glass-strong p-4">
+    <div className="mt-6 ck-card p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Orchestrator</div>
@@ -139,7 +139,7 @@ export function OrchestratorPanel({ teamId }: { teamId: string }) {
             type="button"
             onClick={() => void load()}
             disabled={loading}
-            className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15 disabled:opacity-50"
+            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15 disabled:opacity-50"
           >
             {loading ? "Refreshing…" : "Refresh"}
           </button>
@@ -147,7 +147,7 @@ export function OrchestratorPanel({ teamId }: { teamId: string }) {
       </div>
 
       <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <section className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3">
+        <section className="rounded-lg border border-white/10 bg-white/5 p-3">
           <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">tmux sessions</div>
           {state.tmuxSessions.length ? (
             <ul className="mt-2 space-y-2">
@@ -166,7 +166,7 @@ export function OrchestratorPanel({ teamId }: { teamId: string }) {
           )}
         </section>
 
-        <section className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3">
+        <section className="rounded-lg border border-white/10 bg-white/5 p-3">
           <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">git worktrees</div>
           {state.worktrees.length ? (
             <ul className="mt-2 space-y-2">
@@ -186,7 +186,7 @@ export function OrchestratorPanel({ teamId }: { teamId: string }) {
         </section>
       </div>
 
-      <section className="mt-4 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3">
+      <section className="mt-4 rounded-lg border border-white/10 bg-white/5 p-3">
         <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Active tasks</div>
         {state.activeTasksSummary ? (
           <div className="mt-2 text-sm text-[color:var(--ck-text-secondary)]">
@@ -201,7 +201,7 @@ export function OrchestratorPanel({ teamId }: { teamId: string }) {
         )}
       </section>
 
-      <section className="mt-4 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3">
+      <section className="mt-4 rounded-lg border border-white/10 bg-white/5 p-3">
         <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">CLI quick actions</div>
         <p className="mt-2 text-sm text-[color:var(--ck-text-secondary)]">
           The orchestrator is designed to be driven from the CLI (and usually tmux). Common commands:
@@ -225,7 +225,7 @@ export function OrchestratorPanel({ teamId }: { teamId: string }) {
         </p>
       </section>
 
-      <section className="mt-4 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3">
+      <section className="mt-4 rounded-lg border border-white/10 bg-white/5 p-3">
         <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Human approval gate (recommended)</div>
         <p className="mt-2 text-sm text-[color:var(--ck-text-secondary)]">
           For workflows that publish, deploy, or send outbound messages, keep a <strong>human approval step</strong>.
@@ -237,7 +237,7 @@ export function OrchestratorPanel({ teamId }: { teamId: string }) {
         </ul>
       </section>
 
-      <section className="mt-4 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3">
+      <section className="mt-4 rounded-lg border border-white/10 bg-white/5 p-3">
         <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Where to change settings</div>
         <p className="mt-2 text-sm text-[color:var(--ck-text-secondary)]">
           These are the common knobs for a swarm/orchestrator scaffold (read-only references):

@@ -128,7 +128,7 @@ export function CreateAgentModal({
           value={agentName}
           onChange={(e) => setAgentName(e.target.value)}
           placeholder="e.g. Crypto Onchain"
-          className="mt-2 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] placeholder:text-[color:var(--ck-text-tertiary)]"
+          className="mt-2 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] placeholder:text-[color:var(--ck-text-tertiary)]"
           autoFocus
         />
       </div>
@@ -143,7 +143,7 @@ export function CreateAgentModal({
           }}
           placeholder="e.g. crypto-onchain"
           className={
-            "mt-2 w-full rounded-[var(--ck-radius-sm)] border bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] placeholder:text-[color:var(--ck-text-tertiary)] " +
+            "mt-2 w-full rounded-lg border bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] placeholder:text-[color:var(--ck-text-tertiary)] " +
             getAvailabilityBorderClass(availability.state)
           }
         />

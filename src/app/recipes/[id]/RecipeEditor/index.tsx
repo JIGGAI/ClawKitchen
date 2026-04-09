@@ -141,8 +141,8 @@ export default function RecipeEditor({ recipeId }: { recipeId: string }) {
     }
   }
 
-  if (loading) return <div className="ck-glass mx-auto max-w-4xl p-6">Loading</div>;
-  if (!recipe) return <div className="ck-glass mx-auto max-w-4xl p-6">Not found.</div>;
+  if (loading) return <div className="ck-card mx-auto max-w-4xl p-6">Loading</div>;
+  if (!recipe) return <div className="ck-card mx-auto max-w-4xl p-6">Not found.</div>;
 
   const fm = recipe.kind === "team" ? teamFrontmatter.fm : null;
   const fmErr = recipe.kind === "team" ? teamFrontmatter.error : undefined;
@@ -151,7 +151,7 @@ export default function RecipeEditor({ recipeId }: { recipeId: string }) {
   const afmErr = recipe.kind === "agent" ? agentFrontmatter.error : undefined;
 
   return (
-    <div className="ck-glass mx-auto max-w-6xl p-6 sm:p-8">
+    <div className="ck-card mx-auto max-w-6xl p-6 sm:p-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
         <div className="min-w-0">
           <h1 className="truncate text-2xl font-semibold tracking-tight">{recipe.name}</h1>
@@ -167,7 +167,7 @@ export default function RecipeEditor({ recipeId }: { recipeId: string }) {
           <button
             disabled={!canSave || saving}
             onClick={onSave}
-            className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] transition-colors hover:bg-[var(--ck-accent-red-hover)] active:bg-[var(--ck-accent-red-active)] disabled:opacity-50"
+            className="rounded-lg bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] transition-colors hover:bg-[var(--ck-accent-red-hover)] active:bg-[var(--ck-accent-red-active)] disabled:opacity-50"
           >
             {saving ? "Saving" : "Save"}
           </button>
@@ -175,18 +175,18 @@ export default function RecipeEditor({ recipeId }: { recipeId: string }) {
       </div>
 
       {message ? (
-        <div className="mt-4 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3 text-sm text-[color:var(--ck-text-primary)]">
+        <div className="mt-4 rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-[color:var(--ck-text-primary)]">
           {message}
         </div>
       ) : null}
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="ck-glass-strong p-4">
+        <div className="ck-card p-4">
           <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Recipe markdown</div>
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            className="mt-2 h-[70vh] w-full resize-none rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-3 font-mono text-xs text-[color:var(--ck-text-primary)] placeholder:text-[color:var(--ck-text-tertiary)]"
+            className="mt-2 h-[70vh] w-full resize-none rounded-lg border border-white/10 bg-white/5 p-3 font-mono text-xs text-[color:var(--ck-text-primary)] placeholder:text-[color:var(--ck-text-tertiary)]"
             spellCheck={false}
           />
         </div>
@@ -216,7 +216,7 @@ export default function RecipeEditor({ recipeId }: { recipeId: string }) {
                 value={createId}
                 onChange={(e) => setCreateId(e.target.value)}
                 placeholder="e.g. acme"
-                className="mt-2 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                className="mt-2 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
                 disabled={createBusy}
               />
             </label>
@@ -225,7 +225,7 @@ export default function RecipeEditor({ recipeId }: { recipeId: string }) {
               <select
                 value={cronInstallChoice}
                 onChange={(e) => setCronInstallChoice(e.target.value as "yes" | "no")}
-                className="mt-2 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                className="mt-2 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
                 disabled={createBusy}
               >
                 <option value="no">No (recommended)</option>
@@ -244,7 +244,7 @@ export default function RecipeEditor({ recipeId }: { recipeId: string }) {
                 value={createId}
                 onChange={(e) => setCreateId(e.target.value)}
                 placeholder="e.g. larry"
-                className="mt-2 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                className="mt-2 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
                 disabled={createBusy}
               />
             </label>
@@ -254,7 +254,7 @@ export default function RecipeEditor({ recipeId }: { recipeId: string }) {
                 value={createName}
                 onChange={(e) => setCreateName(e.target.value)}
                 placeholder="e.g. Larry"
-                className="mt-2 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                className="mt-2 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
                 disabled={createBusy}
               />
             </label>

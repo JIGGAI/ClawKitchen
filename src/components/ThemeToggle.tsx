@@ -36,7 +36,7 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={toggle}
-      className="grid h-9 w-9 place-items-center rounded-full border border-[color:var(--ck-border-subtle)] bg-[color:var(--ck-bg-glass)] text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-[color:var(--ck-bg-glass-strong)]"
+      className="grid h-9 w-9 place-items-center rounded-full border border-[color:var(--ck-border-subtle)] bg-white/5 text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-[color:var(--ck-bg-soft)]"
       aria-label={label}
       title={label}
     >

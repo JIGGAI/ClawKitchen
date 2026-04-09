@@ -293,7 +293,7 @@ export function CreateCustomTeamModal({
           value={teamId}
           onChange={(e) => setTeamId(normalizeTeamIdInput(e.target.value))}
           placeholder="e.g. my-team"
-          className="mt-2 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] placeholder:text-[color:var(--ck-text-tertiary)]"
+          className="mt-2 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] placeholder:text-[color:var(--ck-text-tertiary)]"
           autoFocus
         />
         {teamIdError ? <div className="mt-2 text-xs text-red-300">{teamIdError}</div> : null}
@@ -317,10 +317,10 @@ export function CreateCustomTeamModal({
             value={catalogQuery}
             onChange={(e) => setCatalogQuery(e.target.value)}
             placeholder="Search local roles/agents (recipe id, name, role)"
-            className="w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] placeholder:text-[color:var(--ck-text-tertiary)]"
+            className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] placeholder:text-[color:var(--ck-text-tertiary)]"
           />
 
-          <div className="mt-3 max-h-[220px] overflow-auto rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 p-3">
+          <div className="mt-3 max-h-[220px] overflow-auto rounded-lg border border-white/10 bg-white/5 p-3">
             {catalogError ? <div className="text-sm text-red-300">{catalogError}</div> : null}
             {!catalogError && agentChoices.length === 0 ? (
               <div className="text-sm text-[color:var(--ck-text-secondary)]">No local roles/agents found.</div>
@@ -365,7 +365,7 @@ export function CreateCustomTeamModal({
             {roles.map((r) => {
               const roleErr = roleErrors.get(r.agentId);
               return (
-                <div key={r.agentId} className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 p-3">
+                <div key={r.agentId} className="rounded-lg border border-white/10 bg-white/5 p-3">
                   <div className="text-xs text-[color:var(--ck-text-tertiary)]">{r.agentId}</div>
 
                   <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -379,7 +379,7 @@ export function CreateCustomTeamModal({
                             [r.agentId]: { ...prev[r.agentId], roleId: e.target.value },
                           }));
                         }}
-                        className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                        className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
                       />
                       {roleErr ? <div className="mt-1 text-xs text-red-300">{roleErr}</div> : null}
                     </div>
@@ -394,7 +394,7 @@ export function CreateCustomTeamModal({
                             [r.agentId]: { ...prev[r.agentId], displayName: e.target.value },
                           }));
                         }}
-                        className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                        className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
                       />
                     </div>
                   </div>
@@ -417,7 +417,7 @@ export function CreateCustomTeamModal({
             Target path: <code>{previewPath}</code>
           </div>
         ) : null}
-        <pre className="mt-3 max-h-[260px] overflow-auto whitespace-pre-wrap rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 p-3 text-xs text-[color:var(--ck-text-secondary)]">
+        <pre className="mt-3 max-h-[260px] overflow-auto whitespace-pre-wrap rounded-lg border border-white/10 bg-black/30 p-3 text-xs text-[color:var(--ck-text-secondary)]">
           {canConfirm ? previewMd || "(Loading preview…)" : "(Select a valid team id and at least one agent to preview.)"}
         </pre>
       </div>

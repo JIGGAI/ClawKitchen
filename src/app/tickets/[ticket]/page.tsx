@@ -16,7 +16,7 @@ export default async function TicketDetailPage({
   const team = typeof sp.team === "string" ? sp.team.trim() : "";
   if (!team) {
     return (
-      <div className="ck-glass p-6">
+      <div className="ck-card p-6">
         <h1 className="text-xl font-semibold tracking-tight">No team selected</h1>
         <p className="mt-3 text-sm text-[color:var(--ck-text-secondary)]">
           Select a team from the sidebar to view tickets.
@@ -30,7 +30,7 @@ export default async function TicketDetailPage({
 
   if (!data) {
     return (
-      <div className="ck-glass p-6">
+      <div className="ck-card p-6">
         <h1 className="text-xl font-semibold tracking-tight">Ticket not found</h1>
         <p className="mt-3 text-sm text-[color:var(--ck-text-secondary)]">
           Couldn’t locate “{ticket}” in backlog/in-progress/testing/done.

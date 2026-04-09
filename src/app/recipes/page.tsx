@@ -94,7 +94,7 @@ export default async function RecipesPage({
       </div>
 
       {error ? (
-        <div className="mt-6 rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] bg-[color:var(--ck-bg-glass)] p-4 text-sm text-[color:var(--ck-text-secondary)]">
+        <div className="mt-6 rounded-lg border border-[color:var(--ck-border-subtle)] bg-white/5 p-4 text-sm text-[color:var(--ck-text-secondary)]">
           <div className="font-medium text-[color:var(--ck-text-primary)]">Recipes unavailable</div>
           <div className="mt-1 whitespace-pre-wrap">{error}</div>
           <div className="mt-3 text-xs text-[color:var(--ck-text-tertiary)]">

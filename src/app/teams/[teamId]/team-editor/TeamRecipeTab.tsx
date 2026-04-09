@@ -36,7 +36,7 @@ export function TeamRecipeTab(props: TeamRecipeTabProps) {
   return (
     <>
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="ck-glass-strong p-4">
+        <div className="ck-card p-4">
           <div className="flex items-center justify-between gap-3">
             <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Custom recipe target</div>
             {p.loading ? (
@@ -48,7 +48,7 @@ export function TeamRecipeTab(props: TeamRecipeTabProps) {
             value={p.toId}
             onChange={(e) => p.setToId(e.target.value)}
             disabled={!p.canEditTargetId}
-            className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] disabled:opacity-70"
+            className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] disabled:opacity-70"
           />
           <div className="mt-1 text-xs text-[color:var(--ck-text-tertiary)]">
             This is the custom recipe id that will be created when you save.
@@ -57,14 +57,14 @@ export function TeamRecipeTab(props: TeamRecipeTabProps) {
           <input
             value={p.toName}
             onChange={(e) => p.setToName(e.target.value)}
-            className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+            className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
           />
           <div className="mt-4 grid grid-cols-1 gap-2">
             <button
               type="button"
               disabled={p.saving || !p.teamIdValid || !p.targetIdValid || p.targetIsBuiltin}
               onClick={() => p.onSaveCustom(true)}
-              className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] disabled:opacity-50"
+              className="rounded-lg bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] disabled:opacity-50"
             >
               {p.saving ? "Saving" : "Save"}
             </button>
@@ -80,7 +80,7 @@ export function TeamRecipeTab(props: TeamRecipeTabProps) {
                 p.loadedRecipeHash === p.teamMetaRecipeHash
               }
               onClick={p.onPublishOpen}
-              className="rounded-[var(--ck-radius-sm)] bg-emerald-600 px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] disabled:opacity-50"
+              className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] disabled:opacity-50"
             >
               {p.publishing ? "Publishing" : "Publish changes"}
             </button>
@@ -88,19 +88,19 @@ export function TeamRecipeTab(props: TeamRecipeTabProps) {
               type="button"
               disabled={p.saving}
               onClick={p.onDeleteOpen}
-              className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] disabled:opacity-50"
+              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] disabled:opacity-50"
             >
               Delete Team
             </button>
           </div>
         </div>
-        <div className="ck-glass-strong p-4">
+        <div className="ck-card p-4">
           <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Notes</div>
-          <div className="mt-3 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3">
+          <div className="mt-3 rounded-lg border border-white/10 bg-white/5 p-3">
             <div className="text-xs font-medium text-[color:var(--ck-text-secondary)]">Parent recipe (locked)</div>
             <select
               disabled
-              className="mt-2 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] disabled:opacity-70"
+              className="mt-2 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] disabled:opacity-70"
               value={p.fromId}
               onChange={(e) => p.setFromId(e.target.value)}
             >
@@ -129,10 +129,10 @@ export function TeamRecipeTab(props: TeamRecipeTabProps) {
           </ul>
         </div>
       </div>
-      <div className="mt-6 ck-glass-strong p-4">
+      <div className="mt-6 ck-card p-4">
         <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Recipe markdown</div>
         {p.recipeLoadError ? (
-          <div className="mt-3 rounded-[var(--ck-radius-sm)] border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">
+          <div className="mt-3 rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">
             {p.recipeLoadError}
           </div>
         ) : null}
@@ -142,7 +142,7 @@ export function TeamRecipeTab(props: TeamRecipeTabProps) {
             p.setContent(e.target.value);
             p.setLoadedRecipeHash(null);
           }}
-          className="mt-2 h-[55vh] w-full resize-none rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-3 font-mono text-xs text-[color:var(--ck-text-primary)]"
+          className="mt-2 h-[55vh] w-full resize-none rounded-lg border border-white/10 bg-white/5 p-3 font-mono text-xs text-[color:var(--ck-text-primary)]"
           spellCheck={false}
         />
       </div>

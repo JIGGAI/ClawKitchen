@@ -29,7 +29,7 @@ export function WorkflowCanvas({
   return (
     <div
       ref={canvasRef}
-      className="relative h-full min-h-0 w-full flex-1 overflow-auto rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20"
+      className="relative h-full min-h-0 w-full flex-1 overflow-auto rounded-lg border border-white/10 bg-white/5"
     >
       <div className="relative h-[1200px] w-[2200px]">
         <svg className="absolute inset-0" width={2200} height={1200}>
@@ -93,8 +93,8 @@ export function WorkflowCanvas({
               }}
               className={
                 selected
-                  ? "absolute cursor-grab rounded-[var(--ck-radius-sm)] border border-white/25 bg-white/10 px-3 py-2 text-xs text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)]"
-                  : "absolute cursor-grab rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-xs text-[color:var(--ck-text-secondary)] hover:bg-white/10"
+                  ? "absolute cursor-grab rounded-lg border border-white/25 bg-white/10 px-3 py-2 text-xs text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)]"
+                  : "absolute cursor-grab rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-[color:var(--ck-text-secondary)] hover:bg-white/10"
               }
               style={{ left: x, top: y, width: 180 }}
             >

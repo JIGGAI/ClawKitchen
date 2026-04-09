@@ -53,7 +53,7 @@ export function OrchestratorSetupModal({
       />
       <div className="fixed inset-0 overflow-y-auto">
         <div className="flex min-h-full items-center justify-center p-4">
-          <div className="w-full max-w-xl rounded-2xl border border-white/10 bg-[color:var(--ck-bg-glass-strong)] p-5 shadow-[var(--ck-shadow-2)]">
+          <div className="w-full max-w-xl rounded-2xl border border-white/10 bg-[color:var(--ck-bg-soft)] p-5 shadow-[var(--ck-shadow-2)]">
             <div className="text-lg font-semibold text-[color:var(--ck-text-primary)]">Add Orchestrator</div>
             <p className="mt-1 text-sm text-[color:var(--ck-text-secondary)]">
               This will scaffold a new <span className="font-mono text-xs">swarm-orchestrator</span> agent workspace for this team and
@@ -64,7 +64,7 @@ export function OrchestratorSetupModal({
             <input
               value={agentId}
               onChange={(e) => setAgentId(e.target.value)}
-              className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+              className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
             />
             <div className="mt-1 text-xs text-[color:var(--ck-text-tertiary)]">
               Default: <span className="font-mono">{defaultAgentId}</span> (normalized: <span className="font-mono">{normalized.effectiveAgentId}</span>)
@@ -75,7 +75,7 @@ export function OrchestratorSetupModal({
               value={repoDir}
               onChange={(e) => setRepoDir(e.target.value)}
               placeholder="~/my-project"
-              className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+              className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
             />
 
             <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -84,7 +84,7 @@ export function OrchestratorSetupModal({
                 <input
                   value={worktreeRoot}
                   onChange={(e) => setWorktreeRoot(e.target.value)}
-                  className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                  className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
                 />
                 <div className="mt-1 text-xs text-[color:var(--ck-text-tertiary)]">Recommend a dedicated folder outside the repo.</div>
               </div>
@@ -94,12 +94,12 @@ export function OrchestratorSetupModal({
                 <input
                   value={baseRef}
                   onChange={(e) => setBaseRef(e.target.value)}
-                  className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                  className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
                 />
               </div>
             </div>
 
-            <label className="mt-5 flex items-start gap-2 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3 text-sm text-[color:var(--ck-text-secondary)]">
+            <label className="mt-5 flex items-start gap-2 rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-[color:var(--ck-text-secondary)]">
               <input type="checkbox" checked={applyConfig} onChange={(e) => setApplyConfig(e.target.checked)} className="mt-1" />
               <span>
                 Add this agent to OpenClaw config (recommended).<br />
@@ -109,7 +109,7 @@ export function OrchestratorSetupModal({
               </span>
             </label>
 
-            <label className="mt-3 flex items-start gap-2 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3 text-sm text-[color:var(--ck-text-secondary)]">
+            <label className="mt-3 flex items-start gap-2 rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-[color:var(--ck-text-secondary)]">
               <input type="checkbox" checked={makeExecutable} onChange={(e) => setMakeExecutable(e.target.checked)} className="mt-1" />
               <span>
                 Make scripts executable (developer convenience).<br />
@@ -120,11 +120,11 @@ export function OrchestratorSetupModal({
             </label>
 
             {error ? (
-              <div className="mt-4 rounded-[var(--ck-radius-sm)] border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">{error}</div>
+              <div className="mt-4 rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">{error}</div>
             ) : null}
 
             {result ? (
-              <div className="mt-4 rounded-[var(--ck-radius-sm)] border border-emerald-400/30 bg-emerald-500/10 p-3 text-sm text-emerald-100">
+              <div className="mt-4 rounded-lg border border-emerald-400/30 bg-emerald-500/10 p-3 text-sm text-emerald-100">
                 Installed <span className="font-mono">{result.orchestratorAgentId}</span> → <span className="font-mono">{result.workspace}</span>
               </div>
             ) : null}
@@ -134,7 +134,7 @@ export function OrchestratorSetupModal({
                 type="button"
                 onClick={onClose}
                 disabled={submitting}
-                className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10 disabled:opacity-50"
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10 disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -171,7 +171,7 @@ export function OrchestratorSetupModal({
                     setSubmitting(false);
                   }
                 }}
-                className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] hover:bg-[var(--ck-accent-red-hover)] disabled:opacity-50"
+                className="rounded-lg bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] hover:bg-[var(--ck-accent-red-hover)] disabled:opacity-50"
               >
                 {submitting ? "Installing…" : "Install"}
               </button>

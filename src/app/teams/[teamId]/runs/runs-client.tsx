@@ -50,7 +50,7 @@ export default function RunsClient({
   }, [initialRuns]);
 
   return (
-    <div className="rounded-[var(--ck-radius-lg)] border border-white/10 bg-black/10 p-4">
+    <div className="rounded-3xl border border-white/10 bg-black/10 p-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-wrap items-end gap-3">
           <label className="block">
@@ -58,7 +58,7 @@ export default function RunsClient({
             <select
               value={workflowId}
               onChange={(e) => setWorkflowId((e.target.value || "").trim())}
-              className="mt-1 w-64 max-w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
+              className="mt-1 w-64 max-w-full rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
             >
               <option value="">All workflows</option>
               {workflowOptions.map((id) => (
@@ -74,7 +74,7 @@ export default function RunsClient({
             <select
               value={status}
               onChange={(e) => setStatus((e.target.value || "").trim())}
-              className="mt-1 w-56 max-w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
+              className="mt-1 w-56 max-w-full rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
             >
               <option value="">All</option>
               <option value="running">running</option>
@@ -91,7 +91,7 @@ export default function RunsClient({
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="run id / workflow / name"
-              className="mt-1 w-72 max-w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
+              className="mt-1 w-72 max-w-full rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
             />
           </label>
         </div>
@@ -100,7 +100,7 @@ export default function RunsClient({
           <button
             type="button"
             onClick={() => router.refresh()}
-            className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
+            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
           >
             Refresh
           </button>

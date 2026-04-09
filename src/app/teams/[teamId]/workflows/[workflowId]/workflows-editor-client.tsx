@@ -147,14 +147,14 @@ function VariableInsertDropdown({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 px-2 py-1 text-[9px] text-[color:var(--ck-text-secondary)] hover:bg-white/10 hover:text-[color:var(--ck-text-primary)]"
+        className="rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-[9px] text-[color:var(--ck-text-secondary)] hover:bg-white/10 hover:text-[color:var(--ck-text-primary)]"
         title="Insert variable"
       >
         {'{{}}'}
       </button>
       
       {isOpen && (
-        <div className="absolute right-0 top-8 z-50 w-72 max-h-80 overflow-auto rounded-[var(--ck-radius-sm)] border border-white/15 bg-black/80 backdrop-blur shadow-[var(--ck-shadow-1)]">
+        <div className="absolute right-0 top-8 z-50 w-72 max-h-80 overflow-auto rounded-lg border border-white/15 bg-black/80 backdrop-blur shadow-[var(--ck-shadow-1)]">
           <div className="p-1">
             <div>
               <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">
@@ -165,7 +165,7 @@ function VariableInsertDropdown({
                   key={variable}
                   type="button"
                   onClick={() => insertVariable(variable)}
-                  className="w-full flex items-center justify-between gap-2 rounded-[var(--ck-radius-sm)] px-2 py-1 text-left text-xs text-[color:var(--ck-text-primary)] hover:bg-white/10 cursor-pointer"
+                  className="w-full flex items-center justify-between gap-2 rounded-lg px-2 py-1 text-left text-xs text-[color:var(--ck-text-primary)] hover:bg-white/10 cursor-pointer"
                 >
                   <span className="font-mono">{variable}</span>
                   <span className="text-[9px] px-1 py-0.5 rounded-sm bg-black/30 text-blue-400">
@@ -191,7 +191,7 @@ function VariableInsertDropdown({
                       key={`${group.nodeId}.${field.name}`}
                       type="button"
                       onClick={() => insertVariable(variable)}
-                      className="w-full flex items-center justify-between gap-2 rounded-[var(--ck-radius-sm)] px-2 py-1 text-left text-xs text-[color:var(--ck-text-primary)] hover:bg-white/10 cursor-pointer"
+                      className="w-full flex items-center justify-between gap-2 rounded-lg px-2 py-1 text-left text-xs text-[color:var(--ck-text-primary)] hover:bg-white/10 cursor-pointer"
                     >
                       <span className="font-mono">{variable}</span>
                       <span className={`text-[9px] px-1 py-0.5 rounded-sm bg-black/30 ${badgeColor}`}>
@@ -279,7 +279,7 @@ function OutputFieldsEditor({
                 newOutputFields[index] = { ...field, name: e.target.value };
                 onChange(newOutputFields);
               }}
-              className="flex-1 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+              className="flex-1 rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
               placeholder="Field name"
             />
             <select
@@ -290,7 +290,7 @@ function OutputFieldsEditor({
                 newOutputFields[index] = { ...field, type: newType };
                 onChange(newOutputFields);
               }}
-              className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+              className="rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
             >
               <option value="text">text</option>
               <option value="list">list</option>
@@ -778,7 +778,7 @@ export default function WorkflowsEditorClient({
 
   // (section collapse uses native <details> to keep this file simple)
   const llmHelp = llmTaskEnabled === false ? (
-    <div className="mx-3 mb-3 rounded-[var(--ck-radius-sm)] border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+    <div className="mx-3 mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
       <div className="font-medium text-amber-200">LLM support is not enabled</div>
       <div className="mt-1 text-[color:var(--ck-text-secondary)]">
         Workflow LLM nodes require the optional built-in <code className="px-1">llm-task</code> plugin.
@@ -797,7 +797,7 @@ export default function WorkflowsEditorClient({
         <div className="flex min-w-0 items-center gap-2">
           <a
             href={`/teams/${encodeURIComponent(teamId)}?tab=workflows`}
-            className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
+            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
           >
             Back
           </a>
@@ -810,7 +810,7 @@ export default function WorkflowsEditorClient({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex overflow-hidden rounded-[var(--ck-radius-sm)] border border-white/10">
+          <div className="flex overflow-hidden rounded-lg border border-white/10">
             <button
               type="button"
               onClick={() => setView("canvas")}
@@ -868,7 +868,7 @@ export default function WorkflowsEditorClient({
             type="button"
             disabled={saving}
             onClick={() => importInputRef.current?.click()}
-            className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] hover:bg-white/10 disabled:opacity-50"
+            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] hover:bg-white/10 disabled:opacity-50"
           >
             Import
           </button>
@@ -877,7 +877,7 @@ export default function WorkflowsEditorClient({
             type="button"
             disabled={!parsed.wf || Boolean(parsed.err) || validation.errors.length > 0}
             onClick={onExport}
-            className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] hover:bg-white/10 disabled:opacity-50"
+            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] hover:bg-white/10 disabled:opacity-50"
           >
             Export
           </button>
@@ -886,7 +886,7 @@ export default function WorkflowsEditorClient({
             type="button"
             disabled={saving || !parsed.wf || Boolean(parsed.err) || validation.errors.length > 0}
             onClick={onSave}
-            className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] disabled:opacity-50"
+            className="rounded-lg bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] disabled:opacity-50"
           >
             {saving ? "Saving…" : "Save"}
           </button>
@@ -898,12 +898,12 @@ export default function WorkflowsEditorClient({
       {llmHelp}
 
       {parsed.err ? (
-        <div className="mt-3 rounded-[var(--ck-radius-sm)] border border-yellow-400/30 bg-yellow-500/10 p-3 text-sm text-yellow-100">
+        <div className="mt-3 rounded-lg border border-yellow-400/30 bg-yellow-500/10 p-3 text-sm text-yellow-100">
           JSON parse error: {parsed.err}
         </div>
       ) : null}
       {!parsed.err && validation.errors.length ? (
-        <div className="mt-3 rounded-[var(--ck-radius-sm)] border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">
+        <div className="mt-3 rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">
           <div className="font-medium">Workflow validation errors</div>
           <ul className="mt-2 list-disc space-y-1 pl-5">
             {validation.errors.map((e) => (
@@ -914,7 +914,7 @@ export default function WorkflowsEditorClient({
       ) : null}
 
       {!parsed.err && !validation.errors.length && validation.warnings.length ? (
-        <div className="mt-3 rounded-[var(--ck-radius-sm)] border border-yellow-400/30 bg-yellow-500/10 p-3 text-sm text-yellow-100">
+        <div className="mt-3 rounded-lg border border-yellow-400/30 bg-yellow-500/10 p-3 text-sm text-yellow-100">
           <div className="font-medium">Workflow validation warnings</div>
           <ul className="mt-2 list-disc space-y-1 pl-5">
             {validation.warnings.map((w) => (
@@ -925,7 +925,7 @@ export default function WorkflowsEditorClient({
       ) : null}
 
       {actionError ? (
-        <div className="mt-3 rounded-[var(--ck-radius-sm)] border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">
+        <div className="mt-3 rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">
           {actionError}
         </div>
       ) : null}
@@ -945,12 +945,12 @@ export default function WorkflowsEditorClient({
                 }
               }
             }}
-            className="h-full min-h-0 w-full flex-1 resize-none rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3 font-mono text-xs text-[color:var(--ck-text-primary)]"
+            className="h-full min-h-0 w-full flex-1 resize-none rounded-lg border border-white/10 bg-white/5 p-3 font-mono text-xs text-[color:var(--ck-text-primary)]"
           />
         ) : (
           <div
             ref={canvasRef}
-            className="relative h-full min-h-0 w-full flex-1 overflow-auto bg-black/20"
+            className="relative h-full min-h-0 w-full flex-1 overflow-auto bg-white/5"
             onWheel={(e) => {
               // Ctrl/Cmd + wheel to zoom (avoid hijacking normal scroll)
               if (!e.ctrlKey && !e.metaKey) return;
@@ -1011,8 +1011,8 @@ export default function WorkflowsEditorClient({
               <div
                 className={
                   toolsCollapsed
-                    ? "absolute left-3 top-3 z-20 w-[44px] overflow-hidden rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/40 p-2 backdrop-blur"
-                    : "absolute left-3 top-3 z-20 w-[260px] rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/40 p-2 backdrop-blur"
+                    ? "absolute left-3 top-3 z-20 w-[44px] overflow-hidden rounded-lg border border-white/10 bg-black/40 p-2 backdrop-blur"
+                    : "absolute left-3 top-3 z-20 w-[260px] rounded-lg border border-white/10 bg-black/40 p-2 backdrop-blur"
                 }
               >
                 <div className="flex items-center justify-between gap-2">
@@ -1022,7 +1022,7 @@ export default function WorkflowsEditorClient({
                       <button
                         type="button"
                         onClick={() => setZoom((z) => Math.max(ZOOM_MIN, Math.round((z - ZOOM_STEP) * 10) / 10))}
-                        className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-[color:var(--ck-text-secondary)] hover:bg-white/10"
+                        className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-[color:var(--ck-text-secondary)] hover:bg-white/10"
                         title="Zoom out (Ctrl/Cmd+wheel)"
                       >
                         -
@@ -1031,7 +1031,7 @@ export default function WorkflowsEditorClient({
                       <button
                         type="button"
                         onClick={() => setZoom((z) => Math.min(ZOOM_MAX, Math.round((z + ZOOM_STEP) * 10) / 10))}
-                        className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-[color:var(--ck-text-secondary)] hover:bg-white/10"
+                        className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-[color:var(--ck-text-secondary)] hover:bg-white/10"
                         title="Zoom in (Ctrl/Cmd+wheel)"
                       >
                         +
@@ -1041,7 +1041,7 @@ export default function WorkflowsEditorClient({
                     <button
                       type="button"
                       onClick={() => setToolsCollapsed((v) => !v)}
-                      className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-[color:var(--ck-text-secondary)] hover:bg-white/10"
+                      className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-[color:var(--ck-text-secondary)] hover:bg-white/10"
                       title={toolsCollapsed ? "Expand" : "Collapse"}
                     >
                       {toolsCollapsed ? ">" : "<"}
@@ -1225,8 +1225,8 @@ export default function WorkflowsEditorClient({
                         onClick={b.onClick}
                         className={
                           b.active
-                            ? "flex h-8 w-8 items-center justify-center rounded-[var(--ck-radius-sm)] bg-white/10 text-[color:var(--ck-text-primary)]"
-                            : "flex h-8 w-8 items-center justify-center rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 text-[color:var(--ck-text-secondary)] hover:bg-white/10"
+                            ? "flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-[color:var(--ck-text-primary)]"
+                            : "flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-[color:var(--ck-text-secondary)] hover:bg-white/10"
                         }
                         title={b.label}
                         aria-label={b.label}
@@ -1245,8 +1245,8 @@ export default function WorkflowsEditorClient({
                       }}
                       className={
                         activeTool.kind === "select"
-                          ? "rounded-[var(--ck-radius-sm)] bg-white/10 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
-                          : "rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-secondary)] hover:bg-white/10"
+                          ? "rounded-lg bg-white/10 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                          : "rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-secondary)] hover:bg-white/10"
                       }
                     >
                       Select
@@ -1259,8 +1259,8 @@ export default function WorkflowsEditorClient({
                       }}
                       className={
                         activeTool.kind === "connect"
-                          ? "rounded-[var(--ck-radius-sm)] bg-white/10 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
-                          : "rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-secondary)] hover:bg-white/10"
+                          ? "rounded-lg bg-white/10 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                          : "rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-secondary)] hover:bg-white/10"
                       }
                       title="Click a node, then click another node to create an edge"
                     >
@@ -1287,8 +1287,8 @@ export default function WorkflowsEditorClient({
                         }}
                         className={
                           activeTool.kind === "add-node" && activeTool.nodeType === x.t
-                            ? "rounded-[var(--ck-radius-sm)] bg-white/10 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
-                            : "rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-secondary)] hover:bg-white/10"
+                            ? "rounded-lg bg-white/10 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                            : "rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-secondary)] hover:bg-white/10"
                         }
                         title="Select tool, then click on the canvas to place"
                       >
@@ -1315,7 +1315,7 @@ export default function WorkflowsEditorClient({
                     <button
                       type="button"
                       onClick={() => setToolsCollapsed(false)}
-                      className="mt-2 flex h-8 w-8 items-center justify-center rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 text-[color:var(--ck-text-secondary)] hover:bg-white/10"
+                      className="mt-2 flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-[color:var(--ck-text-secondary)] hover:bg-white/10"
                       title="Expand to see agents"
                       aria-label="Expand to see agents"
                     >
@@ -1337,7 +1337,7 @@ export default function WorkflowsEditorClient({
                                 e.dataTransfer.setData("text/plain", a.id);
                                 e.dataTransfer.effectAllowed = "copy";
                               }}
-                              className="cursor-grab rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-secondary)] hover:bg-white/10"
+                              className="cursor-grab rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-secondary)] hover:bg-white/10"
                               title={a.id}
                             >
                               {a.identityName ? a.identityName : a.id.replace(`${teamId}-`, "")}
@@ -1490,8 +1490,8 @@ export default function WorkflowsEditorClient({
                     }}
                     className={
                       selected
-                        ? "absolute z-10 cursor-grab rounded-[var(--ck-radius-sm)] border border-white/25 bg-white/10 px-3 py-2 text-xs text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)]"
-                        : "absolute z-10 cursor-grab rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-xs text-[color:var(--ck-text-secondary)] hover:bg-white/10"
+                        ? "absolute z-10 cursor-grab rounded-lg border border-white/25 bg-white/10 px-3 py-2 text-xs text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)]"
+                        : "absolute z-10 cursor-grab rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-[color:var(--ck-text-secondary)] hover:bg-white/10"
                     }
                     style={{ left: x, top: y, width: 180 }}
                   >
@@ -1567,7 +1567,7 @@ export default function WorkflowsEditorClient({
 
                 return (
                   <div
-                    className="absolute z-10 w-[320px] rounded-[var(--ck-radius-sm)] border border-white/15 bg-black/60 p-3 shadow-[var(--ck-shadow-1)] backdrop-blur"
+                    className="absolute z-10 w-[320px] rounded-lg border border-white/15 bg-black/60 p-3 shadow-[var(--ck-shadow-1)] backdrop-blur"
                     style={{ left: x + 200, top: y }}
                   >
                     <div className="flex items-center justify-between gap-2">
@@ -1590,7 +1590,7 @@ export default function WorkflowsEditorClient({
                             const nextName = e.target.value;
                             setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, name: nextName } : n)) });
                           }}
-                          className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                          className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                           placeholder="Optional"
                         />
                       </label>
@@ -1603,7 +1603,7 @@ export default function WorkflowsEditorClient({
                             const nextType = e.target.value as WorkflowFileV1["nodes"][number]["type"];
                             setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, type: nextType } : n)) });
                           }}
-                          className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                          className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                         >
                           <option value="start">start</option>
                           <option value="end">end</option>
@@ -1628,7 +1628,7 @@ export default function WorkflowsEditorClient({
                             if (!nextAgentId) delete (nextCfg as Record<string, unknown>).agentId;
                             setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
                           }}
-                          className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                          className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                           placeholder="(drag an agent onto the node or type)"
                         />
                       </label>
@@ -1644,7 +1644,7 @@ export default function WorkflowsEditorClient({
                               if (!nextModel) delete (nextCfg as Record<string, unknown>).model;
                               setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
                             }}
-                            className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                            className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                           >
                             <option value="">Default (inherit global)</option>
                             {availableModels.map((m) => (
@@ -1658,7 +1658,7 @@ export default function WorkflowsEditorClient({
                       ) : null}
 
                       {node.type === "human_approval" ? (
-                        <div className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-2">
+                        <div className="rounded-lg border border-white/10 bg-white/5 p-2">
                           <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">approval config</div>
 
                           <div className="mt-2 space-y-2">
@@ -1672,7 +1672,7 @@ export default function WorkflowsEditorClient({
                                   if (!v) delete (nextCfg as Record<string, unknown>).provider;
                                   setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
                                 }}
-                                className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                                className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                                 placeholder="telegram"
                               />
                             </label>
@@ -1687,7 +1687,7 @@ export default function WorkflowsEditorClient({
                                   if (!v) delete (nextCfg as Record<string, unknown>).target;
                                   setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
                                 }}
-                                className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                                className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                                 placeholder="(e.g. Telegram chat id)"
                               />
                               <div className="mt-1 text-[10px] text-[color:var(--ck-text-tertiary)]">Overrides workflow-level default when set.</div>
@@ -1704,7 +1704,7 @@ export default function WorkflowsEditorClient({
                                   if (!nextValue.trim()) delete (nextCfg as Record<string, unknown>).messageTemplate;
                                   setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
                                 }}
-                                className="mt-1 h-[70px] w-full resize-none rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-2 pr-12 font-mono text-[10px] text-[color:var(--ck-text-primary)]"
+                                className="mt-1 h-[70px] w-full resize-none rounded-lg border border-white/10 bg-white/5 p-2 pr-12 font-mono text-[10px] text-[color:var(--ck-text-primary)]"
                                 placeholder="Approval needed for {{workflowName}} (run {{runId}})"
                                 spellCheck={false}
                               />
@@ -1717,7 +1717,7 @@ export default function WorkflowsEditorClient({
                       ) : null}
 
                       {isMediaNode(node.type) ? (
-                        <div className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-2">
+                        <div className="rounded-lg border border-white/10 bg-white/5 p-2">
                           <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">Media Generation</div>
                           <div className="mt-2">
                             <MediaGenerationConfigComponent
@@ -1758,7 +1758,7 @@ export default function WorkflowsEditorClient({
                                 const nextCfg = { ...cfg, promptTemplate: nextValue };
                                 setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
                               }}
-                              className="mt-1 min-h-[200px] w-full resize-y rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 p-2 pr-12 font-mono text-xs text-[color:var(--ck-text-primary)]"
+                              className="mt-1 min-h-[200px] w-full resize-y rounded-lg border border-white/10 bg-black/30 p-2 pr-12 font-mono text-xs text-[color:var(--ck-text-primary)]"
                               placeholder="What should this node do? Use {{nodeId.output}} to reference upstream node outputs."
                               spellCheck={false}
                             />
@@ -1782,7 +1782,7 @@ export default function WorkflowsEditorClient({
                                           const nextCfg = { ...cfg, outputFields: newOutputFields };
                                           setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
                                         }}
-                                        className="flex-1 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                                        className="flex-1 rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                                         placeholder="Field name"
                                       />
                                       <select
@@ -1794,7 +1794,7 @@ export default function WorkflowsEditorClient({
                                           const nextCfg = { ...cfg, outputFields: newOutputFields };
                                           setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
                                         }}
-                                        className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                                        className="rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                                       >
                                         <option value="text">text</option>
                                         <option value="list">list</option>
@@ -1850,7 +1850,7 @@ export default function WorkflowsEditorClient({
                                 }
                                 setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
                               }}
-                              className="mt-1 w-24 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                              className="mt-1 w-24 rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                               placeholder="120"
                               min="1"
                             />
@@ -1898,12 +1898,12 @@ export default function WorkflowsEditorClient({
                         }
 
                         return (
-                          <div className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-2 space-y-2">
+                          <div className="rounded-lg border border-white/10 bg-white/5 p-2 space-y-2">
                             <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">handoff config</div>
 
                             <label className="block">
                               <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">mode</div>
-                              <select value={handoffModeInsp} onChange={(e) => updateCfgInsp({ mode: e.target.value === 'fire-and-forget' ? undefined : e.target.value })} className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]">
+                              <select value={handoffModeInsp} onChange={(e) => updateCfgInsp({ mode: e.target.value === 'fire-and-forget' ? undefined : e.target.value })} className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]">
                                 <option value="fire-and-forget">Fire &amp; Forget</option>
                                 <option value="wait-for-completion">Wait for Completion</option>
                               </select>
@@ -1911,7 +1911,7 @@ export default function WorkflowsEditorClient({
 
                             <label className="block">
                               <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">target team</div>
-                              <select value={targetTeamIdInsp} onChange={(e) => { updateCfgInsp({ targetTeamId: e.target.value || undefined, targetWorkflowId: undefined }); }} className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]">
+                              <select value={targetTeamIdInsp} onChange={(e) => { updateCfgInsp({ targetTeamId: e.target.value || undefined, targetWorkflowId: undefined }); }} className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]">
                                 <option value="">— Select —</option>
                                 {handoffTeams.map((t) => <option key={t} value={t}>{t}{t === teamId ? ' (current)' : ''}</option>)}
                               </select>
@@ -1920,7 +1920,7 @@ export default function WorkflowsEditorClient({
                             {targetTeamIdInsp ? (
                               <label className="block">
                                 <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">target workflow</div>
-                                <select value={targetWorkflowIdInsp} onChange={(e) => updateCfgInsp({ targetWorkflowId: e.target.value || undefined })} className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]">
+                                <select value={targetWorkflowIdInsp} onChange={(e) => updateCfgInsp({ targetWorkflowId: e.target.value || undefined })} className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]">
                                   <option value="">— Select —</option>
                                   {targetWfsInsp.map((w) => <option key={w.id} value={w.id}>{w.name || w.id}</option>)}
                                 </select>
@@ -1934,7 +1934,7 @@ export default function WorkflowsEditorClient({
                                   {igOptsInsp.map((opt) => {
                                     const checked = currentIdsInsp.includes(opt.integrationId);
                                     return (
-                                      <label key={opt.integrationId} className="flex items-center gap-2 cursor-pointer rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 hover:bg-white/10">
+                                      <label key={opt.integrationId} className="flex items-center gap-2 cursor-pointer rounded-lg border border-white/10 bg-white/5 px-2 py-1 hover:bg-white/10">
                                         <input type="checkbox" checked={checked} onChange={() => {
                                           const next = checked ? currentIdsInsp.filter((id: string) => id !== opt.integrationId) : [...currentIdsInsp, opt.integrationId];
                                           const nextVm = { ...variableMappingInsp }; delete nextVm.integrationId;
@@ -1979,7 +1979,7 @@ export default function WorkflowsEditorClient({
                                   // ignore invalid JSON while typing
                                 }
                               }}
-                              className="mt-1 h-[140px] w-full resize-none rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 p-2 font-mono text-[10px] text-[color:var(--ck-text-primary)]"
+                              className="mt-1 h-[140px] w-full resize-none rounded-lg border border-white/10 bg-black/30 p-2 font-mono text-[10px] text-[color:var(--ck-text-primary)]"
                               spellCheck={false}
                             />
                             <div className="mt-1 text-[10px] text-[color:var(--ck-text-tertiary)]">(Edits apply when JSON is valid.)</div>
@@ -2022,7 +2022,7 @@ export default function WorkflowsEditorClient({
 
               return (
                 <div className="space-y-3">
-                  <details open className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/15">
+                  <details open className="rounded-lg border border-white/10 bg-white/5">
                     <summary className="cursor-pointer list-none px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)]">Workflow</summary>
                     <div className="px-3 pb-3">
                       <label className="block">
@@ -2033,14 +2033,14 @@ export default function WorkflowsEditorClient({
                             const nextTz = String(e.target.value || "").trim() || "UTC";
                             setWorkflow({ ...wf, timezone: nextTz });
                           }}
-                          className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-sm text-[color:var(--ck-text-primary)]"
+                          className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-sm text-[color:var(--ck-text-primary)]"
                           placeholder="America/New_York"
                         />
                       </label>
                     </div>
                   </details>
 
-                  <details open className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/15">
+                  <details open className="rounded-lg border border-white/10 bg-white/5">
                     <summary className="cursor-pointer list-none px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)]">Approval Channel</summary>
                     <div className="px-3 pb-3 space-y-2">
                       <label className="block">
@@ -2098,7 +2098,7 @@ export default function WorkflowsEditorClient({
                               });
                             }
                           }}
-                          className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                          className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                         >
                           <option value="">(manual)</option>
                           {approvalBindings.map((b) => (
@@ -2121,7 +2121,7 @@ export default function WorkflowsEditorClient({
                         </div>
                       </label>
 
-                      <details className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/10">
+                      <details className="rounded-lg border border-white/10 bg-black/10">
                         <summary className="cursor-pointer list-none px-2 py-1 text-[11px] font-medium text-[color:var(--ck-text-secondary)]">Advanced: manual override</summary>
                         <div className="px-2 pb-2 pt-1 space-y-2">
                           <label className="block">
@@ -2149,7 +2149,7 @@ export default function WorkflowsEditorClient({
                                   ),
                                 });
                               }}
-                              className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                              className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                               placeholder="telegram"
                             />
                           </label>
@@ -2179,7 +2179,7 @@ export default function WorkflowsEditorClient({
                                   ),
                                 });
                               }}
-                              className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                              className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                               placeholder="(e.g. Telegram chat id)"
                             />
                           </label>
@@ -2188,7 +2188,7 @@ export default function WorkflowsEditorClient({
                     </div>
                   </details>
 
-                  <details open className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/15">
+                  <details open className="rounded-lg border border-white/10 bg-white/5">
                     <summary className="cursor-pointer list-none px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)]">Node inspector</summary>
                     <div className="px-3 pb-3">
                       <div className="flex items-center justify-between gap-2">
@@ -2202,7 +2202,7 @@ export default function WorkflowsEditorClient({
                             setWorkflow({ ...wf, nodes: nextNodes, edges: nextEdges });
                             setSelectedNodeId("");
                           }}
-                          className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-medium text-red-100 hover:bg-white/10"
+                          className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-medium text-red-100 hover:bg-white/10"
                         >
                           Delete node
                         </button>
@@ -2218,7 +2218,7 @@ export default function WorkflowsEditorClient({
                           <div className="mt-3 space-y-3">
                             <div>
                               <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">id</div>
-                              <div className="mt-1 rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]">
+                              <div className="mt-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]">
                                 {node.id}
                               </div>
                             </div>
@@ -2231,7 +2231,7 @@ export default function WorkflowsEditorClient({
                                   const nextName = e.target.value;
                                   setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, name: nextName } : n)) });
                                 }}
-                                className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                                className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                                 placeholder="Optional"
                               />
                             </label>
@@ -2244,7 +2244,7 @@ export default function WorkflowsEditorClient({
                                   const nextType = e.target.value as WorkflowFileV1["nodes"][number]["type"];
                                   setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, type: nextType } : n)) });
                                 }}
-                                className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                                className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                               >
                                 <option value="start">start</option>
                                 <option value="end">end</option>
@@ -2269,7 +2269,7 @@ export default function WorkflowsEditorClient({
                                     const nextX = Number(e.target.value);
                                     setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, x: nextX } : n)) });
                                   }}
-                                  className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                                  className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                                 />
                               </label>
                               <label className="block">
@@ -2281,7 +2281,7 @@ export default function WorkflowsEditorClient({
                                     const nextY = Number(e.target.value);
                                     setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, y: nextY } : n)) });
                                   }}
-                                  className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                                  className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                                 />
                               </label>
                             </div>
@@ -2299,7 +2299,7 @@ export default function WorkflowsEditorClient({
                                       const nextCfg = { ...(node.config as Record<string, unknown>), promptTemplate: nextValue };
                                       setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
                                     }}
-                                    className="mt-1 min-h-[150px] w-full resize-y rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-2 pr-12 font-mono text-xs text-[color:var(--ck-text-primary)]"
+                                    className="mt-1 min-h-[150px] w-full resize-y rounded-lg border border-white/10 bg-white/5 p-2 pr-12 font-mono text-xs text-[color:var(--ck-text-primary)]"
                                     placeholder="What should this node do? Use {{nodeId.output}} to reference upstream node outputs."
                                     spellCheck={false}
                                   />
@@ -2315,7 +2315,7 @@ export default function WorkflowsEditorClient({
                                       if (!nextModel) delete nextCfg.model;
                                       setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
                                     }}
-                                    className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                                    className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                                   >
                                     <option value="">Default (inherit global)</option>
                                     {availableModels.map((m) => (
@@ -2342,7 +2342,7 @@ export default function WorkflowsEditorClient({
                                       }
                                       setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
                                     }}
-                                    className="mt-1 w-24 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                                    className="mt-1 w-24 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                                     placeholder="120"
                                     min="1"
                                   />
@@ -2393,7 +2393,7 @@ export default function WorkflowsEditorClient({
                                       if (!v) delete nextCfg.provider;
                                       setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
                                     }}
-                                    className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                                    className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                                     placeholder="telegram"
                                   />
                                 </label>
@@ -2408,7 +2408,7 @@ export default function WorkflowsEditorClient({
                                       if (!v) delete nextCfg.target;
                                       setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
                                     }}
-                                    className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                                    className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                                     placeholder="(e.g. Telegram chat id)"
                                   />
                                   <div className="mt-1 text-[10px] text-[color:var(--ck-text-tertiary)]">Overrides workflow-level default when set.</div>
@@ -2425,7 +2425,7 @@ export default function WorkflowsEditorClient({
                                       if (!nextValue.trim()) delete nextCfg.messageTemplate;
                                       setWorkflow({ ...wf, nodes: wf.nodes.map((n) => (n.id === node.id ? { ...n, config: nextCfg } : n)) });
                                     }}
-                                    className="mt-1 h-[70px] w-full resize-none rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-2 pr-12 font-mono text-[10px] text-[color:var(--ck-text-primary)]"
+                                    className="mt-1 h-[70px] w-full resize-none rounded-lg border border-white/10 bg-white/5 p-2 pr-12 font-mono text-[10px] text-[color:var(--ck-text-primary)]"
                                     placeholder="Approval needed for {{workflowName}} (run {{runId}})"
                                     spellCheck={false}
                                   />
@@ -2538,7 +2538,7 @@ export default function WorkflowsEditorClient({
                                         const m = e.target.value;
                                         updateCfg({ mode: m === 'fire-and-forget' ? undefined : m });
                                       }}
-                                      className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                                      className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                                     >
                                       <option value="fire-and-forget">Fire &amp; Forget</option>
                                       <option value="wait-for-completion">Wait for Completion</option>
@@ -2556,7 +2556,7 @@ export default function WorkflowsEditorClient({
                                           const secs = Math.max(30, parseInt(e.target.value, 10) || 300);
                                           updateCfg({ waitTimeoutMs: secs * 1000 });
                                         }}
-                                        className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                                        className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                                       />
                                       <div className="mt-0.5 text-[9px] text-[color:var(--ck-text-tertiary)]">
                                         Workflow will wait up to this long for the target to complete.
@@ -2573,7 +2573,7 @@ export default function WorkflowsEditorClient({
                                         updateCfg({ targetTeamId: tid || undefined, targetWorkflowId: undefined });
                                         if (tid && !handoffWorkflows[tid]) loadWorkflows(tid);
                                       }}
-                                      className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                                      className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                                     >
                                       <option value="">— Select team —</option>
                                       {handoffTeams.map((t) => (
@@ -2588,7 +2588,7 @@ export default function WorkflowsEditorClient({
                                       <select
                                         value={targetWorkflowId}
                                         onChange={(e) => updateCfg({ targetWorkflowId: e.target.value || undefined })}
-                                        className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                                        className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                                       >
                                         <option value="">— Select workflow —</option>
                                         {targetWfs.map((w) => (
@@ -2608,7 +2608,7 @@ export default function WorkflowsEditorClient({
                                         <button
                                           type="button"
                                           onClick={() => { setHandoffIgAccounts((prev) => { const next = { ...prev }; delete next[kitchenTeamId]; return next; }); loadInstagramAccounts(kitchenTeamId); }}
-                                          className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
+                                          className="rounded-lg border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
                                         >
                                           Refresh
                                         </button>
@@ -2624,7 +2624,7 @@ export default function WorkflowsEditorClient({
                                           {igOptions.map((opt) => {
                                             const checked = currentIds.includes(opt.integrationId);
                                             return (
-                                              <label key={opt.integrationId} className="flex items-center gap-2 cursor-pointer rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 hover:bg-white/10">
+                                              <label key={opt.integrationId} className="flex items-center gap-2 cursor-pointer rounded-lg border border-white/10 bg-white/5 px-2 py-1 hover:bg-white/10">
                                                 <input
                                                   type="checkbox"
                                                   checked={checked}
@@ -2668,7 +2668,7 @@ export default function WorkflowsEditorClient({
                                           const key = `var_${Date.now()}`;
                                           updateCfg({ variableMapping: { ...variableMapping, [key]: "" } });
                                         }}
-                                        className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
+                                        className="rounded-lg border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
                                       >
                                         + Add
                                       </button>
@@ -2689,7 +2689,7 @@ export default function WorkflowsEditorClient({
                                                 newMapping[newKey] = value;
                                                 updateCfg({ variableMapping: newMapping });
                                               }}
-                                              className="w-1/3 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-1.5 py-0.5 text-[10px] text-[color:var(--ck-text-primary)]"
+                                              className="w-1/3 rounded-lg border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] text-[color:var(--ck-text-primary)]"
                                               placeholder="target_var"
                                             />
                                             <span className="text-[10px] text-[color:var(--ck-text-tertiary)]">→</span>
@@ -2699,7 +2699,7 @@ export default function WorkflowsEditorClient({
                                                 const newMapping = { ...variableMapping, [key]: e.target.value };
                                                 updateCfg({ variableMapping: newMapping });
                                               }}
-                                              className="flex-1 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-1.5 py-0.5 text-[10px] text-[color:var(--ck-text-primary)]"
+                                              className="flex-1 rounded-lg border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] text-[color:var(--ck-text-primary)]"
                                               placeholder="{{nodeId.output}}"
                                             />
                                             <button
@@ -2742,10 +2742,10 @@ export default function WorkflowsEditorClient({
                             </div>
 
                             {/* Raw config section for debugging */}
-                            <details className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/10">
+                            <details className="rounded-lg border border-white/10 bg-black/10">
                               <summary className="cursor-pointer list-none px-2 py-1 text-[10px] font-medium text-[color:var(--ck-text-secondary)]">Raw Config (debug)</summary>
                               <div className="p-2">
-                                <pre className="mt-1 max-h-[150px] overflow-auto rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-2 text-[9px] text-[color:var(--ck-text-tertiary)]">
+                                <pre className="mt-1 max-h-[150px] overflow-auto rounded-lg border border-white/10 bg-white/5 p-2 text-[9px] text-[color:var(--ck-text-tertiary)]">
                                   {JSON.stringify(node.config ?? {}, null, 2)}
                                 </pre>
                               </div>
@@ -2759,7 +2759,7 @@ export default function WorkflowsEditorClient({
                   </div>
                   </details>
 
-                  <details open className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/15">
+                  <details open className="rounded-lg border border-white/10 bg-white/5">
                     <summary className="cursor-pointer list-none px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)]">Triggers</summary>
                     <div className="px-3 pb-3">
                     <div className="flex items-center justify-between gap-2">
@@ -2776,7 +2776,7 @@ export default function WorkflowsEditorClient({
                             ],
                           });
                         }}
-                        className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
+                        className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
                       >
                         + Add
                       </button>
@@ -2784,7 +2784,7 @@ export default function WorkflowsEditorClient({
 
                     {/* Trigger sync status */}
                     {triggerSyncStatus !== "idle" && (
-                      <div className="mt-2 flex items-center gap-2 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1">
+                      <div className="mt-2 flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-2 py-1">
                         {triggerSyncStatus === "syncing" && (
                           <>
                             <div className="h-3 w-3 animate-spin rounded-full border border-blue-400 border-t-transparent"></div>
@@ -2820,7 +2820,7 @@ export default function WorkflowsEditorClient({
                           const cronLooksValid = !expr.trim() || cronFields.length === 5;
 
                           return (
-                            <div key={`${id}-${i}`} className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-2">
+                            <div key={`${id}-${i}`} className="rounded-lg border border-white/10 bg-white/5 p-2">
                               <div className="flex items-center justify-between gap-2">
                                 <div className="text-xs text-[color:var(--ck-text-primary)]">{name || id || `trigger-${i + 1}`}</div>
                                 <button
@@ -2863,7 +2863,7 @@ export default function WorkflowsEditorClient({
                                         triggers: triggers.map((x, idx) => (idx === i && x.kind === "cron" ? { ...x, name: nextName } : x)),
                                       });
                                     }}
-                                    className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                                    className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                                     placeholder="Content cadence"
                                   />
                                 </label>
@@ -2881,8 +2881,8 @@ export default function WorkflowsEditorClient({
                                     }}
                                     className={
                                       cronLooksValid
-                                        ? "mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 font-mono text-[11px] text-[color:var(--ck-text-primary)]"
-                                        : "mt-1 w-full rounded-[var(--ck-radius-sm)] border border-red-400/50 bg-black/25 px-2 py-1 font-mono text-[11px] text-[color:var(--ck-text-primary)]"
+                                        ? "mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 font-mono text-[11px] text-[color:var(--ck-text-primary)]"
+                                        : "mt-1 w-full rounded-lg border border-red-400/50 bg-white/5 px-2 py-1 font-mono text-[11px] text-[color:var(--ck-text-primary)]"
                                     }
                                     placeholder="0 9 * * 1,3,5"
                                   />
@@ -2901,7 +2901,7 @@ export default function WorkflowsEditorClient({
                                           triggers: triggers.map((x, idx) => (idx === i && x.kind === "cron" ? { ...x, expr: nextExpr } : x)),
                                         });
                                       }}
-                                      className="w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-[11px] text-[color:var(--ck-text-secondary)]"
+                                      className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-[color:var(--ck-text-secondary)]"
                                     >
                                       {presets.map((p) => (
                                         <option key={p.label} value={p.expr}>
@@ -2924,7 +2924,7 @@ export default function WorkflowsEditorClient({
                                         triggers: triggers.map((x, idx) => (idx === i && x.kind === "cron" ? { ...x, tz: nextTz } : x)),
                                       });
                                     }}
-                                    className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                                    className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                                     placeholder={tz}
                                   />
                                 </label>
@@ -2939,7 +2939,7 @@ export default function WorkflowsEditorClient({
                     </div>
                   </details>
 
-                  <details open className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/15">
+                  <details open className="rounded-lg border border-white/10 bg-white/5">
                     <summary className="cursor-pointer list-none px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)]">Runs</summary>
                     <div className="px-3 pb-3">
                     <div className="flex items-center justify-between gap-2">
@@ -2986,7 +2986,7 @@ export default function WorkflowsEditorClient({
                               setWorkflowRunsLoading(false);
                             }
                           }}
-                          className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10 disabled:opacity-50"
+                          className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10 disabled:opacity-50"
                         >
                           + Queue run
                         </button>
@@ -3065,7 +3065,7 @@ export default function WorkflowsEditorClient({
                               setWorkflowRunsLoading(false);
                             }
                           }}
-                          className="rounded-[var(--ck-radius-sm)] border border-emerald-400/30 bg-emerald-500/10 px-2 py-1 text-[10px] font-medium text-emerald-50 hover:bg-emerald-500/15 disabled:opacity-50"
+                          className="rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-2 py-1 text-[10px] font-medium text-emerald-50 hover:bg-emerald-500/15 disabled:opacity-50"
                           title="Enqueue a run for the workflow runner (Kitchen does not execute nodes)"
                         >
                           + Run now
@@ -3079,11 +3079,11 @@ export default function WorkflowsEditorClient({
                     </div>
 
                     {runPreflight.missingAgentOnNodeIds.length ? (
-                      <div className="mt-2 rounded-[var(--ck-radius-sm)] border border-red-400/30 bg-red-500/10 p-2 text-xs text-red-100">
+                      <div className="mt-2 rounded-lg border border-red-400/30 bg-red-500/10 p-2 text-xs text-red-100">
                         All nodes must be assigned to an agent. Missing agentId on: {runPreflight.missingAgentOnNodeIds.join(", ")}
                       </div>
                     ) : runPreflight.agentIdsMissingCron.length ? (
-                      <div className="mt-2 rounded-[var(--ck-radius-sm)] border border-amber-400/30 bg-amber-500/10 p-2 text-xs text-amber-50">
+                      <div className="mt-2 rounded-lg border border-amber-400/30 bg-amber-500/10 p-2 text-xs text-amber-50">
                         <div>Cron not set up for: {runPreflight.agentIdsMissingCron.join(", ")}</div>
                         <div className="mt-2 flex items-center gap-2">
                           <button
@@ -3092,14 +3092,14 @@ export default function WorkflowsEditorClient({
                               setInstallCronError("");
                               setInstallCronOpen(true);
                             }}
-                            className="rounded-[var(--ck-radius-sm)] border border-amber-300/30 bg-amber-500/10 px-2 py-1 text-[10px] font-medium text-amber-50 hover:bg-amber-500/15"
+                            className="rounded-lg border border-amber-300/30 bg-amber-500/10 px-2 py-1 text-[10px] font-medium text-amber-50 hover:bg-amber-500/15"
                           >
                             Install worker cron(s)
                           </button>
                           <button
                             type="button"
                             onClick={() => void refreshCronMap()}
-                            className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
+                            className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
                           >
                             Re-check
                           </button>
@@ -3140,7 +3140,7 @@ export default function WorkflowsEditorClient({
                     >
                       <div className="text-sm text-[color:var(--ck-text-secondary)]">
                         Kitchen will install (or enable) worker cron jobs for the following agents so this workflow can drain:
-                        <div className="mt-2 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-2 font-mono text-[11px] text-[color:var(--ck-text-primary)]">
+                        <div className="mt-2 rounded-lg border border-white/10 bg-white/5 p-2 font-mono text-[11px] text-[color:var(--ck-text-primary)]">
                           {runPreflight.agentIdsMissingCron.join(", ")}
                         </div>
                         <div className="mt-2 text-xs text-[color:var(--ck-text-tertiary)]">
@@ -3150,7 +3150,7 @@ export default function WorkflowsEditorClient({
                     </ConfirmationModal>
 
                     {workflowRunsError ? (
-                      <div className="mt-2 rounded-[var(--ck-radius-sm)] border border-red-400/30 bg-red-500/10 p-2 text-xs text-red-100">
+                      <div className="mt-2 rounded-lg border border-red-400/30 bg-red-500/10 p-2 text-xs text-red-100">
                         {workflowRunsError}
                       </div>
                     ) : null}
@@ -3174,8 +3174,8 @@ export default function WorkflowsEditorClient({
                               onClick={() => setSelectedWorkflowRunId(runId)}
                               className={
                                 selected
-                                  ? "block w-full rounded-[var(--ck-radius-sm)] bg-white/10 px-2 py-1 text-left text-[11px] font-mono text-[color:var(--ck-text-primary)]"
-                                  : "block w-full rounded-[var(--ck-radius-sm)] px-2 py-1 text-left text-[11px] font-mono text-[color:var(--ck-text-secondary)] hover:bg-white/5"
+                                  ? "block w-full rounded-lg bg-white/10 px-2 py-1 text-left text-[11px] font-mono text-[color:var(--ck-text-primary)]"
+                                  : "block w-full rounded-lg px-2 py-1 text-left text-[11px] font-mono text-[color:var(--ck-text-secondary)] hover:bg-white/5"
                               }
                               title="Open run detail"
                             >
@@ -3188,18 +3188,18 @@ export default function WorkflowsEditorClient({
                       )}
                     </div>
 
-                    <details open className="mt-3 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/10">
+                    <details open className="mt-3 rounded-lg border border-white/10 bg-black/10">
                       <summary className="cursor-pointer list-none px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)]">Nodes</summary>
                       <div className="px-3 pb-3">
 
-                      <div className="mt-2 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-2">
+                      <div className="mt-2 rounded-lg border border-white/10 bg-white/5 p-2">
                         <div className="grid grid-cols-1 gap-2">
                           <label className="block">
                             <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">id</div>
                             <input
                               value={newNodeId}
                               onChange={(e) => setNewNodeId(e.target.value)}
-                              className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                              className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                               placeholder="e.g. draft_assets"
                             />
                           </label>
@@ -3209,7 +3209,7 @@ export default function WorkflowsEditorClient({
                             <input
                               value={newNodeName}
                               onChange={(e) => setNewNodeName(e.target.value)}
-                              className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                              className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                               placeholder="Human-friendly label"
                             />
                           </label>
@@ -3219,7 +3219,7 @@ export default function WorkflowsEditorClient({
                             <select
                               value={newNodeType}
                               onChange={(e) => setNewNodeType(e.target.value as WorkflowFileV1["nodes"][number]["type"])}
-                              className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                              className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                             >
                               <option value="start">start</option>
                               <option value="end">end</option>
@@ -3256,7 +3256,7 @@ export default function WorkflowsEditorClient({
                               setNewNodeId("");
                               setNewNodeName("");
                             }}
-                            className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
+                            className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
                           >
                             + Add node
                           </button>
@@ -3273,8 +3273,8 @@ export default function WorkflowsEditorClient({
                               onClick={() => setSelectedNodeId(n.id)}
                               className={
                                 selected
-                                  ? "w-full rounded-[var(--ck-radius-sm)] bg-white/10 px-2 py-1 text-left text-[11px] text-[color:var(--ck-text-primary)]"
-                                  : "w-full rounded-[var(--ck-radius-sm)] px-2 py-1 text-left text-[11px] text-[color:var(--ck-text-secondary)] hover:bg-white/5"
+                                  ? "w-full rounded-lg bg-white/10 px-2 py-1 text-left text-[11px] text-[color:var(--ck-text-primary)]"
+                                  : "w-full rounded-lg px-2 py-1 text-left text-[11px] text-[color:var(--ck-text-secondary)] hover:bg-white/5"
                               }
                             >
                               <span className="font-mono">{n.id}</span>
@@ -3286,18 +3286,18 @@ export default function WorkflowsEditorClient({
                     </div>
                     </details>
 
-                    <details open className="mt-3 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/10">
+                    <details open className="mt-3 rounded-lg border border-white/10 bg-black/10">
                       <summary className="cursor-pointer list-none px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)]">Edges</summary>
                       <div className="px-3 pb-3">
 
-                      <div className="mt-2 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-2">
+                      <div className="mt-2 rounded-lg border border-white/10 bg-white/5 p-2">
                         <div className="grid grid-cols-1 gap-2">
                           <label className="block">
                             <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">from</div>
                             <select
                               value={newEdgeFrom}
                               onChange={(e) => setNewEdgeFrom(e.target.value)}
-                              className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                              className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                             >
                               <option value="">(select)</option>
                               {wf.nodes.map((n) => (
@@ -3313,7 +3313,7 @@ export default function WorkflowsEditorClient({
                             <select
                               value={newEdgeTo}
                               onChange={(e) => setNewEdgeTo(e.target.value)}
-                              className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                              className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                             >
                               <option value="">(select)</option>
                               {wf.nodes.map((n) => (
@@ -3329,7 +3329,7 @@ export default function WorkflowsEditorClient({
                             <input
                               value={newEdgeLabel}
                               onChange={(e) => setNewEdgeLabel(e.target.value)}
-                              className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                              className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                               placeholder="e.g. approve"
                             />
                           </label>
@@ -3351,7 +3351,7 @@ export default function WorkflowsEditorClient({
                               setWorkflow({ ...wf, edges: [...(wf.edges ?? []), nextEdge] });
                               setNewEdgeLabel("");
                             }}
-                            className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
+                            className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
                           >
                             + Add edge
                           </button>
@@ -3361,7 +3361,7 @@ export default function WorkflowsEditorClient({
                       <div className="mt-2 space-y-2">
                         {(wf.edges ?? []).length ? (
                           (wf.edges ?? []).map((e) => (
-                            <div key={e.id} className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-2">
+                            <div key={e.id} className="rounded-lg border border-white/10 bg-white/5 p-2">
                               <div className="flex items-center justify-between gap-2">
                                 <div className="text-[11px] text-[color:var(--ck-text-secondary)]">
                                   <span className="font-mono">{e.from}</span> → <span className="font-mono">{e.to}</span>

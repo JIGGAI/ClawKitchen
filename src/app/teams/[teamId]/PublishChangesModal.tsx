@@ -26,12 +26,12 @@ export function PublishChangesModal({
       confirmBusyLabel="Publishing…"
       busy={busy}
       onConfirm={onConfirm}
-      confirmButtonClassName="rounded-[var(--ck-radius-sm)] bg-emerald-600 px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] hover:bg-emerald-500 disabled:opacity-50"
+      confirmButtonClassName="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] hover:bg-emerald-500 disabled:opacity-50"
     >
       <p className="mt-2 text-sm text-[color:var(--ck-text-secondary)]">
         This will re-scaffold team <code className="font-mono">{teamId}</code> from recipe <code className="font-mono">{recipeId}</code>.
       </p>
-      <div className="mt-4 rounded-[var(--ck-radius-sm)] border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-100">
+      <div className="mt-4 rounded-lg border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-100">
         <div className="font-medium">Complete overwrite</div>
         <div className="mt-1">
           All existing team workspace files managed by the recipe will be overwritten (for example: <code className="font-mono">AGENTS.md</code>,{" "}

@@ -35,7 +35,7 @@ export default async function TeamDeliverablesPage({
           </div>
         </div>
         
-        <div className="rounded-[var(--ck-radius-lg)] border border-red-400/30 bg-red-500/10 p-4">
+        <div className="rounded-3xl border border-red-400/30 bg-red-500/10 p-4">
           <div className="text-red-50">Failed to load deliverables</div>
           <div className="mt-1 text-sm text-red-200">
             Error: {response.status} {response.statusText}
@@ -57,7 +57,7 @@ export default async function TeamDeliverablesPage({
           </div>
         </div>
         
-        <div className="rounded-[var(--ck-radius-lg)] border border-red-400/30 bg-red-500/10 p-4">
+        <div className="rounded-3xl border border-red-400/30 bg-red-500/10 p-4">
           <div className="text-red-50">Failed to load deliverables</div>
           <div className="mt-1 text-sm text-red-200">
             {(data as { error?: string }).error || "Unknown error"}

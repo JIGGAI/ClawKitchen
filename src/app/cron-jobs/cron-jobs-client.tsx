@@ -147,7 +147,7 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
   return (
     <>
       <div>
-        <div className="ck-glass-strong p-4">
+        <div className="ck-card p-4">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold">All Cron Jobs</h2>
@@ -159,7 +159,7 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
             <button
               type="button"
               onClick={() => setCreateOpen(true)}
-              className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--ck-accent-red-hover)] active:bg-[var(--ck-accent-red-active)]"
+              className="rounded-lg bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--ck-accent-red-hover)] active:bg-[var(--ck-accent-red-active)]"
             >
               Create Job
             </button>
@@ -167,7 +167,7 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
               type="button"
               onClick={refresh}
               disabled={loading}
-              className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15"
+              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15"
             >
               Refresh
             </button>
@@ -176,14 +176,14 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
       </div>
 
       {msg ? (
-        <div className="mt-4 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3 text-sm">
+        <div className="mt-4 rounded-lg border border-white/10 bg-white/5 p-3 text-sm">
           {msg}
         </div>
       ) : null}
 
       <div className="mt-6 space-y-3">
         {sorted.map((j) => (
-          <div key={j.id} className="ck-glass px-4 py-3">
+          <div key={j.id} className="ck-card px-4 py-3">
             <div
               role="button"
               tabIndex={0}
@@ -225,7 +225,7 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
                     type="button"
                     onClick={() => openEdit(j)}
                     disabled={loading}
-                    className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium transition-colors hover:bg-white/10"
+                    className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium transition-colors hover:bg-white/10"
                   >
                     Edit
                   </button>
@@ -233,7 +233,7 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
                     type="button"
                     onClick={() => act(j.id, isEnabled(j) ? "disable" : "enable")}
                     disabled={loading}
-                    className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium transition-colors hover:bg-white/10"
+                    className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium transition-colors hover:bg-white/10"
                   >
                     {isEnabled(j) ? "Disable" : "Enable"}
                   </button>
@@ -241,7 +241,7 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
                     type="button"
                     onClick={() => act(j.id, "run")}
                     disabled={loading}
-                    className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--ck-accent-red-hover)] active:bg-[var(--ck-accent-red-active)]"
+                    className="rounded-lg bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--ck-accent-red-hover)] active:bg-[var(--ck-accent-red-active)]"
                   >
                     Run now
                   </button>
@@ -250,7 +250,7 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
                     title={isEnabled(j) ? "Disable this job before deleting." : "Delete cron job"}
                     onClick={() => openDelete(j)}
                     disabled={loading || isEnabled(j)}
-                    className="rounded-[var(--ck-radius-sm)] border border-[color:rgba(255,59,48,0.45)] bg-[color:rgba(255,59,48,0.08)] px-3 py-2 text-sm font-medium text-[color:var(--ck-accent-red)] transition-colors hover:bg-[color:rgba(255,59,48,0.12)] disabled:opacity-40"
+                    className="rounded-lg border border-[color:rgba(255,59,48,0.45)] bg-[color:rgba(255,59,48,0.08)] px-3 py-2 text-sm font-medium text-[color:var(--ck-accent-red)] transition-colors hover:bg-[color:rgba(255,59,48,0.12)] disabled:opacity-40"
                   >
                     Delete
                   </button>
@@ -259,7 +259,7 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
             </div>
 
             {expandedId === j.id ? (
-              <pre className="mt-3 overflow-x-auto rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-3 text-xs text-[color:var(--ck-text-primary)]">
+              <pre className="mt-3 overflow-x-auto rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-[color:var(--ck-text-primary)]">
                 {JSON.stringify(j, null, 2)}
               </pre>
             ) : null}

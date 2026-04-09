@@ -193,11 +193,11 @@ export default function WorkflowsClient({ teamId, llmTaskEnabled }: { teamId: st
   }, [selectedRun]);
 
   if (loading) {
-    return <div className="ck-glass p-4">Loading workflows…</div>;
+    return <div className="ck-card p-4">Loading workflows…</div>;
   }
 
   const llmHelp = llmTaskEnabled === false ? (
-    <div className="rounded-[var(--ck-radius-sm)] border border-amber-500/30 bg-amber-500/10 p-4 text-sm">
+    <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm">
       <div className="font-medium text-amber-200">LLM support is not enabled</div>
       <div className="mt-1 text-[color:var(--ck-text-secondary)]">
         Workflow LLM nodes require the optional built-in <code className="px-1">llm-task</code> plugin.
@@ -213,7 +213,7 @@ export default function WorkflowsClient({ teamId, llmTaskEnabled }: { teamId: st
   ) : null;
 
   return (
-    <div className="ck-glass p-6">
+    <div className="ck-card p-6">
       <div>
         <h2 className="text-lg font-semibold">Workflows (file-first)</h2>
         <p className="mt-1 text-sm text-[color:var(--ck-text-secondary)]">
@@ -229,7 +229,7 @@ export default function WorkflowsClient({ teamId, llmTaskEnabled }: { teamId: st
               const id = `new-${Date.now()}`;
               router.push(`/teams/${encodeURIComponent(teamId)}/workflows/${encodeURIComponent(id)}?draft=1`);
             }}
-            className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)]"
+            className="rounded-lg bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)]"
           >
             Add workflow
           </button>
@@ -238,7 +238,7 @@ export default function WorkflowsClient({ teamId, llmTaskEnabled }: { teamId: st
           <button
             type="button"
             onClick={() => void onAddTemplate("marketing-cadence-v1")}
-            className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
+            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
           >
             Add example template
           </button>
@@ -247,7 +247,7 @@ export default function WorkflowsClient({ teamId, llmTaskEnabled }: { teamId: st
             type="button"
             onClick={onRefresh}
             disabled={refreshing}
-            className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10 disabled:opacity-60"
+            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10 disabled:opacity-60"
           >
             {refreshing ? "Refreshing…" : "Refresh"}
           </button>
@@ -255,7 +255,7 @@ export default function WorkflowsClient({ teamId, llmTaskEnabled }: { teamId: st
       </div>
 
       {error ? (
-        <div className="mt-4 rounded-[var(--ck-radius-sm)] border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-100">
+        <div className="mt-4 rounded-lg border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-100">
           {error}
         </div>
       ) : null}
@@ -263,7 +263,7 @@ export default function WorkflowsClient({ teamId, llmTaskEnabled }: { teamId: st
       {workflows.length === 0 ? (
         <p className="mt-4 text-sm text-[color:var(--ck-text-secondary)]">No workflows yet.</p>
       ) : (
-        <ul className="mt-4 divide-y divide-white/10 overflow-hidden rounded-[var(--ck-radius-sm)] border border-white/10">
+        <ul className="mt-4 divide-y divide-white/10 overflow-hidden rounded-lg border border-white/10">
           {workflows.map((w) => {
             const expanded = expandedWorkflowId === w.id;
             const runs = runsByWorkflow[w.id] ?? [];
@@ -294,14 +294,14 @@ export default function WorkflowsClient({ teamId, llmTaskEnabled }: { teamId: st
                   <div className="flex shrink-0 items-center gap-2">
                     <Link
                       href={`/teams/${encodeURIComponent(teamId)}/workflows/${encodeURIComponent(w.id)}`}
-                      className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
+                      className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
                     >
                       Edit
                     </Link>
                     <button
                       type="button"
                       onClick={() => void onDelete(w.id)}
-                      className="rounded-[var(--ck-radius-sm)] border border-[color:rgba(255,59,48,0.45)] bg-[color:rgba(255,59,48,0.08)] px-3 py-1.5 text-sm font-medium text-[color:var(--ck-accent-red)] transition-colors hover:bg-[color:rgba(255,59,48,0.12)]"
+                      className="rounded-lg border border-[color:rgba(255,59,48,0.45)] bg-[color:rgba(255,59,48,0.08)] px-3 py-1.5 text-sm font-medium text-[color:var(--ck-accent-red)] transition-colors hover:bg-[color:rgba(255,59,48,0.12)]"
                     >
                       Delete
                     </button>
@@ -309,25 +309,25 @@ export default function WorkflowsClient({ teamId, llmTaskEnabled }: { teamId: st
                 </div>
 
                 {expanded ? (
-                  <div className="border-t border-white/10 bg-black/20 px-4 py-3">
+                  <div className="border-t border-white/10 bg-white/5 px-4 py-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="text-xs font-medium text-[color:var(--ck-text-secondary)]">Runs</div>
                       <button
                         type="button"
                         disabled={isLoadingRuns}
                         onClick={() => void loadRunsForWorkflow(w.id)}
-                        className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10 disabled:opacity-60"
+                        className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10 disabled:opacity-60"
                       >
                         {isLoadingRuns ? "Loading…" : "Refresh runs"}
                       </button>
                     </div>
 
                     {runError ? (
-                      <div className="mt-2 rounded-[var(--ck-radius-sm)] border border-red-400/30 bg-red-500/10 p-2 text-xs text-red-100">{runError}</div>
+                      <div className="mt-2 rounded-lg border border-red-400/30 bg-red-500/10 p-2 text-xs text-red-100">{runError}</div>
                     ) : null}
 
                     <div className="mt-2 grid grid-cols-1 gap-3 lg:grid-cols-2">
-                      <div className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-2">
+                      <div className="rounded-lg border border-white/10 bg-white/5 p-2">
                         {runs.length ? (
                           <div className="space-y-1">
                             {runs.slice(0, 8).map((runId) => {
@@ -339,8 +339,8 @@ export default function WorkflowsClient({ teamId, llmTaskEnabled }: { teamId: st
                                   onClick={() => void loadRunDetail(w.id, runId)}
                                   className={
                                     selected
-                                      ? "w-full rounded-[var(--ck-radius-sm)] bg-white/10 px-2 py-1 text-left text-[11px] text-[color:var(--ck-text-primary)]"
-                                      : "w-full rounded-[var(--ck-radius-sm)] px-2 py-1 text-left text-[11px] text-[color:var(--ck-text-secondary)] hover:bg-white/5"
+                                      ? "w-full rounded-lg bg-white/10 px-2 py-1 text-left text-[11px] text-[color:var(--ck-text-primary)]"
+                                      : "w-full rounded-lg px-2 py-1 text-left text-[11px] text-[color:var(--ck-text-secondary)] hover:bg-white/5"
                                   }
                                 >
                                   <span className="font-mono">{runId}</span>
@@ -353,7 +353,7 @@ export default function WorkflowsClient({ teamId, llmTaskEnabled }: { teamId: st
                         )}
                       </div>
 
-                      <div className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3">
+                      <div className="rounded-lg border border-white/10 bg-white/5 p-3">
                         {selectedRun ? (
                           <div className="space-y-3">
                             <div>
@@ -383,7 +383,7 @@ export default function WorkflowsClient({ teamId, llmTaskEnabled }: { teamId: st
 
                                 return (
                                   <div className="mt-2 space-y-2">
-                                    <div className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-2 text-[11px] text-[color:var(--ck-text-secondary)]">
+                                    <div className="rounded-lg border border-white/10 bg-white/5 p-2 text-[11px] text-[color:var(--ck-text-secondary)]">
                                       <div>
                                         <span className="font-mono">state</span>: <span className="font-mono text-[color:var(--ck-text-primary)]">{state || "(unknown)"}</span>
                                       </div>
@@ -406,7 +406,7 @@ export default function WorkflowsClient({ teamId, llmTaskEnabled }: { teamId: st
                                         <div className="mt-1 whitespace-pre-wrap text-xs text-[color:var(--ck-text-primary)]">{note}</div>
                                       ) : null}
                                       {outbound ? (
-                                        <div className="mt-2 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 p-2 text-[10px]">
+                                        <div className="mt-2 rounded-lg border border-white/10 bg-black/30 p-2 text-[10px]">
                                           <div className="text-[color:var(--ck-text-tertiary)]">Outbound</div>
                                           <pre className="mt-1 overflow-auto whitespace-pre-wrap">{JSON.stringify(outbound, null, 2)}</pre>
                                         </div>
@@ -414,13 +414,13 @@ export default function WorkflowsClient({ teamId, llmTaskEnabled }: { teamId: st
                                     </div>
 
                                     {canAct ? (
-                                      <div className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-2">
+                                      <div className="rounded-lg border border-white/10 bg-white/5 p-2">
                                         <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">approval note (optional)</div>
                                         <textarea
                                           value={approvalNote}
                                           onChange={(e) => setApprovalNote(e.target.value)}
                                           rows={3}
-                                          className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                                          className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                                           placeholder="e.g. Ship it / please tweak hook"
                                         />
                                         <div className="mt-2 flex flex-wrap gap-2">
@@ -460,7 +460,7 @@ export default function WorkflowsClient({ teamId, llmTaskEnabled }: { teamId: st
                                                   setApprovalBusy(false);
                                                 }
                                               }}
-                                              className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10 disabled:opacity-60"
+                                              className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10 disabled:opacity-60"
                                             >
                                               {btn.label}
                                             </button>
@@ -478,13 +478,13 @@ export default function WorkflowsClient({ teamId, llmTaskEnabled }: { teamId: st
                               {memoryUsedItems.length ? (
                                 <div className="mt-2 space-y-2">
                                   {memoryUsedItems.slice(0, 20).map((m, idx) => (
-                                    <div key={`${m.ts}-${idx}`} className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-2">
+                                    <div key={`${m.ts}-${idx}`} className="rounded-lg border border-white/10 bg-white/5 p-2">
                                       <div className="text-[10px] text-[color:var(--ck-text-tertiary)]">
                                         <span className="font-mono">{m.ts}</span> • <span className="font-mono">{m.type}</span> • <span className="font-mono">{m.author}</span>
                                       </div>
                                       <div className="mt-1 whitespace-pre-wrap text-xs text-[color:var(--ck-text-primary)]">{m.content}</div>
                                       {m.source !== undefined ? (
-                                        <pre className="mt-2 overflow-auto rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 p-2 text-[10px] text-[color:var(--ck-text-secondary)]">
+                                        <pre className="mt-2 overflow-auto rounded-lg border border-white/10 bg-black/30 p-2 text-[10px] text-[color:var(--ck-text-secondary)]">
                                           {JSON.stringify(m.source, null, 2)}
                                         </pre>
                                       ) : null}

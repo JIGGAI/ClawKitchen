@@ -81,7 +81,7 @@ export function DeliverablesTab({ teamId }: { teamId: string }) {
 
   if (loading) {
     return (
-      <div className="rounded-[var(--ck-radius-lg)] border border-white/10 bg-black/10 p-6">
+      <div className="rounded-3xl border border-white/10 bg-black/10 p-6">
         <div className="flex items-center justify-center py-8">
           <div className="text-[color:var(--ck-text-secondary)]">Loading deliverables...</div>
         </div>
@@ -91,7 +91,7 @@ export function DeliverablesTab({ teamId }: { teamId: string }) {
 
   if (error) {
     return (
-      <div className="rounded-[var(--ck-radius-lg)] border border-red-400/30 bg-red-500/10 p-6">
+      <div className="rounded-3xl border border-red-400/30 bg-red-500/10 p-6">
         <div className="text-red-50">Failed to load deliverables</div>
         <div className="mt-2 text-sm text-red-200">{error}</div>
       </div>

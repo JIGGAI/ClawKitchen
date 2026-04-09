@@ -312,11 +312,11 @@ export default function AgentEditor({ agentId, returnTo }: { agentId: string; re
   }
 
   // Initial load only gates the minimal state (agent exists). Files/skills stream in.
-  if (loading) return <div className="ck-glass mx-auto max-w-4xl p-6">Loading…</div>;
-  if (!agent) return <div className="ck-glass mx-auto max-w-4xl p-6">Agent not found: {agentId}</div>;
+  if (loading) return <div className="ck-card mx-auto max-w-4xl p-6">Loading…</div>;
+  if (!agent) return <div className="ck-card mx-auto max-w-4xl p-6">Agent not found: {agentId}</div>;
 
   return (
-    <div className="ck-glass mx-auto max-w-4xl p-6 sm:p-8">
+    <div className="ck-card mx-auto max-w-4xl p-6 sm:p-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Agent editor</h1>
@@ -333,7 +333,7 @@ export default function AgentEditor({ agentId, returnTo }: { agentId: string; re
             setDeleteError(null);
             setDeleteOpen(true);
           }}
-          className="rounded-[var(--ck-radius-sm)] border border-[color:rgba(255,59,48,0.45)] bg-[color:rgba(255,59,48,0.08)] px-3 py-2 text-sm font-medium text-[color:var(--ck-accent-red)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-[color:rgba(255,59,48,0.12)] disabled:opacity-50"
+          className="rounded-lg border border-[color:rgba(255,59,48,0.45)] bg-[color:rgba(255,59,48,0.08)] px-3 py-2 text-sm font-medium text-[color:var(--ck-accent-red)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-[color:rgba(255,59,48,0.12)] disabled:opacity-50"
         >
           Delete agent
         </button>
@@ -344,7 +344,7 @@ export default function AgentEditor({ agentId, returnTo }: { agentId: string; re
       {teamId ? <div className="mt-1 text-xs text-[color:var(--ck-text-tertiary)]">Team: {teamId}</div> : null}
 
       {pageMsg ? (
-        <div className="mt-4 rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 p-3 text-sm text-[color:var(--ck-text-primary)]">
+        <div className="mt-4 rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-[color:var(--ck-text-primary)]">
           {pageMsg}
         </div>
       ) : null}
@@ -363,8 +363,8 @@ export default function AgentEditor({ agentId, returnTo }: { agentId: string; re
             onClick={() => setActiveTab(t.id)}
             className={
               activeTab === t.id
-                ? "rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)]"
-                : "rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] hover:bg-white/10"
+                ? "rounded-lg bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)]"
+                : "rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] hover:bg-white/10"
             }
           >
             {t.label}

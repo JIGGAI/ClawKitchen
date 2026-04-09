@@ -40,7 +40,7 @@ export function TeamAgentsTab(props: TeamAgentsTabProps) {
   } = props;
 
   return (
-    <div className="mt-6 ck-glass-strong p-4">
+    <div className="mt-6 ck-card p-4">
       <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Agents in this team</div>
       <p className="mt-2 text-sm text-[color:var(--ck-text-secondary)]">
         Add/remove agents by updating the <code>agents:</code> list in your custom team recipe (<code>{toId}</code>).
@@ -63,7 +63,7 @@ export function TeamAgentsTab(props: TeamAgentsTabProps) {
               const match = recipeAgents.find((a) => a.role === v);
               setNewRoleName(match?.name || "");
             }}
-            className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+            className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
           >
             <option value="">Select…</option>
             {recipeAgents.map((a) => (
@@ -79,7 +79,7 @@ export function TeamAgentsTab(props: TeamAgentsTabProps) {
               value={customRole}
               onChange={(e) => setCustomRole(e.target.value)}
               placeholder="role (e.g. researcher)"
-              className="mt-2 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+              className="mt-2 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
             />
           ) : null}
 
@@ -95,7 +95,7 @@ export function TeamAgentsTab(props: TeamAgentsTabProps) {
               value={newRoleName}
               onChange={(e) => setNewRoleName(e.target.value)}
               placeholder="Onchain Researcher"
-              className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+              className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
             />
           </div>
         </div>
@@ -105,7 +105,7 @@ export function TeamAgentsTab(props: TeamAgentsTabProps) {
         <button
           disabled={saving || !derivedRole}
           onClick={onAddAgent}
-          className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] disabled:opacity-50"
+          className="rounded-lg bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] disabled:opacity-50"
         >
           Add agent
         </button>

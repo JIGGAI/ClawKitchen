@@ -18,7 +18,7 @@ async function fetchGoals(): Promise<{ goals: GoalFrontmatter[]; error: string |
 
 function Badge({ children }: { children: React.ReactNode }) {
   return (
-    <span className="rounded-full bg-[color:var(--ck-bg-glass)] px-2 py-0.5 text-xs text-[color:var(--ck-text-secondary)]">
+    <span className="rounded-full bg-white/5 px-2 py-0.5 text-xs text-[color:var(--ck-text-secondary)]">
       {children}
     </span>
   );
@@ -89,7 +89,7 @@ export default function GoalsClient() {
       <Link
         key={g.id}
         href={`/goals/${encodeURIComponent(g.id)}`}
-        className="block ck-glass p-5 transition hover:bg-[color:var(--ck-bg-glass)]"
+        className="block ck-glass p-5 transition hover:bg-white/5"
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
@@ -129,17 +129,17 @@ export default function GoalsClient() {
         </div>
         <Link
           href="/goals/new"
-          className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white"
+          className="rounded-lg bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white"
         >
           Create goal
         </Link>
       </div>
 
-      <div className="ck-glass p-4">
+      <div className="ck-card p-4">
         <div className="flex flex-wrap items-center gap-3">
           <label className="text-sm text-[color:var(--ck-text-secondary)]">Status</label>
           <select
-            className="rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] bg-transparent px-2 py-1 text-sm"
+            className="rounded-lg border border-[color:var(--ck-border-subtle)] bg-transparent px-2 py-1 text-sm"
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
           >
@@ -159,14 +159,14 @@ export default function GoalsClient() {
       </div>
 
       {error ? (
-        <div className="ck-glass p-4 text-sm text-red-300">{error}</div>
+        <div className="ck-card p-4 text-sm text-red-300">{error}</div>
       ) : null}
 
       {goals == null && (
-        <div className="ck-glass p-6 text-sm text-[color:var(--ck-text-secondary)]">Loading…</div>
+        <div className="ck-card p-6 text-sm text-[color:var(--ck-text-secondary)]">Loading…</div>
       )}
       {goals != null && filtered.length === 0 && (
-        <div className="ck-glass p-6">
+        <div className="ck-card p-6">
           <div className="text-sm text-[color:var(--ck-text-secondary)]">No goals yet.</div>
           <div className="mt-3">
             <Link href="/goals/new" className="text-sm font-medium hover:underline">

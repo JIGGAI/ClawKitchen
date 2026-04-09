@@ -6,7 +6,7 @@ import type { RecipeListItem } from "@/lib/recipes";
 import { slugifyId } from "@/lib/slugify";
 
 function getIdInputClass(state: "empty" | "available" | "taken"): string {
-  const base = "mt-1 w-full rounded-[var(--ck-radius-sm)] border bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] ";
+  const base = "mt-1 w-full rounded-lg border bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] ";
   if (state === "available") return base + "border-emerald-400/50";
   if (state === "taken") return base + "border-red-400/60";
   return base + "border-white/10";
@@ -57,7 +57,7 @@ export function CloneTeamModal({
       <input
         value={name}
         onChange={(e) => setName(e.target.value)}
-        className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+        className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
       />
 
       <label className="mt-4 block text-xs font-medium text-[color:var(--ck-text-secondary)]">New team id</label>
@@ -75,7 +75,7 @@ export function CloneTeamModal({
       </div>
 
       {availability.state === "taken" ? (
-        <div className="mt-3 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3">
+        <div className="mt-3 rounded-lg border border-white/10 bg-white/5 p-3">
           <div className="text-xs font-medium text-[color:var(--ck-text-secondary)]">Try one of these ids</div>
           <div className="mt-2 flex flex-wrap gap-2">
             {[`custom-${effectiveId.trim()}`, `my-${effectiveId.trim()}`, `${effectiveId.trim()}-2`, `${effectiveId.trim()}-alt`]
@@ -88,7 +88,7 @@ export function CloneTeamModal({
                     setIdTouched(true);
                     setId(x);
                   }}
-                  className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
+                  className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
                 >
                   {x}
                 </button>
@@ -97,7 +97,7 @@ export function CloneTeamModal({
         </div>
       ) : null}
 
-      <label className="mt-5 flex items-start gap-2 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3 text-sm text-[color:var(--ck-text-secondary)]">
+      <label className="mt-5 flex items-start gap-2 rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-[color:var(--ck-text-secondary)]">
         <input
           type="checkbox"
           checked={scaffold}

@@ -82,7 +82,7 @@ export default function SettingsClient() {
       <Option value="on" title="On" help="Install/reconcile jobs during scaffold (enabledByDefault controls new jobs)." />
 
       {msg ? (
-        <div className="mt-2 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3 text-sm">
+        <div className="mt-2 rounded-lg border border-white/10 bg-white/5 p-3 text-sm">
           {msg}
         </div>
       ) : null}

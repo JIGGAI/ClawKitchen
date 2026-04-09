@@ -24,7 +24,7 @@ export default function GlobalError({
             An unexpected error occurred.
           </p>
 
-          <pre className="mt-6 overflow-auto rounded-md border border-[color:var(--ck-border-subtle)] bg-[color:var(--ck-bg-glass)] p-4 text-xs text-[color:var(--ck-text-secondary)]">
+          <pre className="mt-6 overflow-auto rounded-md border border-[color:var(--ck-border-subtle)] bg-white/5 p-4 text-xs text-[color:var(--ck-text-secondary)]">
             {String(error?.stack || error)}
           </pre>
 
@@ -38,7 +38,7 @@ export default function GlobalError({
             <button
               type="button"
               onClick={() => reset()}
-              className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-4 py-2 text-sm font-medium text-white"
+              className="rounded-lg bg-[var(--ck-accent-red)] px-4 py-2 text-sm font-medium text-white"
             >
               Try again
             </button>

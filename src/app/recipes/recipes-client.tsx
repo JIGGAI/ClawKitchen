@@ -60,7 +60,7 @@ function RecipesSection({
             return (
               <div
                 key={`${r.source}:${r.id}`}
-                className="ck-glass flex flex-col gap-3 px-4 py-3"
+                className="ck-card flex flex-col gap-3 px-4 py-3"
               >
                 <div>
                   <div className="font-medium text-[color:var(--ck-text-primary)] whitespace-normal break-words">
@@ -76,7 +76,7 @@ function RecipesSection({
                     <button
                       type="button"
                       onClick={() => onCreateTeam(r)}
-                      className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15"
+                      className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15"
                     >
                       Create team
                     </button>
@@ -86,14 +86,14 @@ function RecipesSection({
                     <button
                       type="button"
                       onClick={() => onCreateAgent(r)}
-                      className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15"
+                      className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15"
                     >
                       Create agent
                     </button>
                   ) : null}
 
                   <Link
-                    className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15"
+                    className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15"
                     href={editHref}
                   >
                     {editLabel}
@@ -103,7 +103,7 @@ function RecipesSection({
                     <button
                       type="button"
                       onClick={() => onDelete(r.id)}
-                      className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
+                      className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
                     >
                       Delete
                     </button>
@@ -526,7 +526,7 @@ export default function RecipesClient({
             <button
               type="button"
               onClick={onCreateCustomTeam}
-              className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15"
+              className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15"
             >
               Create custom team
             </button>
