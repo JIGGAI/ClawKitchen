@@ -76,7 +76,8 @@
   },
   "main": "openclaw/index.ts",
   "compat": {
-    "pluginApiRange": ">=2026.3"
+    "pluginApi": "2026.4",
+      "pluginApiRange": ">=2026.3"
   },
   "build": {
     "openclawVersion": "2026.3.28"
