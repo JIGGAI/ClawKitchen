@@ -45,7 +45,7 @@ const EXPERIMENTAL_TABS = [
 
 type TabId = (typeof BASE_TABS | typeof EXPERIMENTAL_TABS)[number]["id"];
 
-export default function TeamEditor({ teamId, initialTab }: { teamId: string; initialTab?: string }) {
+export default function TeamEditor({ teamId, teamName, initialTab }: { teamId: string; teamName?: string | null; initialTab?: string }) {
   const router = useRouter();
   const [recipes, setRecipes] = useState<RecipeListItem[]>([]);
   const [fromId, setFromId] = useState<string>("");
@@ -402,7 +402,7 @@ export default function TeamEditor({ teamId, initialTab }: { teamId: string; ini
 
   return (
     <div className="w-full">
-      <h1 className="text-2xl font-semibold tracking-tight">{lockedFromName || teamId}</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">{teamName || teamId}</h1>
       <p className="mt-1 text-sm font-mono text-[color:var(--ck-text-tertiary)]">{teamId}</p>
 
 
