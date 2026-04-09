@@ -44,6 +44,7 @@ export default function RunDetailClient({
   const [showStopModal, setShowStopModal] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
   const [actionError, setActionError] = useState<string>("");
+  const [actionDone, setActionDone] = useState<string>("");
 
   const selectedNode: WorkflowRunNodeResultV1 | undefined = useMemo(
     () => (nodes.length ? nodes[Math.min(Math.max(0, selectedIdx), nodes.length - 1)] : undefined),
@@ -196,21 +197,27 @@ export default function RunDetailClient({
           </div>
         </div>
 
-        {run.approval ? (
+        {(run.approval || run.status === "waiting_for_approval" || nodes.some((n) => n.status === "waiting")) ? (
           <div className="mt-4 rounded-lg border border-white/10 bg-black/10 p-3">
             <div className="text-xs uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">approval</div>
-            <div className="mt-2 text-xs text-[color:var(--ck-text-secondary)]">
-              <div>
-                <span className="font-medium">node:</span> <span className="font-mono">{run.approval.nodeId}</span>
+            {run.approval ? (
+              <div className="mt-2 text-xs text-[color:var(--ck-text-secondary)]">
+                <div>
+                  <span className="font-medium">node:</span> <span className="font-mono">{run.approval.nodeId}</span>
+                </div>
+                <div>
+                  <span className="font-medium">state:</span> {run.approval.state}
+                </div>
+                {run.approval.note ? (
+                  <div className="mt-2 rounded border border-white/10 bg-white/5 p-2 text-[11px]">{run.approval.note}</div>
+                ) : null}
               </div>
-              <div>
-                <span className="font-medium">state:</span> {run.approval.state}
+            ) : null}
+            {actionDone ? (
+              <div className={`mt-3 rounded-lg px-4 py-2 text-sm font-medium ${actionDone === "approved" ? "border border-emerald-400/30 bg-emerald-500/10 text-emerald-200" : "border border-amber-400/30 bg-amber-500/10 text-amber-200"}`}>
+                {actionDone === "approved" ? "Approved — the runner will resume this workflow shortly." : "Rejected — revision requested."}
               </div>
-              {run.approval.note ? (
-                <div className="mt-2 rounded border border-white/10 bg-white/5 p-2 text-[11px]">{run.approval.note}</div>
-              ) : null}
-            </div>
-            {run.approval.state === "pending" ? (
+            ) : (!run.approval || run.approval.state === "pending") && !actionDone ? (
               <div className="mt-3 flex gap-2">
                 <button
                   type="button"
@@ -224,7 +231,7 @@ export default function RunDetailClient({
                         headers: { "content-type": "application/json" },
                         body: JSON.stringify({ teamId, workflowId, runId: run.id, action: "approve" }),
                       });
-                      router.refresh();
+                      setActionDone("approved");
                     } catch (err) {
                       setActionError(String(err));
                     } finally {
@@ -233,7 +240,7 @@ export default function RunDetailClient({
                   }}
                   className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] transition hover:bg-emerald-500 disabled:opacity-50"
                 >
-                  {actionBusy ? "…" : "Approve"}
+                  {actionBusy ? "Approving…" : "Approve"}
                 </button>
                 <button
                   type="button"
@@ -248,7 +255,7 @@ export default function RunDetailClient({
                         headers: { "content-type": "application/json" },
                         body: JSON.stringify({ teamId, workflowId, runId: run.id, action: "request_changes", ...(note ? { note } : {}) }),
                       });
-                      router.refresh();
+                      setActionDone("rejected");
                     } catch (err) {
                       setActionError(String(err));
                     } finally {
@@ -257,7 +264,7 @@ export default function RunDetailClient({
                   }}
                   className="rounded-lg border border-amber-400/30 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-200 shadow-[var(--ck-shadow-1)] transition hover:bg-amber-500/20 disabled:opacity-50"
                 >
-                  Reject
+                  {actionBusy ? "…" : "Reject"}
                 </button>
               </div>
             ) : null}
