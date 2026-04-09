@@ -40,7 +40,7 @@ export function ScaffoldOverlay({
             e.stopPropagation();
             onDismiss();
           }}
-          className="fixed right-4 top-4 z-[10000] rounded-full border border-white/10 bg-[color:var(--ck-bg-glass)] px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] hover:bg-[color:var(--ck-bg-glass-strong)]"
+          className="fixed right-4 top-4 z-[10000] rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] hover:bg-[color:var(--ck-bg-soft)]"
           aria-label="Dismiss loading overlay"
           title="Dismiss"
         >
@@ -49,7 +49,7 @@ export function ScaffoldOverlay({
       ) : null}
 
       <div className="fixed inset-0 flex items-center justify-center p-6 sm:p-10">
-        <div className="w-full max-w-2xl rounded-2xl border border-white/10 bg-[color:var(--ck-bg-glass-strong)] p-8 sm:p-10 shadow-[var(--ck-shadow-2)]">
+        <div className="w-full max-w-2xl rounded-2xl border border-white/10 bg-[color:var(--ck-bg-soft)] p-8 sm:p-10 shadow-[var(--ck-shadow-2)]">
           <div className="text-2xl font-semibold text-[color:var(--ck-text-primary)]">Claw Kitchen</div>
           <div className="mt-3 text-base text-[color:var(--ck-text-secondary)]">Hang tight — we’re updating your OpenClaw install.</div>
 

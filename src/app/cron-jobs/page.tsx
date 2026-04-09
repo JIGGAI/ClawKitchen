@@ -10,7 +10,7 @@ export default async function CronJobsPage({
   const team = typeof sp.team === "string" ? sp.team.trim() : "";
 
   return (
-    <div className="ck-glass w-full p-6 sm:p-8">
+    <div className="w-full">
       <div className="flex items-baseline justify-between gap-4">
         <h1 className="text-2xl font-semibold tracking-tight">Cron Jobs (recipe-installed)</h1>
         <div className="flex gap-3">

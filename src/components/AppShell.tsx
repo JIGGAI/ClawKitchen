@@ -6,7 +6,6 @@ import { useEffect, useMemo, useState } from "react";
 import { dispatchSelectedTeamChanged } from "@/lib/selected-team";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { fetchJson } from "@/lib/fetch-json";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { ToastProvider } from "@/components/ToastProvider";
 
 function Icon({ children }: { children: React.ReactNode }) {
@@ -40,8 +39,8 @@ function SideNavLink({
       className={
         (
           active
-            ? "flex items-center rounded-[var(--ck-radius-sm)] bg-white/10 text-sm font-medium text-[color:var(--ck-text-primary)]"
-            : "flex items-center rounded-[var(--ck-radius-sm)] text-sm font-medium text-[color:var(--ck-text-secondary)] transition-colors hover:bg-white/5 hover:text-[color:var(--ck-text-primary)]"
+            ? "flex items-center rounded-lg bg-white/10 text-sm font-medium text-[color:var(--ck-text-primary)]"
+            : "flex items-center rounded-lg text-sm font-medium text-[color:var(--ck-text-secondary)] transition-colors hover:bg-white/5 hover:text-[color:var(--ck-text-primary)]"
         ) +
         (collapsed ? " justify-center px-0 py-3" : " gap-4 px-4 py-3")
       }
@@ -311,14 +310,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <ToastProvider>
       <div className="flex h-dvh w-dvw overflow-hidden">
-        <aside className={`flex shrink-0 flex-col border-r border-[color:var(--ck-border-subtle)] bg-[color:var(--ck-bg-glass)] backdrop-blur-[var(--ck-glass-blur)] ${sideWidth}`}>
+        <aside className={`flex shrink-0 flex-col border-r border-[color:var(--ck-border-subtle)] bg-[color:var(--ck-bg-soft)]/95 backdrop-blur-[var(--ck-glass-blur)] ${sideWidth}`}>
           <div className="flex h-14 items-center justify-between gap-2 border-b border-[color:var(--ck-border-subtle)] px-3">
             <Link href="/" className="text-sm font-semibold tracking-tight" title="Home">
               {collapsed ? "CK" : "Claw Kitchen"}
             </Link>
             <button
               onClick={toggleCollapsed}
-              className="rounded-[var(--ck-radius-sm)] px-2 py-1 text-sm text-[color:var(--ck-text-secondary)] hover:bg-white/5 hover:text-[color:var(--ck-text-primary)]"
+              className="rounded-lg px-2 py-1 text-sm text-[color:var(--ck-text-secondary)] hover:bg-white/5 hover:text-[color:var(--ck-text-primary)]"
               title={collapsed ? "Expand" : "Collapse"}
             >
               {collapsed ? "»" : "«"}
@@ -328,7 +327,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="border-b border-[color:var(--ck-border-subtle)] p-2">
             {collapsed ? (
               <button
-                className="w-full rounded-[var(--ck-radius-sm)] bg-white/5 px-2 py-2 text-xs font-medium text-[color:var(--ck-text-secondary)] hover:bg-white/10"
+                className="w-full rounded-lg bg-white/5 px-2 py-2 text-xs font-medium text-[color:var(--ck-text-secondary)] hover:bg-white/10"
                 title={selectedTeamId ? `Team: ${selectedTeamId}` : "Select team"}
                 onClick={() => {
                   const id = teamIds[0] || "";
@@ -367,7 +366,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     syncTeamToCurrentUrl(id);
                   }}
                   className={
-                    "w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]" +
+                    "w-full rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]" +
                     (isTeamEditorRoute ? " cursor-not-allowed opacity-60" : "")
                   }
                 >
@@ -417,19 +416,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               rel="noreferrer"
               className={
                 collapsed
-                  ? "mx-auto rounded-[var(--ck-radius-sm)] px-2 py-2 text-sm text-[color:var(--ck-text-secondary)] hover:bg-white/5 hover:text-[color:var(--ck-text-primary)]"
-                  : "rounded-[var(--ck-radius-sm)] px-3 py-2 text-sm font-medium text-[color:var(--ck-text-secondary)] hover:bg-white/5 hover:text-[color:var(--ck-text-primary)]"
+                  ? "mx-auto rounded-lg px-2 py-2 text-sm text-[color:var(--ck-text-secondary)] hover:bg-white/5 hover:text-[color:var(--ck-text-primary)]"
+                  : "rounded-lg px-3 py-2 text-sm font-medium text-[color:var(--ck-text-secondary)] hover:bg-white/5 hover:text-[color:var(--ck-text-primary)]"
               }
               title="Docs"
             >
               {collapsed ? "📖" : "Docs"}
             </a>
-            {collapsed ? null : <ThemeToggle />}
           </div>
         </aside>
 
         <div className="min-w-0 flex-1">
-          <main className="h-full overflow-auto p-4 md:p-6">
+          <main className="h-full overflow-auto px-6 py-5 lg:px-10">
             <ErrorBoundary>{children}</ErrorBoundary>
           </main>
         </div>

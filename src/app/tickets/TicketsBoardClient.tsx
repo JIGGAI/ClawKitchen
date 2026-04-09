@@ -185,7 +185,7 @@ export function TicketsBoardClient({
 
       <div className="grid gap-4 lg:grid-cols-4">
         {STAGES.map(({ key, label }) => (
-          <section key={key} className="ck-glass p-3">
+          <section key={key} className="ck-card p-3">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-sm font-semibold tracking-tight">{label}</h2>
               <span className="text-xs text-[color:var(--ck-text-tertiary)]">{byStage[key].length}</span>
@@ -193,7 +193,7 @@ export function TicketsBoardClient({
 
             <div className="space-y-2">
               {byStage[key].length === 0 ? (
-                <div className="rounded-[var(--ck-radius-sm)] border border-dashed border-[color:var(--ck-border-subtle)] p-3 text-xs text-[color:var(--ck-text-tertiary)]">
+                <div className="rounded-lg border border-dashed border-[color:var(--ck-border-subtle)] p-3 text-xs text-[color:var(--ck-text-tertiary)]">
                   Empty
                 </div>
               ) : null}
@@ -201,7 +201,7 @@ export function TicketsBoardClient({
               {byStage[key].map((t) => (
                 <div
                   key={`${t.teamId}:${t.id}`}
-                  className="rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] bg-[color:var(--ck-bg-glass-strong)] p-3"
+                  className="rounded-lg border border-[color:var(--ck-border-subtle)] bg-[color:var(--ck-bg-soft)] p-3"
                 >
                   <Link
                     href={(() => {

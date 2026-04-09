@@ -32,13 +32,13 @@ export function IdentityTab({
   router: { push: (href: string) => void };
 }) {
   return (
-    <div className="ck-glass-strong p-4">
+    <div className="ck-card p-4">
       <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Identity</div>
       <label className="mt-3 block text-xs font-medium text-[color:var(--ck-text-secondary)]">Name</label>
       <input
         value={name}
         onChange={(e) => onNameChange(e.target.value)}
-        className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+        className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
       />
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div>
@@ -47,7 +47,7 @@ export function IdentityTab({
             value={emoji}
             onChange={(e) => onEmojiChange(e.target.value)}
             placeholder="🦞"
-            className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+            className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
           />
         </div>
         <div>
@@ -56,7 +56,7 @@ export function IdentityTab({
             value={theme}
             onChange={(e) => onThemeChange(e.target.value)}
             placeholder="warm, sharp, calm"
-            className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+            className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
           />
         </div>
         <div>
@@ -65,7 +65,7 @@ export function IdentityTab({
             value={avatar}
             onChange={(e) => onAvatarChange(e.target.value)}
             placeholder="avatars/openclaw.png"
-            className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+            className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
           />
         </div>
       </div>
@@ -73,7 +73,7 @@ export function IdentityTab({
         <button
           disabled={saving}
           onClick={onSave}
-          className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] transition-colors hover:bg-[var(--ck-accent-red-hover)] active:bg-[var(--ck-accent-red-active)] disabled:opacity-50"
+          className="rounded-lg bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] transition-colors hover:bg-[var(--ck-accent-red-hover)] active:bg-[var(--ck-accent-red-active)] disabled:opacity-50"
         >
           {saving ? "Saving…" : "Save"}
         </button>
@@ -84,7 +84,7 @@ export function IdentityTab({
               await onSave();
               router.push(returnTo);
             }}
-            className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15 disabled:opacity-50"
+            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-white/10 active:bg-white/15 disabled:opacity-50"
           >
             Save & return
           </button>
@@ -106,7 +106,7 @@ export function ConfigTab({
   onSave: () => Promise<void>;
 }) {
   return (
-    <div className="ck-glass-strong p-4">
+    <div className="ck-card p-4">
       <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Config</div>
       <p className="mt-2 text-sm text-[color:var(--ck-text-secondary)]">
         Thin slice: edit the configured model id for this agent (writes to OpenClaw config).
@@ -116,13 +116,13 @@ export function ConfigTab({
         value={model}
         onChange={(e) => onModelChange(e.target.value)}
         placeholder="openai/gpt-5.2"
-        className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+        className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
       />
       <div className="mt-3">
         <button
           disabled={saving}
           onClick={onSave}
-          className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] disabled:opacity-50"
+          className="rounded-lg bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] disabled:opacity-50"
         >
           {saving ? "Saving…" : "Save config"}
         </button>
@@ -155,7 +155,7 @@ export function SkillsTab({
   onInstallSkill: () => Promise<void>;
 }) {
   return (
-    <div className="ck-glass-strong p-4">
+    <div className="ck-card p-4">
       <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Skills</div>
       <p className="mt-2 text-sm text-[color:var(--ck-text-secondary)]">
         Skills installed in this <strong>agent</strong> workspace (<code>skills/</code>). If you want a skill available to all agents,
@@ -169,13 +169,13 @@ export function SkillsTab({
           {!skillsLoading && !skillsList.length && <li>None installed.</li>}
         </ul>
       </div>
-      <div className="mt-5 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/15 p-3">
+      <div className="mt-5 rounded-lg border border-white/10 bg-white/5 p-3">
         <div className="text-xs font-medium text-[color:var(--ck-text-secondary)]">Add a skill</div>
         <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
           <select
             value={selectedSkill}
             onChange={(e) => onSelectedSkillChange(e.target.value)}
-            className="w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+            className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
             disabled={installingSkill || !availableSkills.length}
           >
             {availableSkills.length ? (
@@ -192,18 +192,18 @@ export function SkillsTab({
             type="button"
             disabled={installingSkill || !selectedSkill}
             onClick={() => void onInstallSkill()}
-            className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] disabled:opacity-50"
+            className="rounded-lg bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] disabled:opacity-50"
           >
             {installingSkill ? "Adding…" : "Add"}
           </button>
         </div>
         {skillError && (
-          <div className="mt-3 rounded-[var(--ck-radius-sm)] border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">
+          <div className="mt-3 rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">
             {skillError}
           </div>
         )}
         {!skillError && skillMsg && (
-          <div className="mt-3 rounded-[var(--ck-radius-sm)] border border-emerald-400/30 bg-emerald-500/10 p-3 text-sm text-emerald-100">
+          <div className="mt-3 rounded-lg border border-emerald-400/30 bg-emerald-500/10 p-3 text-sm text-emerald-100">
             {skillMsg}
           </div>
         )}
@@ -260,14 +260,14 @@ export function FilesTab({
               type="button"
               disabled={saving}
               onClick={() => void onCreateMissingFile(f.name)}
-              className="shrink-0 rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 text-xs font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10 disabled:opacity-50"
+              className="shrink-0 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10 disabled:opacity-50"
             >
               Create
             </button>
           ) : null
         }
       />
-      <div className="ck-glass-strong p-4 lg:col-span-2">
+      <div className="ck-card p-4 lg:col-span-2">
         <div className="flex items-center justify-between gap-3">
           <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Edit: {fileName}</div>
           <div className="flex items-center gap-3">
@@ -275,21 +275,21 @@ export function FilesTab({
             <button
               disabled={saving}
               onClick={onSaveFile}
-              className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] disabled:opacity-50"
+              className="rounded-lg bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] disabled:opacity-50"
             >
               {saving ? "Saving…" : "Save file"}
             </button>
           </div>
         </div>
         {fileError ? (
-          <div className="mt-3 rounded-[var(--ck-radius-sm)] border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">
+          <div className="mt-3 rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">
             {fileError}
           </div>
         ) : null}
         <textarea
           value={fileContent}
           onChange={(e) => onFileContentChange(e.target.value)}
-          className="mt-3 h-[55vh] w-full resize-none rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-3 font-mono text-xs text-[color:var(--ck-text-primary)]"
+          className="mt-3 h-[55vh] w-full resize-none rounded-lg border border-white/10 bg-white/5 p-3 font-mono text-xs text-[color:var(--ck-text-primary)]"
           spellCheck={false}
         />
       </div>

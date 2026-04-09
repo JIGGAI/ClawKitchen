@@ -20,7 +20,7 @@ function RecipePanelCard({
   children: ReactNode;
 }) {
   return (
-    <div className="ck-glass-strong p-4">
+    <div className="ck-card p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">{title}</div>
@@ -29,13 +29,13 @@ function RecipePanelCard({
         <button
           type="button"
           onClick={onButtonClick}
-          className="shrink-0 rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] transition-colors hover:bg-[var(--ck-accent-red-hover)] active:bg-[var(--ck-accent-red-active)]"
+          className="shrink-0 rounded-lg bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] transition-colors hover:bg-[var(--ck-accent-red-hover)] active:bg-[var(--ck-accent-red-active)]"
         >
           {buttonLabel}
         </button>
       </div>
       {error ? (
-        <div className="mt-4 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3 text-xs text-[color:var(--ck-text-primary)]">
+        <div className="mt-4 rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-[color:var(--ck-text-primary)]">
           Frontmatter parse error: {error}
         </div>
       ) : null}
@@ -47,7 +47,7 @@ function RecipePanelCard({
 function TeamRecipeDetails({ fm, recipe }: { fm: TeamRecipeFrontmatter | null; recipe: { id: string } }) {
   return (
     <div className="mt-4 space-y-3">
-      <details className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/15 p-3" open>
+      <details className="rounded-lg border border-white/10 bg-white/5 p-3" open>
         <summary className="cursor-pointer text-sm font-medium text-[color:var(--ck-text-primary)]">Recipe information</summary>
         <div className="mt-2 space-y-1 text-xs text-[color:var(--ck-text-secondary)]">
           <div><span className="text-[color:var(--ck-text-tertiary)]">Recipe id:</span> {fm?.id ?? recipe.id}</div>
@@ -64,13 +64,13 @@ function TeamRecipeDetails({ fm, recipe }: { fm: TeamRecipeFrontmatter | null; r
 
 function TeamAgentsDetails({ fm }: { fm: TeamRecipeFrontmatter | null }) {
   return (
-    <details className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/15 p-3">
+    <details className="rounded-lg border border-white/10 bg-white/5 p-3">
       <summary className="cursor-pointer text-sm font-medium text-[color:var(--ck-text-primary)]">
         Agents ({fm?.agents?.length ?? 0})
       </summary>
       <div className="mt-2 space-y-2">
         {(fm?.agents ?? []).map((a, idx) => (
-          <details key={`${a.role ?? "agent"}:${idx}`} className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3">
+          <details key={`${a.role ?? "agent"}:${idx}`} className="rounded-lg border border-white/10 bg-white/5 p-3">
             <summary className="cursor-pointer text-sm text-[color:var(--ck-text-primary)]">
               <span className="font-medium">{a.name ?? a.role ?? "(unnamed)"}</span>
               {a.role ? <span className="text-[color:var(--ck-text-tertiary)]"> — {a.role}</span> : null}
@@ -97,13 +97,13 @@ function TeamAgentsDetails({ fm }: { fm: TeamRecipeFrontmatter | null }) {
 
 function TeamCronDetails({ fm }: { fm: TeamRecipeFrontmatter | null }) {
   return (
-    <details className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/15 p-3">
+    <details className="rounded-lg border border-white/10 bg-white/5 p-3">
       <summary className="cursor-pointer text-sm font-medium text-[color:var(--ck-text-primary)]">
         Cron jobs ({fm?.cronJobs?.length ?? 0})
       </summary>
       <div className="mt-2 space-y-2">
         {(fm?.cronJobs ?? []).map((c, idx) => (
-          <details key={`${c.id ?? "cron"}:${idx}`} className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3">
+          <details key={`${c.id ?? "cron"}:${idx}`} className="rounded-lg border border-white/10 bg-white/5 p-3">
             <summary className="cursor-pointer text-sm text-[color:var(--ck-text-primary)]">
               <span className="font-medium">{c.name ?? c.id ?? "(unnamed)"}</span>
               {c.schedule ? <span className="text-[color:var(--ck-text-tertiary)]"> — {c.schedule}</span> : null}
@@ -115,7 +115,7 @@ function TeamCronDetails({ fm }: { fm: TeamRecipeFrontmatter | null }) {
                 <div><span className="text-[color:var(--ck-text-tertiary)]">Enabled by default:</span> {c.enabledByDefault ? "yes" : "no"}</div>
               ) : null}
               {c.message ? (
-                <div className="mt-2 whitespace-pre-wrap rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-2 text-[11px] text-[color:var(--ck-text-primary)]">{c.message}</div>
+                <div className="mt-2 whitespace-pre-wrap rounded-lg border border-white/10 bg-white/5 p-2 text-[11px] text-[color:var(--ck-text-primary)]">{c.message}</div>
               ) : null}
             </div>
           </details>
@@ -182,7 +182,7 @@ export function AgentRecipePanelContent({
       error={afmErr}
     >
       <div className="mt-4 space-y-3">
-        <details className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/15 p-3" open>
+        <details className="rounded-lg border border-white/10 bg-white/5 p-3" open>
           <summary className="cursor-pointer text-sm font-medium text-[color:var(--ck-text-primary)]">Recipe information</summary>
           <div className="mt-2 space-y-1 text-xs text-[color:var(--ck-text-secondary)]">
             <div><span className="text-[color:var(--ck-text-tertiary)]">Recipe id:</span> {afm?.id ?? recipe.id}</div>
@@ -190,7 +190,7 @@ export function AgentRecipePanelContent({
             {afm?.description ? <div className="whitespace-pre-wrap">{afm.description}</div> : null}
           </div>
         </details>
-        <details className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/15 p-3">
+        <details className="rounded-lg border border-white/10 bg-white/5 p-3">
           <summary className="cursor-pointer text-sm font-medium text-[color:var(--ck-text-primary)]">
             Files ({Object.keys(afm?.templates ?? {}).length})
           </summary>

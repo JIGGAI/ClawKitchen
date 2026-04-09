@@ -2,7 +2,7 @@ import SettingsClient from "./settings-client";
 
 export default function SettingsPage() {
   return (
-    <div className="ck-glass w-full p-6 sm:p-8">
+    <div className="w-full">
       <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
       <p className="mt-2 text-sm text-[color:var(--ck-text-secondary)]">
         Configuration that affects scaffold behavior and automation.

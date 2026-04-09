@@ -13,7 +13,7 @@ export default async function TeamTicketDetailPage({
 
   if (!data) {
     return (
-      <div className="ck-glass p-6">
+      <div className="ck-card p-6">
         <h1 className="text-xl font-semibold tracking-tight">Ticket not found</h1>
         <p className="mt-3 text-sm text-[color:var(--ck-text-secondary)]">
           Couldn’t locate “{ticket}” in backlog/in-progress/testing/done for team “{teamId}”.

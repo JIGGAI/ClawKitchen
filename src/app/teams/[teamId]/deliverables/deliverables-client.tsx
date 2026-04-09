@@ -133,7 +133,7 @@ export default function DeliverablesClient({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="rounded-[var(--ck-radius-lg)] border border-white/10 bg-black/10 p-4">
+      <div className="rounded-3xl border border-white/10 bg-black/10 p-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="flex flex-wrap items-end gap-3">
             <label className="block">
@@ -144,7 +144,7 @@ export default function DeliverablesClient({
                   setWorkflowFilter(e.target.value || "");
                   setRunFilter(""); // Reset run filter when workflow changes
                 }}
-                className="mt-1 w-64 max-w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                className="mt-1 w-64 max-w-full rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
               >
                 <option value="">All workflows</option>
                 {workflowOptions.map((id) => (
@@ -160,7 +160,7 @@ export default function DeliverablesClient({
               <select
                 value={runFilter}
                 onChange={(e) => setRunFilter(e.target.value || "")}
-                className="mt-1 w-56 max-w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                className="mt-1 w-56 max-w-full rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
               >
                 <option value="">All runs</option>
                 {runOptions.map((id) => (
@@ -177,7 +177,7 @@ export default function DeliverablesClient({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="filename / content"
-                className="mt-1 w-72 max-w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                className="mt-1 w-72 max-w-full rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
               />
             </label>
           </div>
@@ -186,7 +186,7 @@ export default function DeliverablesClient({
             <button
               type="button"
               onClick={() => router.refresh()}
-              className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
+              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
             >
               Refresh
             </button>
@@ -196,7 +196,7 @@ export default function DeliverablesClient({
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Deliverables List */}
-        <div className="lg:col-span-2 rounded-[var(--ck-radius-lg)] border border-white/10 bg-black/10 p-4">
+        <div className="lg:col-span-2 rounded-3xl border border-white/10 bg-black/10 p-4">
           <h2 className="text-lg font-semibold text-[color:var(--ck-text-primary)] mb-4">
             Workflow Deliverables
           </h2>
@@ -210,7 +210,7 @@ export default function DeliverablesClient({
                 return (
                   <div
                     key={`${deliverable.runId}-${deliverable.relativePath}`}
-                    className={`cursor-pointer rounded-[var(--ck-radius-sm)] border p-3 transition-colors ${
+                    className={`cursor-pointer rounded-lg border p-3 transition-colors ${
                       isSelected
                         ? "border-white/20 bg-white/10"
                         : "border-white/5 bg-black/5 hover:bg-white/5"
@@ -219,7 +219,7 @@ export default function DeliverablesClient({
                   >
                     <div className="flex items-start justify-between gap-3">
                       {isImageFile(deliverable.fileName) && (
-                        <div className="flex-shrink-0 w-12 h-12 rounded overflow-hidden bg-black/20 border border-white/10">
+                        <div className="flex-shrink-0 w-12 h-12 rounded overflow-hidden bg-white/5 border border-white/10">
                           <Image
                             src={deliverableFileUrl(teamId, deliverable)}
                             alt={deliverable.fileName}
@@ -298,7 +298,7 @@ export default function DeliverablesClient({
         </div>
 
         {/* Preview Panel */}
-        <div className="lg:col-span-1 rounded-[var(--ck-radius-lg)] border border-white/10 bg-black/10 p-4">
+        <div className="lg:col-span-1 rounded-3xl border border-white/10 bg-black/10 p-4">
           <h3 className="text-sm font-semibold text-[color:var(--ck-text-primary)] mb-3">
             Preview
           </h3>

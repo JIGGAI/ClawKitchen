@@ -138,7 +138,7 @@ export default function RunDeliverables({
 
   if (loading) {
     return (
-      <div className="rounded-[var(--ck-radius-lg)] border border-white/10 bg-black/10 p-4">
+      <div className="rounded-3xl border border-white/10 bg-black/10 p-4">
         <h2 className="text-lg font-semibold text-[color:var(--ck-text-primary)] mb-4">
           Run Deliverables
         </h2>
@@ -154,7 +154,7 @@ export default function RunDeliverables({
 
   if (error) {
     return (
-      <div className="rounded-[var(--ck-radius-lg)] border border-white/10 bg-black/10 p-4">
+      <div className="rounded-3xl border border-white/10 bg-black/10 p-4">
         <h2 className="text-lg font-semibold text-[color:var(--ck-text-primary)] mb-4">
           Run Deliverables
         </h2>
@@ -167,7 +167,7 @@ export default function RunDeliverables({
   }
 
   return (
-    <div className="rounded-[var(--ck-radius-lg)] border border-white/10 bg-black/10 p-4">
+    <div className="rounded-3xl border border-white/10 bg-black/10 p-4">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h2 className="text-lg font-semibold text-[color:var(--ck-text-primary)]">
           Run Deliverables
@@ -180,7 +180,7 @@ export default function RunDeliverables({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="filename / content"
-              className="mt-1 w-64 max-w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
+              className="mt-1 w-64 max-w-full rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
             />
           </label>
         )}
@@ -197,7 +197,7 @@ export default function RunDeliverables({
                 return (
                   <div
                     key={`${deliverable.runId}-${deliverable.relativePath}`}
-                    className={`cursor-pointer rounded-[var(--ck-radius-sm)] border p-3 transition-colors ${
+                    className={`cursor-pointer rounded-lg border p-3 transition-colors ${
                       isSelected
                         ? "border-white/20 bg-white/10"
                         : "border-white/5 bg-black/5 hover:bg-white/5"
@@ -206,7 +206,7 @@ export default function RunDeliverables({
                   >
                     <div className="flex items-start justify-between gap-3">
                       {isImageFile(deliverable.fileName) && (
-                        <div className="flex-shrink-0 w-12 h-12 rounded overflow-hidden bg-black/20 border border-white/10">
+                        <div className="flex-shrink-0 w-12 h-12 rounded overflow-hidden bg-white/5 border border-white/10">
                           <Image
                             src={deliverableFileUrl(teamId, deliverable)}
                             alt={deliverable.fileName}
@@ -264,7 +264,7 @@ export default function RunDeliverables({
 
           {/* Preview Panel */}
           <div className="lg:col-span-1">
-            <div className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/10 p-4">
+            <div className="rounded-lg border border-white/10 bg-black/10 p-4">
               <h3 className="text-sm font-semibold text-[color:var(--ck-text-primary)] mb-3">
                 Preview
               </h3>

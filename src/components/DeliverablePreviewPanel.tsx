@@ -83,13 +83,13 @@ export function DeliverablePreviewPanel({
       {isImageFile(deliverable.fileName) ? (
         <div>
           <div className="text-xs text-[color:var(--ck-text-tertiary)] mb-2">Image Preview:</div>
-          <div className="bg-black/20 border border-white/10 rounded-[var(--ck-radius-sm)] p-2 overflow-hidden">
+          <div className="bg-white/5 border border-white/10 rounded-lg p-2 overflow-hidden">
             <Image
               src={fileUrl}
               alt={deliverable.fileName}
               width={800}
               height={600}
-              className="w-full h-auto rounded-[var(--ck-radius-sm)] object-contain"
+              className="w-full h-auto rounded-lg object-contain"
               style={{ maxHeight: maxMediaHeight }}
               unoptimized
             />
@@ -114,11 +114,11 @@ export function DeliverablePreviewPanel({
       ) : isVideoFile(deliverable.fileName) ? (
         <div>
           <div className="text-xs text-[color:var(--ck-text-tertiary)] mb-2">Video Preview:</div>
-          <div className="bg-black/20 border border-white/10 rounded-[var(--ck-radius-sm)] p-2 overflow-hidden">
+          <div className="bg-white/5 border border-white/10 rounded-lg p-2 overflow-hidden">
             <video
               src={fileUrl}
               controls
-              className="w-full rounded-[var(--ck-radius-sm)]"
+              className="w-full rounded-lg"
               style={{ maxHeight: maxMediaHeight }}
               preload="metadata"
             >
@@ -146,7 +146,7 @@ export function DeliverablePreviewPanel({
       ) : isAudioFile(deliverable.fileName) ? (
         <div>
           <div className="text-xs text-[color:var(--ck-text-tertiary)] mb-2">Audio Preview:</div>
-          <div className="bg-black/20 border border-white/10 rounded-[var(--ck-radius-sm)] p-2">
+          <div className="bg-white/5 border border-white/10 rounded-lg p-2">
             <audio
               src={fileUrl}
               controls
@@ -169,7 +169,7 @@ export function DeliverablePreviewPanel({
       ) : deliverable.isText && deliverable.contentPreview ? (
         <div>
           <div className="text-xs text-[color:var(--ck-text-tertiary)] mb-2">Content Preview:</div>
-          <div className="bg-black/20 border border-white/10 rounded-[var(--ck-radius-sm)] p-3 overflow-auto" style={{ maxHeight: maxMediaHeight }}>
+          <div className="bg-white/5 border border-white/10 rounded-lg p-3 overflow-auto" style={{ maxHeight: maxMediaHeight }}>
             <pre className="text-xs text-[color:var(--ck-text-primary)] whitespace-pre-wrap break-words">
               {deliverable.contentPreview}
             </pre>

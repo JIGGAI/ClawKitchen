@@ -97,10 +97,10 @@ function MemoryItemCard({
 
   return (
     <div
-      className={`rounded-[var(--ck-radius-sm)] border p-3 ${
+      className={`rounded-lg border p-3 ${
         it._parseError
           ? "border-red-400/30 bg-red-500/5"
-          : "border-white/10 bg-black/25"
+          : "border-white/10 bg-white/5"
       }`}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -133,7 +133,7 @@ function MemoryItemCard({
               type="button"
               onClick={() => onUnpin(it)}
               disabled={pinningKey === k}
-              className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 text-xs font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10 disabled:opacity-50"
+              className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10 disabled:opacity-50"
             >
               {pinningKey === k ? "…" : "Unpin"}
             </button>
@@ -142,7 +142,7 @@ function MemoryItemCard({
               type="button"
               onClick={() => onPin(it)}
               disabled={pinningKey === k || !it._file || !it._line}
-              className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 text-xs font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10 disabled:opacity-50"
+              className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10 disabled:opacity-50"
             >
               {pinningKey === k ? "…" : "Pin"}
             </button>
@@ -151,7 +151,7 @@ function MemoryItemCard({
             type="button"
             onClick={() => onDelete(it)}
             disabled={deletingKey === k || !it._file || !it._line}
-            className="rounded-[var(--ck-radius-sm)] border border-red-400/20 bg-red-500/5 px-2 py-1 text-xs font-medium text-red-300 hover:bg-red-500/10 disabled:opacity-50"
+            className="rounded-lg border border-red-400/20 bg-red-500/5 px-2 py-1 text-xs font-medium text-red-300 hover:bg-red-500/10 disabled:opacity-50"
           >
             {deletingKey === k ? "…" : "×"}
           </button>
@@ -169,7 +169,7 @@ function MemoryItemCard({
       </div>
 
       {it.source ? (
-        <pre className="mt-2 overflow-auto rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 p-2 text-[10px] text-[color:var(--ck-text-secondary)]">
+        <pre className="mt-2 overflow-auto rounded-lg border border-white/10 bg-black/30 p-2 text-[10px] text-[color:var(--ck-text-secondary)]">
           {JSON.stringify(it.source, null, 2)}
         </pre>
       ) : null}
@@ -406,7 +406,7 @@ export function TeamMemoryTab({ teamId }: { teamId: string }) {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="ck-glass p-4">
+      <div className="ck-card p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Team Memory</div>
@@ -421,21 +421,21 @@ export function TeamMemoryTab({ teamId }: { teamId: string }) {
             type="button"
             onClick={() => void refresh()}
             disabled={loading}
-            className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10 disabled:opacity-50"
+            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10 disabled:opacity-50"
           >
             {loading ? "Loading…" : "Refresh"}
           </button>
         </div>
 
         {error ? (
-          <div className="mt-3 rounded-[var(--ck-radius-sm)] border border-red-400/30 bg-red-500/10 p-2 text-sm text-red-100">
+          <div className="mt-3 rounded-lg border border-red-400/30 bg-red-500/10 p-2 text-sm text-red-100">
             {error}
           </div>
         ) : null}
       </div>
 
       {/* File Browser */}
-      <div className="ck-glass p-4">
+      <div className="ck-card p-4">
         <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Files</div>
         <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {fileList.map((f) => (
@@ -453,11 +453,11 @@ export function TeamMemoryTab({ teamId }: { teamId: string }) {
                   setSelectedFile(f.name);
                 }
               }}
-              className={`flex items-center gap-2 rounded-[var(--ck-radius-sm)] border p-2 text-left transition-colors ${
+              className={`flex items-center gap-2 rounded-lg border p-2 text-left transition-colors ${
                 (viewMode === "md-viewer" && selectedMd === f.name) ||
                 (viewMode === "file" && selectedFile === f.name)
                   ? "border-[var(--ck-accent-red)]/50 bg-[var(--ck-accent-red)]/10"
-                  : "border-white/10 bg-black/25 hover:bg-white/5"
+                  : "border-white/10 bg-white/5 hover:bg-white/5"
               }`}
             >
               <FileIcon kind={f.kind} />
@@ -492,7 +492,7 @@ export function TeamMemoryTab({ teamId }: { teamId: string }) {
 
       {/* Markdown Viewer */}
       {viewMode === "md-viewer" && selectedMarkdown && (
-        <div className="ck-glass p-4">
+        <div className="ck-card p-4">
           <div className="flex items-center justify-between gap-2">
             <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">
               📄 {selectedMarkdown.name}
@@ -506,7 +506,7 @@ export function TeamMemoryTab({ teamId }: { teamId: string }) {
                   <button
                     type="button"
                     onClick={() => setEditingMd(false)}
-                    className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 text-xs font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
+                    className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
                   >
                     Cancel
                   </button>
@@ -514,7 +514,7 @@ export function TeamMemoryTab({ teamId }: { teamId: string }) {
                     type="button"
                     onClick={() => void saveMarkdown()}
                     disabled={savingMd}
-                    className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-2 py-1 text-xs font-medium text-white disabled:opacity-50"
+                    className="rounded-lg bg-[var(--ck-accent-red)] px-2 py-1 text-xs font-medium text-white disabled:opacity-50"
                   >
                     {savingMd ? "Saving…" : "Save"}
                   </button>
@@ -526,7 +526,7 @@ export function TeamMemoryTab({ teamId }: { teamId: string }) {
                     setMdEditContent(selectedMarkdown.content);
                     setEditingMd(true);
                   }}
-                  className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-2 py-1 text-xs font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
+                  className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
                 >
                   Edit
                 </button>
@@ -538,10 +538,10 @@ export function TeamMemoryTab({ teamId }: { teamId: string }) {
             <textarea
               value={mdEditContent}
               onChange={(e) => setMdEditContent(e.target.value)}
-              className="mt-3 h-[400px] w-full resize-y rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 p-3 font-mono text-sm text-[color:var(--ck-text-primary)]"
+              className="mt-3 h-[400px] w-full resize-y rounded-lg border border-white/10 bg-black/30 p-3 font-mono text-sm text-[color:var(--ck-text-primary)]"
             />
           ) : (
-            <div className="mt-3 max-h-[500px] overflow-auto rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 p-4">
+            <div className="mt-3 max-h-[500px] overflow-auto rounded-lg border border-white/10 bg-black/30 p-4">
               <div className="prose prose-invert prose-sm max-w-none text-sm text-[color:var(--ck-text-primary)]">
                 <ReactMarkdown 
                   remarkPlugins={[remarkGfm]}
@@ -572,7 +572,7 @@ export function TeamMemoryTab({ teamId }: { teamId: string }) {
       {viewMode !== "md-viewer" && (
         <>
           {/* Search & filter bar */}
-          <div className="ck-glass p-4">
+          <div className="ck-card p-4">
             <div className="flex flex-wrap items-end gap-3">
               <label className="min-w-0 flex-1">
                 <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">
@@ -582,7 +582,7 @@ export function TeamMemoryTab({ teamId }: { teamId: string }) {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search content, author, type…"
-                  className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                  className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
                 />
               </label>
 
@@ -591,7 +591,7 @@ export function TeamMemoryTab({ teamId }: { teamId: string }) {
                 <select
                   value={filterType}
                   onChange={(e) => setFilterType(e.target.value)}
-                  className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                  className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
                 >
                   <option value="">All types</option>
                   {allTypes.map((t) => (
@@ -616,7 +616,7 @@ export function TeamMemoryTab({ teamId }: { teamId: string }) {
                       setSelectedFile("");
                     }
                   }}
-                  className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                  className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
                 >
                   <option value="">All streams</option>
                   {allFiles.map((f) => (
@@ -630,7 +630,7 @@ export function TeamMemoryTab({ teamId }: { teamId: string }) {
           </div>
 
           {/* Add item form */}
-          <div className="ck-glass p-4">
+          <div className="ck-card p-4">
             <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">Add memory item</div>
             <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
               <label className="block">
@@ -638,7 +638,7 @@ export function TeamMemoryTab({ teamId }: { teamId: string }) {
                 <select
                   value={newType}
                   onChange={(e) => setNewType(e.target.value)}
-                  className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                  className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
                 >
                   {typeOptions.map((x) => (
                     <option key={x.value} value={x.value}>
@@ -655,7 +655,7 @@ export function TeamMemoryTab({ teamId }: { teamId: string }) {
                 <select
                   value={newTargetFile}
                   onChange={(e) => setNewTargetFile(e.target.value)}
-                  className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                  className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
                 >
                   {writableJsonlFiles.length > 0 ? (
                     writableJsonlFiles.map((f) => (
@@ -676,7 +676,7 @@ export function TeamMemoryTab({ teamId }: { teamId: string }) {
                 <input
                   value={newSource}
                   onChange={(e) => setNewSource(e.target.value)}
-                  className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                  className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
                   placeholder="ticket, PR, path…"
                 />
               </label>
@@ -688,7 +688,7 @@ export function TeamMemoryTab({ teamId }: { teamId: string }) {
                 <textarea
                   value={newContent}
                   onChange={(e) => setNewContent(e.target.value)}
-                  className="mt-1 h-[80px] w-full resize-none rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-2 text-sm text-[color:var(--ck-text-primary)]"
+                  className="mt-1 h-[80px] w-full resize-none rounded-lg border border-white/10 bg-white/5 p-2 text-sm text-[color:var(--ck-text-primary)]"
                   placeholder="Write a specific, attributable memory item…"
                 />
               </label>
@@ -729,7 +729,7 @@ export function TeamMemoryTab({ teamId }: { teamId: string }) {
                       setSaving(false);
                     }
                   }}
-                  className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] disabled:opacity-50"
+                  className="rounded-lg bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] disabled:opacity-50"
                 >
                   {saving ? "Saving…" : `Append to ${newTargetFile}`}
                 </button>
@@ -739,7 +739,7 @@ export function TeamMemoryTab({ teamId }: { teamId: string }) {
 
           {/* Pinned items */}
           {pinnedItems.length > 0 && (
-            <div className="ck-glass p-4">
+            <div className="ck-card p-4">
               <div className="flex items-center justify-between gap-2">
                 <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">
                   📌 Pinned ({pinnedItems.length})
@@ -763,7 +763,7 @@ export function TeamMemoryTab({ teamId }: { teamId: string }) {
           )}
 
           {/* Items list */}
-          <div className="ck-glass p-4">
+          <div className="ck-card p-4">
             <div className="flex items-center justify-between gap-2">
               <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">
                 {filterFile ? `📊 ${filterFile}` : "All Streams"}{" "}

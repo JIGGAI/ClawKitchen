@@ -8,8 +8,6 @@ import type { AgentListItem } from "@/lib/agents";
 function inferTeamIdFromWorkspace(workspace: string | undefined) {
   if (!workspace) return null;
   const parts = workspace.split("/").filter(Boolean);
-  // Team workspaces are typically ~/.openclaw/workspace-<teamId>/..., so the workspace- segment
-  // is not always the last path component.
   const wsPart = parts.find((p) => p.startsWith("workspace-")) ?? "";
   if (!wsPart) return null;
   const team = wsPart.slice("workspace-".length);
@@ -17,7 +15,6 @@ function inferTeamIdFromWorkspace(workspace: string | undefined) {
 }
 
 function normalizeTeamId(teamId: string) {
-  // Support legacy workspaces that used a "-team" suffix.
   return teamId.endsWith("-team") ? teamId.slice(0, -"-team".length) : teamId;
 }
 
@@ -37,10 +34,7 @@ export default function HomeClient({
     const groups = new Map<string, AgentListItem[]>();
 
     function titleCaseId(id: string) {
-      const s = id
-        .replace(/[-_]+/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
+      const s = id.replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
       if (!s) return id;
       return s
         .split(" ")
@@ -65,7 +59,6 @@ export default function HomeClient({
       groups.set(key, list);
     }
 
-    // Stable ordering: teams first (alphabetical), then personal.
     const keys = Array.from(groups.keys()).sort((a, b) => {
       if (a === "personal") return 1;
       if (b === "personal") return -1;
@@ -77,7 +70,6 @@ export default function HomeClient({
       return {
         key: k,
         title: display,
-        // Keep the raw id visible, but deemphasize it.
         subtitle: k === "personal" ? null : `workspace-${k}`,
         agents: (groups.get(k) ?? []).slice().sort((a, b) => a.id.localeCompare(b.id)),
         isTeam: k !== "personal",
@@ -86,88 +78,52 @@ export default function HomeClient({
   }, [agents, teamFilter, teamNames]);
 
   return (
-    <div className="ck-glass w-full p-6 sm:p-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div className="w-full">
+      <div className="flex items-baseline justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">
-            ClawKitchen{" "}
-            <span className="text-sm align-middle text-[color:var(--ck-text-secondary)]">({appVersion}-beta)</span>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Agents
           </h1>
-          <p className="mt-2 max-w-prose text-[color:var(--ck-text-secondary)]">
-            Installed agents on this machine, grouped by team workspace when available.
+          <p className="mt-1 text-sm text-[color:var(--ck-text-secondary)]">
+            Installed agents grouped by team workspace
           </p>
         </div>
-
-        <div className="flex flex-col items-start gap-2 sm:items-end">
-          <Link
-            href="/recipes?createCustomTeam=1"
-            className="rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] bg-[color:var(--ck-bg-glass)] px-3 py-1.5 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-[color:var(--ck-bg-glass-strong)]"
-          >
-            Create team
-          </Link>
-          <Link
-            href="/recipes"
-            className="text-sm font-medium text-[color:var(--ck-text-secondary)] transition-colors hover:text-[color:var(--ck-text-primary)]"
-          >
-            Recipes
-          </Link>
-          <Link
-            href="/tickets"
-            className="text-sm font-medium text-[color:var(--ck-text-secondary)] transition-colors hover:text-[color:var(--ck-text-primary)]"
-          >
-            Tickets
-          </Link>
-          <Link
-            href="/channels"
-            className="text-sm font-medium text-[color:var(--ck-text-secondary)] transition-colors hover:text-[color:var(--ck-text-primary)]"
-          >
-            Channels / Bindings
-          </Link>
-          <Link
-            href="/settings"
-            className="text-sm font-medium text-[color:var(--ck-text-secondary)] transition-colors hover:text-[color:var(--ck-text-primary)]"
-          >
-            Settings
-          </Link>
-        </div>
+        <span className="text-xs text-[color:var(--ck-text-tertiary)]">{appVersion}-beta</span>
       </div>
 
-
-      
-
-      <div className="mt-8 space-y-8">
+      <div className="mt-6 space-y-8">
         {grouped.map((g) => (
           <section key={g.key}>
             <div className="flex items-center justify-between gap-4">
               <div className="min-w-0">
-                <h2 className="truncate text-lg font-semibold tracking-tight text-[color:var(--ck-text-primary)]">{g.title}</h2>
+                <h2 className="truncate text-lg font-semibold tracking-tight">{g.title}</h2>
                 {g.subtitle ? (
-                  <div className="mt-0.5 truncate text-xs text-[color:var(--ck-text-secondary)]">{g.subtitle}</div>
+                  <div className="mt-0.5 truncate text-xs font-mono text-[color:var(--ck-text-tertiary)]">{g.subtitle}</div>
                 ) : null}
               </div>
               {g.isTeam ? (
                 <Link
                   href={`/teams/${encodeURIComponent(g.key)}`}
-                  className="rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] bg-[color:var(--ck-bg-glass)] px-3 py-1.5 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-[color:var(--ck-bg-glass-strong)]"
+                  className="rounded-lg border border-[color:var(--ck-border-subtle)] bg-white/5 px-4 py-2 text-sm font-medium transition hover:bg-white/10"
                 >
                   Edit
                 </Link>
               ) : null}
             </div>
 
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {g.agents.map((a) => (
                 <Link
                   key={a.id}
                   href={`/agents/${encodeURIComponent(a.id)}`}
-                  className="ck-glass block px-4 py-3 transition-colors hover:bg-[color:var(--ck-bg-glass-strong)]"
+                  className="ck-card block p-4 transition hover:border-[color:var(--ck-border-strong)]"
                 >
-                  <div className="truncate font-medium text-[color:var(--ck-text-primary)]">
+                  <div className="truncate font-medium">
                     {a.identityName || a.id}
                   </div>
                   <div className="mt-1 text-xs text-[color:var(--ck-text-secondary)]">
                     {a.id}
-                    {a.isDefault ? " • default" : ""}
+                    {a.isDefault ? " · default" : ""}
                   </div>
                   {a.model ? (
                     <div className="mt-1 truncate text-xs text-[color:var(--ck-text-tertiary)]">{a.model}</div>
@@ -178,10 +134,6 @@ export default function HomeClient({
           </section>
         ))}
       </div>
-
-      <p className="mt-10 text-xs text-[color:var(--ck-text-tertiary)]">
-        Note: Team detection currently uses the convention <code>~/.openclaw/workspace-&lt;teamId&gt;</code>.
-      </p>
     </div>
   );
 }

@@ -8,7 +8,7 @@ export type FileListWithOptionalToggleEntry = {
 
 function getFileButtonClass(selectedFileName: string, fName: string): string {
   const isSelected = selectedFileName === fName;
-  const base = "w-full rounded-[var(--ck-radius-sm)] px-3 py-2 text-left text-sm";
+  const base = "w-full rounded-lg px-3 py-2 text-left text-sm";
   if (isSelected) {
     return `${base} bg-white/10 text-[color:var(--ck-text-primary)]`;
   }
@@ -37,7 +37,7 @@ export function FileListWithOptionalToggle({
   const filtered = showOptionalFiles ? files : files.filter((f) => f.required || !f.missing);
 
   return (
-    <div className="ck-glass-strong p-4">
+    <div className="ck-card p-4">
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm font-medium text-[color:var(--ck-text-primary)]">{title}</div>
         <label className="flex items-center gap-2 text-xs text-[color:var(--ck-text-secondary)]">

@@ -17,7 +17,7 @@ export function GoalFormCard({
   actions: ReactNode;
 }) {
   return (
-    <div className="ck-glass p-6 space-y-4">
+    <div className="ck-card p-6 space-y-4">
       {children}
       {error ? <div className="text-sm text-red-300">{error}</div> : null}
       {actions}
@@ -26,7 +26,7 @@ export function GoalFormCard({
 }
 
 const inputClass =
-  "mt-1 w-full rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] bg-transparent px-3 py-2 text-sm";
+  "mt-1 w-full rounded-lg border border-[color:var(--ck-border-subtle)] bg-transparent px-3 py-2 text-sm";
 
 type Props = {
   formState: GoalFormState;
@@ -152,7 +152,7 @@ export function GoalFormFields({
         </div>
         <textarea
           id={bodyTextareaId}
-          className={`mt-1 ${bodyHeight} w-full rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] bg-transparent px-3 py-2 font-mono text-sm`}
+          className={`mt-1 ${bodyHeight} w-full rounded-lg border border-[color:var(--ck-border-subtle)] bg-transparent px-3 py-2 font-mono text-sm`}
           value={body}
           onChange={(e) => setBody(e.target.value)}
           placeholder="Write the goal here…"

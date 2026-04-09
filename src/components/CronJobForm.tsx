@@ -17,7 +17,7 @@ export function CronJobForm({ formData, updateField }: CronJobFormProps) {
             type="text"
             value={formData.name}
             onChange={(e) => updateField("name", e.target.value)}
-            className="mt-2 block w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] placeholder:text-[color:var(--ck-text-tertiary)]"
+            className="mt-2 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] placeholder:text-[color:var(--ck-text-tertiary)]"
             placeholder="Job name"
           />
         </label>
@@ -27,7 +27,7 @@ export function CronJobForm({ formData, updateField }: CronJobFormProps) {
             type="text"
             value={formData.agentId}
             onChange={(e) => updateField("agentId", e.target.value)}
-            className="mt-2 block w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] placeholder:text-[color:var(--ck-text-tertiary)]"
+            className="mt-2 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] placeholder:text-[color:var(--ck-text-tertiary)]"
             placeholder="Agent ID"
           />
         </label>
@@ -38,7 +38,7 @@ export function CronJobForm({ formData, updateField }: CronJobFormProps) {
         <textarea
           value={formData.description}
           onChange={(e) => updateField("description", e.target.value)}
-          className="mt-2 block w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] placeholder:text-[color:var(--ck-text-tertiary)]"
+          className="mt-2 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] placeholder:text-[color:var(--ck-text-tertiary)]"
           rows={2}
           placeholder="Optional description"
         />
@@ -66,7 +66,7 @@ export function CronJobForm({ formData, updateField }: CronJobFormProps) {
           <select
             value={formData.scheduleKind}
             onChange={(e) => updateField("scheduleKind", e.target.value as "cron" | "every" | "at")}
-            className="mt-2 block w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+            className="mt-2 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
           >
             <option value="every">Every (interval)</option>
             <option value="cron">Cron expression</option>
@@ -82,7 +82,7 @@ export function CronJobForm({ formData, updateField }: CronJobFormProps) {
                 type="number"
                 value={formData.everyValue}
                 onChange={(e) => updateField("everyValue", Number(e.target.value))}
-                className="mt-2 block w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                className="mt-2 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
                 min="1"
               />
             </label>
@@ -91,7 +91,7 @@ export function CronJobForm({ formData, updateField }: CronJobFormProps) {
               <select
                 value={formData.everyUnit}
                 onChange={(e) => updateField("everyUnit", e.target.value as "s" | "m" | "h" | "d")}
-                className="mt-2 block w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                className="mt-2 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
               >
                 <option value="s">Seconds</option>
                 <option value="m">Minutes</option>
@@ -110,7 +110,7 @@ export function CronJobForm({ formData, updateField }: CronJobFormProps) {
                 type="text"
                 value={formData.cronExpr}
                 onChange={(e) => updateField("cronExpr", e.target.value)}
-                className="mt-2 block w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                className="mt-2 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
                 placeholder="0 * * * *"
               />
             </label>
@@ -120,7 +120,7 @@ export function CronJobForm({ formData, updateField }: CronJobFormProps) {
                 type="text"
                 value={formData.timezone}
                 onChange={(e) => updateField("timezone", e.target.value)}
-                className="mt-2 block w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                className="mt-2 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
                 placeholder="UTC"
               />
             </label>
@@ -134,7 +134,7 @@ export function CronJobForm({ formData, updateField }: CronJobFormProps) {
               type="text"
               value={formData.atValue}
               onChange={(e) => updateField("atValue", e.target.value)}
-              className="mt-2 block w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+              className="mt-2 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
               placeholder="2024-01-01T00:00:00Z"
             />
           </label>
@@ -150,7 +150,7 @@ export function CronJobForm({ formData, updateField }: CronJobFormProps) {
           <select
             value={formData.payloadKind}
             onChange={(e) => updateField("payloadKind", e.target.value as "systemEvent" | "agentTurn")}
-            className="mt-2 block w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+            className="mt-2 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
           >
             <option value="agentTurn">Agent Turn</option>
             <option value="systemEvent">System Event</option>
@@ -163,7 +163,7 @@ export function CronJobForm({ formData, updateField }: CronJobFormProps) {
             <textarea
               value={formData.payloadText}
               onChange={(e) => updateField("payloadText", e.target.value)}
-              className="mt-2 block w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+              className="mt-2 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
               rows={3}
               placeholder="System event message"
             />
@@ -175,7 +175,7 @@ export function CronJobForm({ formData, updateField }: CronJobFormProps) {
               <textarea
                 value={formData.payloadMessage}
                 onChange={(e) => updateField("payloadMessage", e.target.value)}
-                className="mt-2 block w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                className="mt-2 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
                 rows={3}
                 placeholder="Agent message"
               />
@@ -188,7 +188,7 @@ export function CronJobForm({ formData, updateField }: CronJobFormProps) {
                   type="text"
                   value={formData.payloadModel}
                   onChange={(e) => updateField("payloadModel", e.target.value)}
-                  className="mt-2 block w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                  className="mt-2 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
                   placeholder="Model ID"
                 />
               </label>
@@ -198,7 +198,7 @@ export function CronJobForm({ formData, updateField }: CronJobFormProps) {
                   type="text"
                   value={formData.payloadThinking}
                   onChange={(e) => updateField("payloadThinking", e.target.value)}
-                  className="mt-2 block w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                  className="mt-2 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
                   placeholder="Thinking level"
                 />
               </label>
@@ -210,7 +210,7 @@ export function CronJobForm({ formData, updateField }: CronJobFormProps) {
                 type="number"
                 value={formData.payloadTimeout}
                 onChange={(e) => updateField("payloadTimeout", Number(e.target.value))}
-                className="mt-2 block w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                className="mt-2 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
                 min="1"
               />
             </label>
@@ -227,7 +227,7 @@ export function CronJobForm({ formData, updateField }: CronJobFormProps) {
           <select
             value={formData.deliveryMode}
             onChange={(e) => updateField("deliveryMode", e.target.value as "none" | "announce")}
-            className="mt-2 block w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+            className="mt-2 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
           >
             <option value="none">None</option>
             <option value="announce">Announce</option>
@@ -243,7 +243,7 @@ export function CronJobForm({ formData, updateField }: CronJobFormProps) {
                   type="text"
                   value={formData.deliveryChannel}
                   onChange={(e) => updateField("deliveryChannel", e.target.value)}
-                  className="mt-2 block w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                  className="mt-2 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
                   placeholder="Channel ID"
                 />
               </label>
@@ -253,7 +253,7 @@ export function CronJobForm({ formData, updateField }: CronJobFormProps) {
                   type="text"
                   value={formData.deliveryTo}
                   onChange={(e) => updateField("deliveryTo", e.target.value)}
-                  className="mt-2 block w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+                  className="mt-2 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
                   placeholder="Target"
                 />
               </label>
@@ -286,7 +286,7 @@ export function CronJobForm({ formData, updateField }: CronJobFormProps) {
               type="text"
               value={formData.sessionTarget}
               onChange={(e) => updateField("sessionTarget", e.target.value)}
-              className="mt-2 block w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+              className="mt-2 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
               placeholder="Session target"
             />
           </label>
@@ -296,7 +296,7 @@ export function CronJobForm({ formData, updateField }: CronJobFormProps) {
               type="text"
               value={formData.sessionKey}
               onChange={(e) => updateField("sessionKey", e.target.value)}
-              className="mt-2 block w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+              className="mt-2 block w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
               placeholder="Session key"
             />
           </label>

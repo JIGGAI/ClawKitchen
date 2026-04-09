@@ -116,7 +116,7 @@ export default function RunDetailClient({
   return (
     <>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-      <div className="lg:col-span-1 rounded-[var(--ck-radius-lg)] border border-white/10 bg-black/10 p-4">
+      <div className="lg:col-span-1 rounded-3xl border border-white/10 bg-black/10 p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-xs uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">run status</div>
@@ -140,7 +140,7 @@ export default function RunDetailClient({
                 type="button"
                 onClick={() => setShowStopModal(true)}
                 disabled={actionBusy}
-                className="rounded-[var(--ck-radius-sm)] border border-amber-500/50 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-100 hover:bg-amber-500/20 disabled:opacity-50"
+                className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-100 hover:bg-amber-500/20 disabled:opacity-50"
               >
                 Stop Run
               </button>
@@ -150,7 +150,7 @@ export default function RunDetailClient({
                 type="button"
                 onClick={() => setShowDeleteModal(true)}
                 disabled={actionBusy}
-                className="rounded-[var(--ck-radius-sm)] border border-red-500/50 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-100 hover:bg-red-500/20 disabled:opacity-50"
+                className="rounded-lg border border-red-500/50 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-100 hover:bg-red-500/20 disabled:opacity-50"
               >
                 Delete Run
               </button>
@@ -171,8 +171,8 @@ export default function RunDetailClient({
                     onClick={() => setSelectedIdx(idx)}
                     className={
                       active
-                        ? "w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/10 px-2 py-2 text-left"
-                        : "w-full rounded-[var(--ck-radius-sm)] px-2 py-2 text-left hover:bg-white/5"
+                        ? "w-full rounded-lg border border-white/10 bg-white/10 px-2 py-2 text-left"
+                        : "w-full rounded-lg px-2 py-2 text-left hover:bg-white/5"
                     }
                   >
                     <div className="flex items-center justify-between gap-3">
@@ -196,7 +196,7 @@ export default function RunDetailClient({
         </div>
 
         {run.approval ? (
-          <div className="mt-4 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/10 p-3">
+          <div className="mt-4 rounded-lg border border-white/10 bg-black/10 p-3">
             <div className="text-xs uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">approval</div>
             <div className="mt-2 text-xs text-[color:var(--ck-text-secondary)]">
               <div>
@@ -206,14 +206,14 @@ export default function RunDetailClient({
                 <span className="font-medium">state:</span> {run.approval.state}
               </div>
               {run.approval.note ? (
-                <div className="mt-2 rounded border border-white/10 bg-black/20 p-2 text-[11px]">{run.approval.note}</div>
+                <div className="mt-2 rounded border border-white/10 bg-white/5 p-2 text-[11px]">{run.approval.note}</div>
               ) : null}
             </div>
           </div>
         ) : null}
       </div>
 
-      <div className="lg:col-span-2 rounded-[var(--ck-radius-lg)] border border-white/10 bg-black/10 p-4">
+      <div className="lg:col-span-2 rounded-3xl border border-white/10 bg-black/10 p-4">
         <div className="text-xs uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">node output / error</div>
 
         {selectedNode ? (
@@ -224,13 +224,13 @@ export default function RunDetailClient({
             </div>
 
             {selectedNode.error ? (
-              <div className="mt-3 rounded-[var(--ck-radius-sm)] border border-red-400/30 bg-red-500/10 p-3">
+              <div className="mt-3 rounded-lg border border-red-400/30 bg-red-500/10 p-3">
                 <div className="text-xs font-semibold text-red-50">Error</div>
                 <pre className="mt-2 overflow-auto text-xs text-red-50">{asPrettyJson(selectedNode.error)}</pre>
               </div>
             ) : null}
 
-            <div className="mt-3 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3">
+            <div className="mt-3 rounded-lg border border-white/10 bg-white/5 p-3">
               <div className="text-xs font-semibold text-[color:var(--ck-text-secondary)]">Output</div>
               {typeof selectedNode.output === "undefined" || selectedNode.output === null ? (
                 <div className="mt-2 text-xs text-[color:var(--ck-text-tertiary)]">(no output)</div>
@@ -243,7 +243,7 @@ export default function RunDetailClient({
           <div className="mt-3 text-sm text-[color:var(--ck-text-secondary)]">Select a node to view its output.</div>
         )}
 
-        <details className="mt-4 rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/10 p-3">
+        <details className="mt-4 rounded-lg border border-white/10 bg-black/10 p-3">
           <summary className="cursor-pointer text-sm font-medium text-[color:var(--ck-text-secondary)]">Raw run file</summary>
           <pre className="mt-3 overflow-auto text-xs text-[color:var(--ck-text-primary)]">{asPrettyJson(run)}</pre>
         </details>
@@ -262,7 +262,7 @@ export default function RunDetailClient({
         onConfirm={handleStop}
         busy={actionBusy}
         error={actionError}
-        confirmButtonClassName="rounded-[var(--ck-radius-sm)] bg-amber-600 px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] transition-colors hover:bg-amber-700 disabled:opacity-50"
+        confirmButtonClassName="rounded-lg bg-amber-600 px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] transition-colors hover:bg-amber-700 disabled:opacity-50"
       >
         <div className="mt-3 text-sm text-[color:var(--ck-text-secondary)]">
           <p>This will cancel the workflow run and set its status to <code className="bg-white/10 px-1 rounded">canceled</code>.</p>
@@ -287,7 +287,7 @@ export default function RunDetailClient({
         <div className="mt-3 text-sm text-[color:var(--ck-text-secondary)]">
           <p>This will permanently delete the workflow run and all its data.</p>
           <p className="mt-2 font-medium text-[color:var(--ck-text-primary)]">This action cannot be undone.</p>
-          <div className="mt-3 rounded border border-white/10 bg-black/20 p-2 text-xs">
+          <div className="mt-3 rounded border border-white/10 bg-white/5 p-2 text-xs">
             <span className="font-mono">{run.id}</span>
           </div>
         </div>

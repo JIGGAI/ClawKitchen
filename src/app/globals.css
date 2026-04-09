@@ -2,77 +2,60 @@
 
 /*
   Claw Kitchen UI tokens
-  Goal: macOS Mission Control vibe — frosted glass surfaces, subtle depth,
-  and system-red accents.
-
-  Default theme: LIGHT (per ticket 0024).
-  Dark theme is opt-in via [data-theme="dark"].
+  Modernized: dark-first design matching clawmarket aesthetic.
+  Navy blues, coral/cyan accents, deep shadows, subtle gradients.
 */
 :root {
-  /* Base colors (light) */
-  --ck-bg-base: #f6f7fb;
-  --ck-bg-glass: rgba(255, 255, 255, 0.70);
-  --ck-bg-glass-strong: rgba(255, 255, 255, 0.86);
+  /* Core palette */
+  --ck-coral: #ff4d4d;
+  --ck-coral-hover: #ff6666;
+  --ck-coral-active: #e63946;
+  --ck-cyan: #32d7ff;
 
-  /* Toasts (barely transparent in light mode) */
-  --ck-toast-bg: rgba(255, 255, 255, 0.94);
-  --ck-toast-border: rgba(10, 12, 16, 0.16);
+  /* Backgrounds */
+  --ck-bg-base: #090f18;
+  --ck-bg-soft: #121b29;
+  --ck-bg-card: color-mix(in oklab, var(--ck-bg-soft) 85%, #1e2c41);
+  --ck-bg-glass: rgba(18, 27, 41, 0.72);
+  --ck-bg-glass-strong: rgba(18, 27, 41, 0.88);
 
-  --ck-border-subtle: rgba(10, 12, 16, 0.10);
-  --ck-border-strong: rgba(10, 12, 16, 0.16);
+  /* Toasts */
+  --ck-toast-bg: rgba(18, 27, 41, 0.94);
+  --ck-toast-border: rgba(226, 238, 255, 0.18);
 
-  --ck-text-primary: rgba(10, 12, 16, 0.92);
-  --ck-text-secondary: rgba(10, 12, 16, 0.64);
-  --ck-text-tertiary: rgba(10, 12, 16, 0.48);
+  /* Borders */
+  --ck-border-subtle: rgba(226, 238, 255, 0.10);
+  --ck-border-strong: rgba(226, 238, 255, 0.16);
 
-  /* Accent (macOS-ish system red) */
-  --ck-accent-red: #ff3b30;
-  --ck-accent-red-hover: #ff5a52;
-  --ck-accent-red-active: #e6372d;
+  /* Text */
+  --ck-text-primary: #eef5ff;
+  --ck-text-secondary: rgba(222, 233, 248, 0.72);
+  --ck-text-tertiary: rgba(222, 233, 248, 0.50);
 
-  /* Focus ring */
-  --ck-focus-ring: rgba(255, 59, 48, 0.55);
+  /* Accent */
+  --ck-accent-red: var(--ck-coral);
+  --ck-accent-red-hover: var(--ck-coral-hover);
+  --ck-accent-red-active: var(--ck-coral-active);
+
+  /* Focus */
+  --ck-focus-ring: rgba(255, 77, 77, 0.55);
 
   /* Radii */
-  --ck-radius-sm: 10px;
-  --ck-radius-md: 14px;
-  --ck-radius-lg: 18px;
+  --ck-radius-sm: 8px;
+  --ck-radius-md: 16px;
+  --ck-radius-lg: 24px;
 
-  /* Elevation (lighter shadows) */
-  --ck-shadow-1: 0 10px 30px rgba(10, 12, 16, 0.12);
-  --ck-shadow-2: 0 18px 50px rgba(10, 12, 16, 0.18);
+  /* Elevation */
+  --ck-shadow-1: 0 22px 60px rgba(3, 7, 13, 0.5);
+  --ck-shadow-2: 0 28px 70px rgba(3, 7, 13, 0.6);
 
   /* Glass */
   --ck-glass-blur: 18px;
-  --ck-glass-saturation: 1.15;
+  --ck-glass-saturation: 1.25;
 
-  /* Legacy mappings (Next starter defaults) */
+  /* Legacy */
   --background: var(--ck-bg-base);
   --foreground: var(--ck-text-primary);
-}
-
-[data-theme="dark"] {
-  --ck-bg-base: #0b0c10;
-  --ck-bg-glass: rgba(24, 25, 31, 0.72);
-  --ck-bg-glass-strong: rgba(24, 25, 31, 0.88);
-
-  /* Toasts (barely transparent in dark mode) */
-  --ck-toast-bg: rgba(24, 25, 31, 0.92);
-  --ck-toast-border: rgba(255, 255, 255, 0.18);
-
-  --ck-border-subtle: rgba(255, 255, 255, 0.10);
-  --ck-border-strong: rgba(255, 255, 255, 0.16);
-
-  --ck-text-primary: rgba(255, 255, 255, 0.92);
-  --ck-text-secondary: rgba(255, 255, 255, 0.66);
-  --ck-text-tertiary: rgba(255, 255, 255, 0.50);
-
-  --ck-focus-ring: rgba(255, 59, 48, 0.70);
-
-  --ck-shadow-1: 0 10px 30px rgba(0, 0, 0, 0.35);
-  --ck-shadow-2: 0 18px 50px rgba(0, 0, 0, 0.45);
-
-  --ck-glass-saturation: 1.25;
 }
 
 @theme inline {
@@ -82,46 +65,32 @@
   --font-mono: var(--font-geist-mono);
 }
 
+html {
+  color-scheme: dark;
+}
+
 html,
 body {
   height: 100%;
 }
 
 body {
-  background: var(--ck-bg-base);
+  background:
+    radial-gradient(900px 540px at 82% -12%, color-mix(in oklab, var(--ck-coral) 18%, transparent), transparent 68%),
+    radial-gradient(900px 540px at 8% -16%, color-mix(in oklab, var(--ck-cyan) 14%, transparent), transparent 70%),
+    linear-gradient(180deg, #060b13 0%, #0a121c 40%, #101b2a 100%);
+  background-attachment: fixed;
   color: var(--ck-text-primary);
-  font-family: var(--font-geist-sans), system-ui, -apple-system, Segoe UI, Roboto,
-    Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), "Space Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
-/* Wallpaper-like backdrop (kept subtle; readability first) */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  background:
-    radial-gradient(1200px 700px at 20% 15%, rgba(255, 59, 48, 0.10), transparent 60%),
-    radial-gradient(900px 600px at 75% 25%, rgba(10, 12, 16, 0.05), transparent 55%),
-    radial-gradient(1100px 700px at 55% 80%, rgba(120, 140, 255, 0.10), transparent 60%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0));
-}
-
-[data-theme="dark"] body::before {
-  background:
-    radial-gradient(1200px 700px at 20% 15%, rgba(255, 59, 48, 0.14), transparent 60%),
-    radial-gradient(900px 600px at 75% 25%, rgba(255, 255, 255, 0.08), transparent 55%),
-    radial-gradient(1100px 700px at 55% 80%, rgba(120, 140, 255, 0.10), transparent 60%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(0, 0, 0, 0));
-}
-
-/* Universal focus ring: ensures keyboard nav remains obvious on glass. */
+/* Universal focus ring */
 :where(a, button, input, textarea, select, summary, [role="button"], [tabindex]):focus-visible {
   outline: 2px solid var(--ck-focus-ring);
   outline-offset: 2px;
 }
 
-/* Glass surface utility classes (fallback-first) */
+/* Glass surface utility (primary container) */
 .ck-glass {
   background: var(--ck-bg-glass);
   border: 1px solid var(--ck-border-subtle);
@@ -137,6 +106,7 @@ body::before {
   }
 }
 
+/* Glass surface (elevated) */
 .ck-glass-strong {
   background: var(--ck-bg-glass-strong);
   border: 1px solid var(--ck-border-strong);
@@ -150,4 +120,17 @@ body::before {
     -webkit-backdrop-filter: blur(calc(var(--ck-glass-blur) + 4px)) saturate(var(--ck-glass-saturation));
     backdrop-filter: blur(calc(var(--ck-glass-blur) + 4px)) saturate(var(--ck-glass-saturation));
   }
+}
+
+/* Card surface (opaque, for grids) */
+.ck-card {
+  background: var(--ck-bg-card);
+  border: 1px solid var(--ck-border-subtle);
+  border-radius: var(--ck-radius-md);
+  box-shadow: var(--ck-shadow-1);
+  transition: background-color 160ms ease-out, border-color 160ms ease-out;
+}
+
+.ck-card:hover {
+  background: color-mix(in oklab, var(--ck-bg-card) 90%, rgba(255, 255, 255, 0.08));
 }

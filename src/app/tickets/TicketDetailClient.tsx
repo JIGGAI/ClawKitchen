@@ -92,19 +92,19 @@ export function TicketDetailClient(props: {
       </div>
 
       {error ? (
-        <div className="ck-glass border border-[color:var(--ck-border-strong)] p-3 text-sm text-[color:var(--ck-text-primary)]">
+        <div className="ck-card border border-[color:var(--ck-border-strong)] p-3 text-sm text-[color:var(--ck-text-primary)]">
           {error}
         </div>
       ) : null}
 
-      <div className="ck-glass p-6">
+      <div className="ck-card p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="text-sm font-semibold text-[color:var(--ck-text-primary)]">Ticket</div>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <label className="flex items-center gap-2 text-xs text-[color:var(--ck-text-secondary)]">
               <span>Status</span>
               <select
-                className="rounded border border-[color:var(--ck-border-subtle)] bg-black/20 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                className="rounded border border-[color:var(--ck-border-subtle)] bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
                 disabled={isPending}
                 value={props.stage}
                 onChange={(e) => {
@@ -169,7 +169,7 @@ export function TicketDetailClient(props: {
               {comments.map((c, idx) => (
                 <div
                   key={`${c.timestamp}-${idx}`}
-                  className="rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] bg-black/10 p-3"
+                  className="rounded-lg border border-[color:var(--ck-border-subtle)] bg-black/10 p-3"
                 >
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <div className="flex flex-wrap items-baseline gap-2">
@@ -205,7 +205,7 @@ export function TicketDetailClient(props: {
                   value={commentAuthor}
                   onChange={(e) => setCommentAuthor(e.target.value)}
                   placeholder="unknown"
-                  className="w-full rounded border border-[color:var(--ck-border-subtle)] bg-black/20 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] outline-none focus:border-[color:var(--ck-border-strong)]"
+                  className="w-full rounded border border-[color:var(--ck-border-subtle)] bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] outline-none focus:border-[color:var(--ck-border-strong)]"
                   disabled={isPending}
                 />
               </div>
@@ -219,7 +219,7 @@ export function TicketDetailClient(props: {
                   value={commentBody}
                   onChange={(e) => setCommentBody(e.target.value)}
                   rows={4}
-                  className="w-full rounded border border-[color:var(--ck-border-subtle)] bg-black/20 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] outline-none focus:border-[color:var(--ck-border-strong)]"
+                  className="w-full rounded border border-[color:var(--ck-border-subtle)] bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] outline-none focus:border-[color:var(--ck-border-strong)]"
                   disabled={isPending}
                 />
               </div>
@@ -229,10 +229,10 @@ export function TicketDetailClient(props: {
                   type="button"
                   aria-busy={isPending}
                   className={
-                    "rounded-[var(--ck-radius-sm)] bg-[color:var(--ck-accent)] px-3 py-2 text-xs font-semibold text-black transition " +
+                    "rounded-lg bg-[color:var(--ck-accent)] px-3 py-2 text-xs font-semibold text-black transition " +
                     "hover:brightness-110 active:brightness-95 " +
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ck-border-strong)] focus-visible:ring-offset-2 focus-visible:ring-offset-black/30 " +
-                    "disabled:cursor-not-allowed disabled:border disabled:border-[color:var(--ck-border-subtle)] disabled:bg-[color:var(--ck-bg-glass)] disabled:text-[color:var(--ck-text-tertiary)]"
+                    "disabled:cursor-not-allowed disabled:border disabled:border-[color:var(--ck-border-subtle)] disabled:bg-white/5 disabled:text-[color:var(--ck-text-tertiary)]"
                   }
                   onClick={() => {
                     startTransition(() => {
@@ -249,7 +249,7 @@ export function TicketDetailClient(props: {
         </div>
       </div>
 
-      <div className="ck-glass p-6">
+      <div className="ck-card p-6">
         <pre className="whitespace-pre-wrap break-words text-sm leading-6 text-[color:var(--ck-text-primary)]">
           {props.markdown}
         </pre>
@@ -257,7 +257,7 @@ export function TicketDetailClient(props: {
 
       {confirm ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="ck-glass w-full max-w-lg rounded-[var(--ck-radius-md)] border border-[color:var(--ck-border-strong)] p-4">
+          <div className="ck-card w-full max-w-lg rounded-2xl border border-[color:var(--ck-border-strong)] p-4">
             <div className="text-sm font-semibold text-[color:var(--ck-text-primary)]">
               {confirm.kind === "goals" ? "Move to Goals" : "Delete ticket"}
             </div>

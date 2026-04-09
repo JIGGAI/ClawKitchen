@@ -82,7 +82,7 @@ export default async function RecipesPage({
   const customAgentRecipes = workspace.filter((r) => r.kind === "agent");
 
   return (
-    <div className="ck-glass w-full p-6 sm:p-8">
+    <div className="w-full">
       <div className="flex items-baseline justify-between gap-4">
         <h1 className="text-2xl font-semibold tracking-tight">Recipes</h1>
         <Link
@@ -94,7 +94,7 @@ export default async function RecipesPage({
       </div>
 
       {error ? (
-        <div className="mt-6 rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] bg-[color:var(--ck-bg-glass)] p-4 text-sm text-[color:var(--ck-text-secondary)]">
+        <div className="mt-6 rounded-lg border border-[color:var(--ck-border-subtle)] bg-white/5 p-4 text-sm text-[color:var(--ck-text-secondary)]">
           <div className="font-medium text-[color:var(--ck-text-primary)]">Recipes unavailable</div>
           <div className="mt-1 whitespace-pre-wrap">{error}</div>
           <div className="mt-3 text-xs text-[color:var(--ck-text-tertiary)]">

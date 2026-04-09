@@ -24,12 +24,12 @@ function Button({
   kind?: "primary" | "danger";
   disabled?: boolean;
 }) {
-  let base = "rounded-[var(--ck-radius-sm)] px-3 py-2 text-sm font-medium transition disabled:opacity-50 ";
+  let base = "rounded-lg px-3 py-2 text-sm font-medium transition disabled:opacity-50 ";
   if (kind === "primary") base += "bg-[var(--ck-accent-red)] text-white";
   else if (kind === "danger")
     base +=
       "border border-[color:rgba(255,59,48,0.45)] bg-[color:rgba(255,59,48,0.08)] text-[color:var(--ck-accent-red)] hover:bg-[color:rgba(255,59,48,0.12)]";
-  else base += "border border-[color:var(--ck-border-subtle)] hover:bg-[color:var(--ck-bg-glass)]";
+  else base += "border border-[color:var(--ck-border-subtle)] hover:bg-white/5";
   return (
     <button className={base} onClick={onClick} disabled={disabled}>
       {children}
@@ -209,7 +209,7 @@ export default function ChannelsClient() {
     <div className="space-y-6">
       {deleteProvider ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="ck-glass w-full max-w-lg border border-[color:var(--ck-border-subtle)] p-4">
+          <div className="ck-card w-full max-w-lg border border-[color:var(--ck-border-subtle)] p-4">
             <div className="text-sm font-medium text-red-200">Confirm destructive delete</div>
             <div className="mt-2 text-sm text-[color:var(--ck-text-secondary)]">
               This will <span className="font-medium text-red-200">DELETE</span> the channel binding
@@ -222,7 +222,7 @@ export default function ChannelsClient() {
             <input
               value={deleteTyped}
               onChange={(e) => setDeleteTyped(e.target.value)}
-              className="mt-2 w-full rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] bg-transparent px-3 py-2 font-mono text-sm"
+              className="mt-2 w-full rounded-lg border border-[color:var(--ck-border-subtle)] bg-transparent px-3 py-2 font-mono text-sm"
               placeholder={deleteProvider}
               autoFocus
             />
@@ -257,13 +257,13 @@ export default function ChannelsClient() {
       </div>
 
       {isGatewayToolNotAvailable ? (
-        <div className="ck-glass p-4 text-sm">
+        <div className="ck-card p-4 text-sm">
           <div className="font-medium text-yellow-200">Kitchen looks out of date</div>
           <div className="mt-1 text-[color:var(--ck-text-secondary)]">
             This endpoint used to go through the Gateway tool and would fail on hardened systems. Update the Kitchen plugin
             and restart the gateway to pick up the fix.
           </div>
-          <pre className="mt-3 overflow-x-auto rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] bg-black/20 p-3 text-xs">
+          <pre className="mt-3 overflow-x-auto rounded-lg border border-[color:var(--ck-border-subtle)] bg-white/5 p-3 text-xs">
 openclaw plugins update
 openclaw gateway restart
           </pre>
@@ -273,10 +273,10 @@ openclaw gateway restart
         </div>
       ) : null}
 
-      {error ? <div className="ck-glass p-4 text-sm text-red-300">{error}</div> : null}
+      {error ? <div className="ck-card p-4 text-sm text-red-300">{error}</div> : null}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="ck-glass p-4">
+        <div className="ck-card p-4">
           <div className="text-sm font-medium">Bindings</div>
           {loading && <div className="mt-3 text-sm text-[color:var(--ck-text-secondary)]">Loading…</div>}
           {!loading && providers.length === 0 && (
@@ -288,10 +288,10 @@ openclaw gateway restart
                 <button
                   key={p}
                   className={
-                    "flex w-full items-center justify-between rounded-[var(--ck-radius-sm)] border px-3 py-2 text-left text-sm " +
+                    "flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-sm " +
                     (p === provider
-                      ? "border-[var(--ck-accent-red)] bg-[color:var(--ck-bg-glass)]"
-                      : "border-[color:var(--ck-border-subtle)] hover:bg-[color:var(--ck-bg-glass)]")
+                      ? "border-[var(--ck-accent-red)] bg-white/5"
+                      : "border-[color:var(--ck-border-subtle)] hover:bg-white/5")
                   }
                   onClick={() => selectProvider(p)}
                 >
@@ -303,7 +303,7 @@ openclaw gateway restart
           )}
         </div>
 
-        <div className="ck-glass p-4 lg:col-span-2">
+        <div className="ck-card p-4 lg:col-span-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <div className="text-sm font-medium">Edit</div>
@@ -326,7 +326,7 @@ openclaw gateway restart
             <textarea
               value={configJson}
               onChange={(e) => setConfigJson(e.target.value)}
-              className="mt-2 h-[420px] w-full rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] bg-transparent px-3 py-2 font-mono text-sm"
+              className="mt-2 h-[420px] w-full rounded-lg border border-[color:var(--ck-border-subtle)] bg-transparent px-3 py-2 font-mono text-sm"
               placeholder={"{\n  \"enabled\": true\n}"}
             />
             <div className="mt-2 text-xs text-[color:var(--ck-text-tertiary)]">

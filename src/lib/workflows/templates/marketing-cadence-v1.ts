@@ -70,6 +70,7 @@ export function marketingCadenceWorkflowV1(opts?: { id?: string; approvalProvide
           prompt: "{{draft_assets.image_brief}}",
           promptTemplate: "{{draft_assets.image_brief}}",
           outputPath: "node-outputs/generated_image.png",
+          agentId: "marketing-designer",
         },
       },
       {
@@ -97,6 +98,7 @@ export function marketingCadenceWorkflowV1(opts?: { id?: string; approvalProvide
             draftsFromNode: "qc_brand",
             dryRun: true,
           },
+          agentId: "marketing-lead",
         },
       },
       {
@@ -125,6 +127,7 @@ export function marketingCadenceWorkflowV1(opts?: { id?: string; approvalProvide
             platforms: ["x", "instagram", "tiktok", "youtube"],
             draftsFromNode: "qc_brand",
           },
+          agentId: "marketing-lead",
         },
       },
       {
@@ -139,6 +142,7 @@ export function marketingCadenceWorkflowV1(opts?: { id?: string; approvalProvide
             path: "shared-context/marketing/POST_LOG.md",
             content: "- {{date}} {{platforms}} posted. Run={{run.id}}\\n",
           },
+          agentId: "marketing-lead",
         },
       },
       {
@@ -154,6 +158,7 @@ export function marketingCadenceWorkflowV1(opts?: { id?: string; approvalProvide
             content:
               '{"ts":"{{date}}","runId":"{{run.id}}","notes":{{qc_brand.notes_json}}}\\n',
           },
+          agentId: "marketing-lead",
         },
       },
       {
@@ -163,6 +168,7 @@ export function marketingCadenceWorkflowV1(opts?: { id?: string; approvalProvide
         x: 1860,
         y: 100,
         config: {
+          agentId: "marketing-lead",
           promptTemplate:
             "A marketing cadence workflow run just completed. Update the associated ticket with all run details.\n\nWorkflow: {{workflow.name}}\nRun ID: {{run.id}}\nDate: {{date}}\n\nResearch output:\n{{research.output}}\n\nDraft assets:\n{{draft_assets.output}}\n\nGenerated image:\n{{generate_image.output}}\n\nQC/Brand review:\n{{qc_brand.output}}\n\nPosting results:\n{{post_to_platforms.output}}\n\nWrite a clear, dated summary under ## Comments in the ticket capturing:\n- What was researched and which angle was chosen\n- What image was generated and its visual concept\n- What platforms were posted to\n- The final approved copy and image\n- Any QC notes or corrections made\n- Links to posted content if available\n\nThen move the ticket to work/done/.",
         },

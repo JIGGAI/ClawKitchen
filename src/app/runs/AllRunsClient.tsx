@@ -54,7 +54,7 @@ export default function AllRunsClient({ rows }: { rows: AllRunsRow[] }) {
   }, [q, rows, status, teamId, workflowId]);
 
   return (
-    <div className="rounded-[var(--ck-radius-lg)] border border-white/10 bg-black/10 p-4">
+    <div className="rounded-3xl border border-white/10 bg-black/10 p-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-wrap items-end gap-3">
           <label className="block">
@@ -66,7 +66,7 @@ export default function AllRunsClient({ rows }: { rows: AllRunsRow[] }) {
                 setTeamId(next);
                 setWorkflowId("");
               }}
-              className="mt-1 w-64 max-w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
+              className="mt-1 w-64 max-w-full rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
             >
               <option value="">All teams</option>
               {teamOptions.map((id) => (
@@ -82,7 +82,7 @@ export default function AllRunsClient({ rows }: { rows: AllRunsRow[] }) {
             <select
               value={workflowId}
               onChange={(e) => setWorkflowId((e.target.value || "").trim())}
-              className="mt-1 w-64 max-w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
+              className="mt-1 w-64 max-w-full rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
             >
               <option value="">All workflows</option>
               {workflowOptions.map((id) => (
@@ -98,7 +98,7 @@ export default function AllRunsClient({ rows }: { rows: AllRunsRow[] }) {
             <select
               value={status}
               onChange={(e) => setStatus((e.target.value || "").trim())}
-              className="mt-1 w-56 max-w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
+              className="mt-1 w-56 max-w-full rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
             >
               <option value="">All</option>
               <option value="running">running</option>
@@ -118,7 +118,7 @@ export default function AllRunsClient({ rows }: { rows: AllRunsRow[] }) {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="team / workflow / run id"
-              className="mt-1 w-72 max-w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
+              className="mt-1 w-72 max-w-full rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
             />
           </label>
         </div>
@@ -127,7 +127,7 @@ export default function AllRunsClient({ rows }: { rows: AllRunsRow[] }) {
           <button
             type="button"
             onClick={() => router.refresh()}
-            className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
+            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
           >
             Refresh
           </button>

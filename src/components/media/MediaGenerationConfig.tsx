@@ -177,7 +177,7 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId, workf
       )}
 
       {!loading && availableProviders.length === 0 && providers.length > 0 && (
-        <div className="mt-2 rounded-[var(--ck-radius-sm)] border border-amber-400/30 bg-amber-500/10 p-2 text-xs text-amber-50">
+        <div className="mt-2 rounded-lg border border-amber-400/30 bg-amber-500/10 p-2 text-xs text-amber-50">
           <div className="space-y-1">
             <div className="font-medium">⚠️ Media providers detected but not available</div>
             <div>
@@ -199,7 +199,7 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId, workf
       )}
 
       {!loading && providers.length === 0 && (
-        <div className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/20 p-3">
+        <div className="rounded-lg border border-white/10 bg-white/5 p-3">
           <div className="text-xs text-[color:var(--ck-text-secondary)] space-y-2">
             <p className="font-medium text-[color:var(--ck-text-primary)]">⚠️ No media generation providers detected</p>
             <div className="space-y-1 text-[color:var(--ck-text-tertiary)]">
@@ -219,7 +219,7 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId, workf
           <select
             value={config.provider}
             onChange={(e) => updateConfig({ provider: e.target.value })}
-            className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+            className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
           >
             <option value="auto">Auto-detect (recommended)</option>
             {providers.map((provider) => (
@@ -244,7 +244,7 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId, workf
                 )}
               </div>
               {selectedProvider.error && (
-                <div className="mt-2 rounded-[var(--ck-radius-sm)] border border-red-400/30 bg-red-500/10 p-2 text-xs text-red-100">
+                <div className="mt-2 rounded-lg border border-red-400/30 bg-red-500/10 p-2 text-xs text-red-100">
                   <div>
                     <span className="font-medium">⚠️ Setup Required:</span> {selectedProvider.error}
                   </div>
@@ -289,7 +289,7 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId, workf
             onChange={(e) => updateConfig({ prompt: e.target.value })}
             placeholder="Describe the image or video you want to generate..."
             rows={3}
-            className="mt-1 w-full resize-none rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 p-2 pr-12 text-xs text-[color:var(--ck-text-primary)]"
+            className="mt-1 w-full resize-none rounded-lg border border-white/10 bg-white/5 p-2 pr-12 text-xs text-[color:var(--ck-text-primary)]"
           />
 
           {/* Variables dropdown */}
@@ -297,14 +297,14 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId, workf
             <button
               type="button"
               onClick={() => setIsVarsOpen(!isVarsOpen)}
-              className="rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/30 px-2 py-1 text-[9px] text-[color:var(--ck-text-secondary)] hover:bg-white/10 hover:text-[color:var(--ck-text-primary)]"
+              className="rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-[9px] text-[color:var(--ck-text-secondary)] hover:bg-white/10 hover:text-[color:var(--ck-text-primary)]"
               title="Insert variable"
             >
               {'{{}}'}
             </button>
 
             {isVarsOpen && (
-              <div className="absolute right-0 top-8 z-50 w-72 max-h-80 overflow-auto rounded-[var(--ck-radius-sm)] border border-white/15 bg-black/80 backdrop-blur shadow-[var(--ck-shadow-1)]">
+              <div className="absolute right-0 top-8 z-50 w-72 max-h-80 overflow-auto rounded-lg border border-white/15 bg-black/80 backdrop-blur shadow-[var(--ck-shadow-1)]">
                 <div className="p-1">
                   <div>
                     <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">
@@ -315,7 +315,7 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId, workf
                         key={variable}
                         type="button"
                         onClick={() => insertVariable(variable)}
-                        className="w-full flex items-center justify-between gap-2 rounded-[var(--ck-radius-sm)] px-2 py-1 text-left text-xs text-[color:var(--ck-text-primary)] hover:bg-white/10 cursor-pointer"
+                        className="w-full flex items-center justify-between gap-2 rounded-lg px-2 py-1 text-left text-xs text-[color:var(--ck-text-primary)] hover:bg-white/10 cursor-pointer"
                       >
                         <span className="font-mono">{variable}</span>
                         <span className="text-[9px] px-1 py-0.5 rounded-sm bg-black/30 text-blue-400">
@@ -341,7 +341,7 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId, workf
                             key={`${group.nodeId}.${field.name}`}
                             type="button"
                             onClick={() => insertVariable(variable)}
-                            className="w-full flex items-center justify-between gap-2 rounded-[var(--ck-radius-sm)] px-2 py-1 text-left text-xs text-[color:var(--ck-text-primary)] hover:bg-white/10 cursor-pointer"
+                            className="w-full flex items-center justify-between gap-2 rounded-lg px-2 py-1 text-left text-xs text-[color:var(--ck-text-primary)] hover:bg-white/10 cursor-pointer"
                           >
                             <span className="font-mono">{variable}</span>
                             <span className={`text-[9px] px-1 py-0.5 rounded-sm bg-black/30 ${badgeColor}`}>
@@ -370,7 +370,7 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId, workf
             <button
               key={key}
               onClick={() => updateConfig({ prompt: template })}
-              className="rounded-[var(--ck-radius-sm)] bg-black/20 px-2 py-0.5 text-[9px] text-[color:var(--ck-text-tertiary)] hover:bg-black/30"
+              className="rounded-lg bg-white/5 px-2 py-0.5 text-[9px] text-[color:var(--ck-text-tertiary)] hover:bg-black/30"
               type="button"
             >
               {key}
@@ -390,7 +390,7 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId, workf
             <select
               value={config.size || '1024x1024'}
               onChange={(e) => updateConfig({ size: e.target.value })}
-              className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+              className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
             >
               <option value="1024x1024">Square (1024×1024)</option>
               <option value="1792x1024">Landscape (1792×1024)</option>
@@ -405,7 +405,7 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId, workf
               <select
                 value={config.quality || 'standard'}
                 onChange={(e) => updateConfig({ quality: e.target.value as 'standard' | 'hd' })}
-                className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+                className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
               >
                 <option value="standard">Standard</option>
                 <option value="hd">HD (higher cost)</option>
@@ -421,7 +421,7 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId, workf
           <select
             value={config.style || 'natural'}
             onChange={(e) => updateConfig({ style: e.target.value as 'natural' | 'vivid' })}
-            className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+            className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
           >
             <option value="natural">Natural</option>
             <option value="vivid">Vivid</option>
@@ -437,7 +437,7 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId, workf
             <select
               value={config.aspect_ratio || '16:9'}
               onChange={(e) => updateConfig({ aspect_ratio: e.target.value })}
-              className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+              className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
             >
               <option value="16:9">Landscape (16:9)</option>
               <option value="9:16">Portrait (9:16)</option>
@@ -454,7 +454,7 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId, workf
             value={config.duration || '5s'}
             onChange={(e) => updateConfig({ duration: e.target.value })}
             placeholder="e.g., 5s, 10s"
-            className="mt-1 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-black/25 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
+            className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-[color:var(--ck-text-primary)]"
           />
           {selectedProvider?.durationConstraints ? (
             <div className="mt-1 flex items-center gap-1 text-[10px] text-amber-400/80">
@@ -480,7 +480,7 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId, workf
             type="checkbox"
             checked={config.addRefinement === true || config.addRefinement === 'true'}
             onChange={(e) => updateConfig({ addRefinement: e.target.checked })}
-            className="h-3.5 w-3.5 rounded border-white/20 bg-black/25 text-blue-500 accent-blue-500"
+            className="h-3.5 w-3.5 rounded border-white/20 bg-white/5 text-blue-500 accent-blue-500"
           />
           <div>
             <span className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">Add LLM Refinement</span>
@@ -493,7 +493,7 @@ export function MediaGenerationConfigComponent({ config, onChange, teamId, workf
 
       {/* Validation Errors */}
       {errors.length > 0 && (
-        <div className="mt-2 rounded-[var(--ck-radius-sm)] border border-red-400/30 bg-red-500/10 p-2 text-xs text-red-100">
+        <div className="mt-2 rounded-lg border border-red-400/30 bg-red-500/10 p-2 text-xs text-red-100">
           <div className="font-medium mb-1">Configuration Issues:</div>
           <div className="space-y-0.5">
             {errors.map((error, index) => (

@@ -45,7 +45,7 @@ const EXPERIMENTAL_TABS = [
 
 type TabId = (typeof BASE_TABS | typeof EXPERIMENTAL_TABS)[number]["id"];
 
-export default function TeamEditor({ teamId, initialTab }: { teamId: string; initialTab?: string }) {
+export default function TeamEditor({ teamId, teamName, initialTab }: { teamId: string; teamName?: string | null; initialTab?: string }) {
   const router = useRouter();
   const [recipes, setRecipes] = useState<RecipeListItem[]>([]);
   const [fromId, setFromId] = useState<string>("");
@@ -401,11 +401,9 @@ export default function TeamEditor({ teamId, initialTab }: { teamId: string; ini
   }
 
   return (
-    <div className="ck-glass w-full p-6 sm:p-8">
-      <h1 className="text-2xl font-semibold tracking-tight">Team editor</h1>
-      <p className="mt-2 text-sm text-[color:var(--ck-text-secondary)]">
-        Bootstrap a <strong>custom team recipe</strong> for this installed team, without modifying builtin recipes.
-      </p>
+    <div className="w-full">
+      <h1 className="text-2xl font-semibold tracking-tight">{teamName || teamId}</h1>
+      <p className="mt-1 text-sm font-mono text-[color:var(--ck-text-tertiary)]">{teamId}</p>
 
 
       <div className="mt-6 flex flex-wrap gap-2">
@@ -415,8 +413,8 @@ export default function TeamEditor({ teamId, initialTab }: { teamId: string; ini
             onClick={() => setActiveTab(t.id as TabId)}
             className={
               activeTab === t.id
-                ? "rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)]"
-                : "rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] hover:bg-white/10"
+                ? "rounded-lg bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)]"
+                : "rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] hover:bg-white/10"
             }
           >
             {t.label}

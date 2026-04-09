@@ -61,7 +61,7 @@ export function CreateTeamModal({
           value={teamName}
           onChange={(e) => setTeamName(e.target.value)}
           placeholder="e.g. Crypto Team"
-          className="mt-2 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] placeholder:text-[color:var(--ck-text-tertiary)]"
+          className="mt-2 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] placeholder:text-[color:var(--ck-text-tertiary)]"
           autoFocus
         />
       </div>
@@ -75,7 +75,7 @@ export function CreateTeamModal({
             setTeamId(e.target.value);
           }}
           placeholder="e.g. my-team"
-          className="mt-2 w-full rounded-[var(--ck-radius-sm)] border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] placeholder:text-[color:var(--ck-text-tertiary)]"
+          className="mt-2 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)] placeholder:text-[color:var(--ck-text-tertiary)]"
         />
         <div className="mt-2 text-xs text-[color:var(--ck-text-tertiary)]">
           This will scaffold ~/.openclaw/workspace-&lt;teamId&gt; and add the team to config.

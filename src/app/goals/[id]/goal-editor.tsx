@@ -120,28 +120,28 @@ export default function GoalEditor({ goalId }: { goalId: string }) {
           <button
             onClick={() => void save()}
             disabled={saving || loading}
-            className="rounded-[var(--ck-radius-sm)] bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className="rounded-lg bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
           >
             {saving ? "Saving…" : "Save"}
           </button>
           <button
             onClick={() => void loadGoal()}
             disabled={saving}
-            className="rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] px-3 py-2 text-sm"
+            className="rounded-lg border border-[color:var(--ck-border-subtle)] px-3 py-2 text-sm"
           >
             Reload
           </button>
           <button
             onClick={() => void promoteToInbox()}
             disabled={saving || loading}
-            className="rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] px-3 py-2 text-sm font-medium"
+            className="rounded-lg border border-[color:var(--ck-border-subtle)] px-3 py-2 text-sm font-medium"
           >
             Promote to inbox
           </button>
           <button
             onClick={() => void deleteThisGoal()}
             disabled={saving || loading}
-            className="rounded-[var(--ck-radius-sm)] border border-[color:rgba(255,59,48,0.45)] bg-[color:rgba(255,59,48,0.08)] px-3 py-2 text-sm font-medium text-[color:var(--ck-accent-red)] transition-colors hover:bg-[color:rgba(255,59,48,0.12)]"
+            className="rounded-lg border border-[color:rgba(255,59,48,0.45)] bg-[color:rgba(255,59,48,0.08)] px-3 py-2 text-sm font-medium text-[color:var(--ck-accent-red)] transition-colors hover:bg-[color:rgba(255,59,48,0.12)]"
           >
             Delete
           </button>
@@ -151,7 +151,7 @@ export default function GoalEditor({ goalId }: { goalId: string }) {
         <GoalFormFields formState={formState} updatedAt={updatedAt} />
       </GoalFormCard>
 
-      <div className="ck-glass p-6">
+      <div className="ck-card p-6">
         <div className="text-sm font-medium">Preview</div>
         <pre className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-[color:var(--ck-text-primary)]">{formState.body}</pre>
       </div>

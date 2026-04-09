@@ -74,11 +74,11 @@ export function TicketAssignControl({
   }
 
   return (
-    <div className="ck-glass p-4">
+    <div className="ck-card p-4">
       <div className="flex flex-wrap items-center gap-3">
         <div className="text-xs font-medium text-[color:var(--ck-text-tertiary)]">Assignee</div>
         <select
-          className="rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
+          className="rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-[color:var(--ck-text-primary)]"
           value={selected}
           onChange={(e) => setSelected(e.target.value)}
         >
