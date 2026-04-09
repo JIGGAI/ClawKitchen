@@ -161,7 +161,9 @@ export async function readWorkflowRun(teamId: string, workflowId: string, runId:
       );
     }
 
-    return { ok: true as const, path: pRunner, run };
+    // Runner-managed runs have nodeStates and no schema field in the raw file.
+    const isRunnerManaged = !!(parsed && typeof parsed === "object" && "nodeStates" in parsed && !("schema" in parsed));
+    return { ok: true as const, path: pRunner, run, isRunnerManaged };
   } catch (err: unknown) {
     // fallthrough
     if (!(err && typeof err === "object" && (err as { code?: unknown }).code === "ENOENT")) throw err;

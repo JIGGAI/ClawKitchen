@@ -466,10 +466,46 @@ export async function POST(req: Request) {
 
       const existing = await readWorkflowRun(teamId, workflowId, runIdFromBody);
       const run = existing.run;
+      const isRunnerManaged = "isRunnerManaged" in existing && existing.isRunnerManaged;
 
       const approvalNodeId = run.approval?.nodeId || (Array.isArray(run.nodes) ? run.nodes.find((n) => n.status === "waiting")?.nodeId : undefined);
       if (!approvalNodeId) {
         return NextResponse.json({ ok: false, error: "Run is not awaiting approval" }, { status: 400 });
+      }
+
+      // For runner-managed runs (ClawRecipes workflow engine), only write the
+      // approval file and log the event. Do NOT modify run.json — the runner's
+      // poll-approvals handles resuming the run and advancing node state.
+      if (isRunnerManaged) {
+        const decidedAtRunner = nowIso();
+        const nextStateRunner = action === "approve" ? "approved" : action === "request_changes" ? "rejected" : "rejected";
+
+        try {
+          await writeApprovalFile(teamId, workflowId, run.id, approvalNodeId, {
+            state: nextStateRunner,
+            requestedAt: run.approval?.requestedAt,
+            decidedAt: decidedAtRunner,
+            note,
+            decidedBy,
+          });
+        } catch (e) {
+          return NextResponse.json({ ok: false, error: `Failed to write approval: ${e}` }, { status: 500 });
+        }
+
+        try {
+          await appendWorkflowRunEvent(teamId, workflowId, run.id, {
+            type: action === "approve" ? "approval.approved" : "approval.changes_requested",
+            nodeId: approvalNodeId,
+            action,
+            decidedBy: decidedBy || "ClawKitchen UI",
+            note: note || undefined,
+            decision: nextStateRunner,
+          });
+        } catch {
+          // non-critical
+        }
+
+        return jsonOkRest({ ok: true, runId: run.id, action, state: nextStateRunner, runnerManaged: true });
       }
 
       const decidedAt = nowIso();
