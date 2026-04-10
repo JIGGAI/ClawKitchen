@@ -5,6 +5,9 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import type { WorkflowRunSummary } from "@/lib/workflows/runs-storage";
+import { useRunSelection } from "@/hooks/useRunSelection";
+import { ConfirmationModal } from "@/components/ConfirmationModal";
+import { fetchJson } from "@/lib/fetch-json";
 
 function fmt(ts?: string) {
   if (!ts) return "";
@@ -29,6 +32,10 @@ export default function RunsClient({
   const [status, setStatus] = useState<string>("");
   const [q, setQ] = useState<string>("");
 
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return initialRuns.filter((r) => {
@@ -48,6 +55,43 @@ export default function RunsClient({
     const ids = Array.from(new Set(initialRuns.map((r) => r.workflowId).filter(Boolean))).sort();
     return ids;
   }, [initialRuns]);
+
+  const visibleIds = useMemo(() => filtered.map((r) => `${r.workflowId}:${r.runId}`), [filtered]);
+  const { selected, toggle, allSelected, toggleAll, clear, count } = useRunSelection(visibleIds);
+
+  const handleBulkDelete = async () => {
+    setDeleteBusy(true);
+    setDeleteError(null);
+
+    // Group selected runs by workflow for batching
+    const groups = new Map<string, string[]>();
+    for (const key of selected) {
+      const [wfId, runId] = key.split(":");
+      if (!groups.has(wfId)) groups.set(wfId, []);
+      groups.get(wfId)!.push(runId);
+    }
+
+    try {
+      const results = await Promise.all(
+        Array.from(groups.entries()).map(([wfId, runIds]) =>
+          fetchJson<{ ok: boolean; error?: string }>("/api/teams/workflow-runs", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ teamId, workflowId: wfId, action: "bulk-delete", runIds }),
+          }),
+        ),
+      );
+      const failed = results.filter((r) => !r.ok);
+      if (failed.length) throw new Error(failed.map((r) => r.error).join("; "));
+      clear();
+      setShowDeleteModal(false);
+      router.refresh();
+    } catch (err) {
+      setDeleteError(String(err));
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
 
   return (
     <div className="rounded-3xl border border-white/10 bg-black/10 p-4">
@@ -111,6 +155,15 @@ export default function RunsClient({
         <table className="min-w-full border-separate border-spacing-0">
           <thead>
             <tr className="text-left text-xs uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">
+              <th className="border-b border-white/10 px-2 py-2 w-8">
+                <input
+                  type="checkbox"
+                  checked={allSelected && filtered.length > 0}
+                  onChange={toggleAll}
+                  className="accent-[var(--ck-accent-red)]"
+                  aria-label="Select all runs"
+                />
+              </th>
               <th className="border-b border-white/10 px-2 py-2">workflow</th>
               <th className="border-b border-white/10 px-2 py-2">status</th>
               <th className="border-b border-white/10 px-2 py-2">updated</th>
@@ -122,8 +175,18 @@ export default function RunsClient({
               filtered.map((r) => {
                 const wf = workflows[r.workflowId];
                 const wfLabel = wf?.name ? wf.name : r.workflowId;
+                const key = `${r.workflowId}:${r.runId}`;
                 return (
-                  <tr key={`${r.workflowId}:${r.runId}`} className="text-sm">
+                  <tr key={key} className="text-sm">
+                    <td className="border-b border-white/5 px-2 py-2">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(key)}
+                        onChange={() => toggle(key)}
+                        className="accent-[var(--ck-accent-red)]"
+                        aria-label={`Select run ${r.runId}`}
+                      />
+                    </td>
                     <td className="border-b border-white/5 px-2 py-2">
                       <div className="text-[color:var(--ck-text-primary)]">{wfLabel}</div>
                       <div className="text-xs text-[color:var(--ck-text-tertiary)] font-mono">{r.workflowId}</div>
@@ -149,7 +212,7 @@ export default function RunsClient({
               })
             ) : (
               <tr>
-                <td colSpan={4} className="px-2 py-6 text-sm text-[color:var(--ck-text-secondary)]">
+                <td colSpan={5} className="px-2 py-6 text-sm text-[color:var(--ck-text-secondary)]">
                   No runs found.
                 </td>
               </tr>
@@ -161,6 +224,47 @@ export default function RunsClient({
       <div className="mt-3 text-xs text-[color:var(--ck-text-tertiary)]">
         Showing {filtered.length} of {initialRuns.length}.
       </div>
+
+      {count > 0 && (
+        <div className="sticky bottom-4 mt-4 flex items-center justify-between rounded-xl border border-white/10 bg-black/80 backdrop-blur-md px-4 py-3 shadow-lg">
+          <span className="text-sm text-[color:var(--ck-text-secondary)]">
+            {count} run{count !== 1 ? "s" : ""} selected
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={clear}
+              className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
+            >
+              Clear
+            </button>
+            <button
+              type="button"
+              onClick={() => { setDeleteError(null); setShowDeleteModal(true); }}
+              className="rounded-lg bg-[var(--ck-accent-red)] px-3 py-1.5 text-xs font-medium text-white hover:bg-[var(--ck-accent-red-hover)]"
+            >
+              Delete selected
+            </button>
+          </div>
+        </div>
+      )}
+
+      <ConfirmationModal
+        open={showDeleteModal}
+        onClose={() => { setShowDeleteModal(false); setDeleteError(null); }}
+        title="Delete Workflow Runs"
+        confirmLabel="Delete Runs"
+        confirmBusyLabel="Deleting..."
+        onConfirm={handleBulkDelete}
+        busy={deleteBusy}
+        error={deleteError}
+      >
+        <p className="mt-3 text-sm text-[color:var(--ck-text-secondary)]">
+          Are you sure you want to permanently delete{" "}
+          <strong className="text-[color:var(--ck-text-primary)]">{count} run{count !== 1 ? "s" : ""}</strong>?
+          This action cannot be undone.
+        </p>
+      </ConfirmationModal>
     </div>
   );
 }
