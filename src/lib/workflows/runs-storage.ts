@@ -349,14 +349,24 @@ export async function writeApprovalFile(
   // Create approvals directory if it doesn't exist
   await fs.mkdir(approvalsDir, { recursive: true });
 
-  // Write approval file in ClawRecipes format
+  // Read existing approval file to preserve engine fields (runId, teamId, code, etc.)
+  let existing: Record<string, unknown> = {};
+  try {
+    const raw = await fs.readFile(approvalPath, "utf8");
+    existing = JSON.parse(raw);
+  } catch {
+    // No existing file — start fresh
+  }
+
+  // Merge decision into existing approval, using "status" (not "state")
+  // to match ClawRecipes engine's expected field name.
   const approvalFile = {
+    ...existing,
     nodeId,
-    state: approvalData.state,
-    requestedAt: approvalData.requestedAt || new Date().toISOString(),
+    status: approvalData.state,
     decidedAt: approvalData.decidedAt,
-    note: approvalData.note,
-    decidedBy: approvalData.decidedBy
+    ...(approvalData.note ? { note: approvalData.note } : {}),
+    ...(approvalData.decidedBy ? { decidedBy: approvalData.decidedBy } : {}),
   };
 
   await fs.writeFile(approvalPath, JSON.stringify(approvalFile, null, 2) + "\n", "utf8");

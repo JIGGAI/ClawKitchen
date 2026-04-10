@@ -473,9 +473,9 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: false, error: "Run is not awaiting approval" }, { status: 400 });
       }
 
-      // For runner-managed runs (ClawRecipes workflow engine), only write the
-      // approval file and log the event. Do NOT modify run.json — the runner's
-      // poll-approvals handles resuming the run and advancing node state.
+      // For runner-managed runs (ClawRecipes workflow engine), write the
+      // approval file, log the event, then call the engine's resume command
+      // to actually progress the run — mirrors what Telegram auto-approval does.
       if (isRunnerManaged) {
         const decidedAtRunner = nowIso();
         const nextStateRunner = action === "approve" ? "approved" : action === "request_changes" ? "rejected" : "rejected";
@@ -505,7 +505,30 @@ export async function POST(req: Request) {
           // non-critical
         }
 
-        return jsonOkRest({ ok: true, runId: run.id, action, state: nextStateRunner, runnerManaged: true });
+        // Resume the run via the engine CLI so it actually progresses —
+        // same path Telegram auto-approval uses (approve + resume).
+        let resumeError: string | undefined;
+        try {
+          const resumeRes = await runOpenClaw([
+            "recipes", "workflows", "resume",
+            "--team-id", teamId,
+            "--run-id", run.id,
+          ]);
+          if (!resumeRes.ok) {
+            resumeError = resumeRes.stderr || "Resume command failed";
+          }
+        } catch (e) {
+          resumeError = String(e);
+        }
+
+        return jsonOkRest({
+          ok: true,
+          runId: run.id,
+          action,
+          state: nextStateRunner,
+          runnerManaged: true,
+          ...(resumeError ? { resumeError } : { resumed: true }),
+        });
       }
 
       const decidedAt = nowIso();
