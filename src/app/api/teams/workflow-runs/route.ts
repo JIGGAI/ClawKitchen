@@ -376,7 +376,7 @@ export async function POST(req: Request) {
   try {
     // Action mode: approve/request_changes/cancel/stop/delete updates an existing run.
     if (action) {
-      if (!runIdFromBody) return NextResponse.json({ ok: false, error: "runId is required for action" }, { status: 400 });
+      if (!runIdFromBody && action !== "bulk-delete") return NextResponse.json({ ok: false, error: "runId is required for action" }, { status: 400 });
       if (!["approve", "request_changes", "cancel", "stop", "delete", "bulk-delete"].includes(action)) {
         return NextResponse.json({ ok: false, error: `Unsupported action: ${action}` }, { status: 400 });
       }
