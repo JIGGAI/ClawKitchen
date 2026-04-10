@@ -381,7 +381,7 @@ export default function RunDetailClient({
 
       {/* Run Deliverables Section */}
       <div className="mt-8">
-        <RunDeliverables teamId={teamId} workflowId={workflowId} runId={run.id} />
+        <RunDeliverables teamId={teamId} workflowId={workflowId} runId={run.id} isActive={isActive} />
       </div>
     </>
   );

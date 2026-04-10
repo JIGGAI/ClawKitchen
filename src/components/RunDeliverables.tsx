@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchJson } from "@/lib/fetch-json";
 
 import type { WorkflowDeliverable, WorkflowDeliverablesResponse } from "@/app/api/teams/workflow-deliverables/route";
@@ -68,22 +68,25 @@ export default function RunDeliverables({
   teamId,
   workflowId,
   runId,
+  isActive = false,
 }: {
   teamId: string;
   workflowId: string;
   runId: string;
+  isActive?: boolean;
 }) {
   const [deliverables, setDeliverables] = useState<WorkflowDeliverable[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedDeliverable, setSelectedDeliverable] = useState<WorkflowDeliverable | null>(null);
+  const initialLoadDone = useRef(false);
 
   const filteredDeliverables = useMemo(() => {
     const needle = searchQuery.trim().toLowerCase();
     return deliverables.filter((d) => {
       if (!needle) return true;
-      
+
       return (
         d.fileName.toLowerCase().includes(needle) ||
         (d.contentPreview && d.contentPreview.toLowerCase().includes(needle))
@@ -91,30 +94,39 @@ export default function RunDeliverables({
     });
   }, [deliverables, searchQuery]);
 
-  useEffect(() => {
-    const fetchDeliverables = async () => {
-      try {
-        setLoading(true);
-        setError("");
-        
-        const response = await fetchJson<WorkflowDeliverablesResponse>(
-          `/api/teams/workflow-deliverables?teamId=${encodeURIComponent(teamId)}&workflowId=${encodeURIComponent(workflowId)}&runId=${encodeURIComponent(runId)}`
-        );
-        
-        if (!response.ok) {
-          throw new Error("error" in response ? String(response.error) : "Failed to fetch deliverables");
-        }
-        
-        setDeliverables(response.deliverables);
-      } catch (err) {
-        setError(String(err));
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchDeliverables = useCallback(async (showLoading: boolean) => {
+    try {
+      if (showLoading) setLoading(true);
+      setError("");
 
-    fetchDeliverables();
+      const response = await fetchJson<WorkflowDeliverablesResponse>(
+        `/api/teams/workflow-deliverables?teamId=${encodeURIComponent(teamId)}&workflowId=${encodeURIComponent(workflowId)}&runId=${encodeURIComponent(runId)}`
+      );
+
+      if (!response.ok) {
+        throw new Error("error" in response ? String(response.error) : "Failed to fetch deliverables");
+      }
+
+      setDeliverables(response.deliverables);
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setLoading(false);
+    }
   }, [teamId, workflowId, runId]);
+
+  // Initial fetch
+  useEffect(() => {
+    initialLoadDone.current = false;
+    fetchDeliverables(true).then(() => { initialLoadDone.current = true; });
+  }, [fetchDeliverables]);
+
+  // Poll while the run is active
+  useEffect(() => {
+    if (!isActive || !initialLoadDone.current) return;
+    const id = setInterval(() => fetchDeliverables(false), 15_000);
+    return () => clearInterval(id);
+  }, [isActive, fetchDeliverables]);
 
   const downloadDeliverable = async (deliverable: WorkflowDeliverable) => {
     try {
