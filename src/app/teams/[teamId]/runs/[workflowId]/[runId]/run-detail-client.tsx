@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { fetchJson } from "@/lib/fetch-json";
@@ -54,6 +54,14 @@ export default function RunDetailClient({
   // Determine if actions are available
   const canStop = ["running", "waiting_for_approval"].includes(run.status);
   const canDelete = true; // Always allow delete
+
+  // Auto-refresh while the run is in an active state
+  const isActive = ["queued", "running", "waiting_for_approval", "waiting_workers", "waiting_handoff", "awaiting_approval"].includes(run.status);
+  useEffect(() => {
+    if (!isActive) return;
+    const id = setInterval(() => router.refresh(), 15_000);
+    return () => clearInterval(id);
+  }, [isActive, router]);
 
   const handleStop = async () => {
     try {
