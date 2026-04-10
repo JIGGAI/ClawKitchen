@@ -42,13 +42,30 @@ vi.mock("@/lib/paths", async () => {
 });
 
 describe("/api/cron/worker POST", () => {
+  // Env vars the route reads — snapshot and clear before each test so
+  // behavior is deterministic regardless of the host environment. Any test
+  // that needs a non-empty value sets it in its own body.
+  const ENV_VARS_UNDER_TEST = [
+    "KITCHEN_WORKFLOW_CRON_MODEL",
+    "KITCHEN_WORKFLOW_CRON_SCHEDULE",
+  ] as const;
+  const savedEnv: Record<string, string | undefined> = {};
+
   beforeEach(async () => {
     runOpenClawMock.mockClear();
+    for (const k of ENV_VARS_UNDER_TEST) {
+      savedEnv[k] = process.env[k];
+      delete process.env[k];
+    }
     TEAM_DIR = await fs.mkdtemp(path.join(os.tmpdir(), "ck-team-"));
     AGENT_WS = await fs.mkdtemp(path.join(os.tmpdir(), "ck-agent-"));
   });
 
   afterEach(async () => {
+    for (const k of ENV_VARS_UNDER_TEST) {
+      if (savedEnv[k] === undefined) delete process.env[k];
+      else process.env[k] = savedEnv[k];
+    }
     if (TEAM_DIR) await fs.rm(TEAM_DIR, { recursive: true, force: true });
     if (AGENT_WS) await fs.rm(AGENT_WS, { recursive: true, force: true });
   });
@@ -79,11 +96,19 @@ describe("/api/cron/worker POST", () => {
     expect(mapping.entries[key].installedCronId).toBe("cron-123");
     expect(mapping.entries[key].updatedAtMs).toBeTypeOf("number");
 
-    // Verify --no-deliver was passed in the cron add call
+    // Verify the cron add call carries the defaults Kitchen installs today:
+    // every 5 minutes, isolated session, 120s timeout, no forced model.
     const addCall = runOpenClawMock.mock.calls.find((c) => c[0].join(" ").startsWith("cron add"));
     expect(addCall).toBeDefined();
-    expect(addCall![0]).toContain("--no-deliver");
-    expect(addCall![0]).toContain("*/15 * * * *");
+    const args = addCall![0];
+    expect(args).toContain("--no-deliver");
+    expect(args).toContain("*/5 * * * *");
+    expect(args).toContain("--session");
+    expect(args).toContain("isolated");
+    expect(args).toContain("--timeout-seconds");
+    expect(args).toContain("120");
+    // No --model flag unless KITCHEN_WORKFLOW_CRON_MODEL is set (see new test).
+    expect(args).not.toContain("--model");
   });
 
   it("reconcile installs missing and disables orphaned in team mapping", async () => {
@@ -138,5 +163,31 @@ describe("/api/cron/worker POST", () => {
     const disableCall = runOpenClawMock.mock.calls.find((c) => c[0].join(" ").includes("cron disable"));
     expect(disableCall).toBeDefined();
     expect(disableCall![0]).toContain("cron-old");
+  });
+
+  it("passes --model when KITCHEN_WORKFLOW_CRON_MODEL is set, and custom schedule when KITCHEN_WORKFLOW_CRON_SCHEDULE is set", async () => {
+    process.env.KITCHEN_WORKFLOW_CRON_MODEL = "openai/gpt-5.4";
+    process.env.KITCHEN_WORKFLOW_CRON_SCHEDULE = "*/10 * * * *";
+
+    // The route module reads process.env at call time via modelFlagArgs() /
+    // workflowCronSchedule(), so we do NOT need vi.resetModules() here —
+    // the cached import will still see the updated env.
+    const { POST } = await import("../worker/route");
+
+    const res = await POST(
+      new Request("http://localhost/api/cron/worker", {
+        method: "POST",
+        body: JSON.stringify({ action: "install", teamId: "claw-marketing-team", agentId: "claw-marketing-team-writer" }),
+      })
+    );
+    expect(res.status).toBe(200);
+
+    const addCall = runOpenClawMock.mock.calls.find((c) => c[0].join(" ").startsWith("cron add"));
+    expect(addCall).toBeDefined();
+    const args = addCall![0];
+    expect(args).toContain("--model");
+    expect(args).toContain("openai/gpt-5.4");
+    expect(args).toContain("*/10 * * * *");
+    expect(args).not.toContain("*/5 * * * *");
   });
 });

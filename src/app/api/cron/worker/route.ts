@@ -54,6 +54,32 @@ function buildWorkerMessage(teamId: string, agentId: string) {
   return `Workflow worker tick (${agentId}).\n\nRun exactly one shell command using the exec tool.\n\nCommand:\nbash -lc 'openclaw recipes workflows worker-tick --team-id ${teamId} --agent-id ${agentId} --limit 5 --worker-id cron'\n\nRules:\n- Execute with exec and wait for completion.\n- If it succeeds, respond exactly: NO_REPLY\n- If it fails, respond with one short error line.`;
 }
 
+/**
+ * Optional model override for all workflow crons installed by Kitchen.
+ *
+ * Defaults to the gateway's configured default model (by omitting the
+ * `--model` flag entirely). Set `KITCHEN_WORKFLOW_CRON_MODEL` in the gateway
+ * env (e.g. `openai/gpt-5.4`, `anthropic/claude-sonnet-4-5`) to pin a
+ * specific model for every workflow-worker and workflow-runner cron Kitchen
+ * creates.
+ */
+function modelFlagArgs(): string[] {
+  const override = String(process.env.KITCHEN_WORKFLOW_CRON_MODEL ?? "").trim();
+  return override ? ["--model", override] : [];
+}
+
+/**
+ * Cron schedule used by all Kitchen-installed workflow crons.
+ *
+ * Defaults to every 5 minutes, matching the runner/worker tick cadence used
+ * in production deployments. Override with `KITCHEN_WORKFLOW_CRON_SCHEDULE`
+ * if you need a lighter interval such as every 10 or 15 minutes.
+ */
+function workflowCronSchedule(): string {
+  const override = String(process.env.KITCHEN_WORKFLOW_CRON_SCHEDULE ?? "").trim();
+  return override || "*/5 * * * *";
+}
+
 // ---------------------------------------------------------------------------
 // Single provenance file: <teamDir>/notes/cron-jobs.json
 // ---------------------------------------------------------------------------
@@ -144,14 +170,19 @@ async function installWorkerCron(teamId: string, agentId: string): Promise<{
     "add",
     "--agent",
     "main",
+    "--session",
+    "isolated",
     "--cron",
-    "*/15 * * * *",
+    workflowCronSchedule(),
+    "--timeout-seconds",
+    "120",
     "--name",
     name,
     "--description",
     description,
     "--message",
     message,
+    ...modelFlagArgs(),
     "--no-deliver",
     "--json",
   ]);
@@ -192,17 +223,17 @@ async function installRunnerCron(teamId: string): Promise<{
   // Install new runner-tick cron
   const cronName = `workflow-runner-tick:${teamId}`;
   const message = `Runner tick (workflow executor): openclaw recipes workflows runner-tick --team-id ${teamId} --concurrency 4 --lease-seconds 900`;
-  
+
   const result = await runOpenClaw([
     "cron", "add",
     "--name", cronName,
     "--agent", "main",
-    "--session", "isolated", 
-    "--cron", "*/15 * * * *",
+    "--session", "isolated",
+    "--cron", workflowCronSchedule(),
     "--tz", "America/New_York",
     "--no-deliver",
     "--message", message,
-    "--model", "anthropic/claude-sonnet-4-20250514",
+    ...modelFlagArgs(),
     "--timeout-seconds", "900",
     "--json"
   ]);
