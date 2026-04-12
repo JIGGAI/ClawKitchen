@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
+import * as os from "node:os";
+import * as path from "node:path";
 
 type OpenClawConfig = {
   agents?: { defaults?: { workspace?: string } };

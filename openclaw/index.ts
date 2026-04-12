@@ -8,6 +8,11 @@ import { homedir } from "node:os";
 
 // Next is already a dependency of ClawKitchen.
 import next from "next";
+import { WebSocketServer, type WebSocket } from "ws";
+import fsSync from "node:fs";
+
+import { getTeamWorkspaceDir } from "../src/lib/paths";
+import { appendChatMessage, ensureChatFile, resolveRoomFile } from "../src/lib/chat/chat-storage";
 
 type KitchenConfig = {
   enabled?: boolean;
@@ -113,6 +118,115 @@ async function startKitchen(api: OpenClawPluginApi, cfg: KitchenConfig) {
   await app.prepare();
   const handle = app.getRequestHandler();
 
+  // --- Team Chat WebSocket (MVP) ---
+  // Path: /ws/chat?teamId=...&roomId=team|role:<role>
+  //
+  // Client -> server:
+  //   { type: "subscribe", teamId, roomId }
+  //   { type: "post", teamId, roomId, text, author?: { id?: string, label?: string } }
+  // Server -> client:
+  //   { type: "chat_message", message }
+  //   { type: "error", error }
+  const wss = new WebSocketServer({ noServer: true });
+
+  const roomClients = new Map<string, Set<ChatSocket>>(); // key: room file path
+  const roomTails = new Map<string, { watcher: fsSync.FSWatcher; size: number }>();
+
+  type ChatSocket = WebSocket & { __roomFile?: string };
+
+  function addClient(file: string, ws: ChatSocket) {
+    let set = roomClients.get(file);
+    if (!set) {
+      set = new Set();
+      roomClients.set(file, set);
+    }
+    set.add(ws);
+    ws.__roomFile = file;
+  }
+
+  function removeClient(ws: ChatSocket) {
+    const file = ws.__roomFile as string | undefined;
+    if (!file) return;
+    const set = roomClients.get(file);
+    if (set) {
+      set.delete(ws);
+      if (set.size === 0) {
+        roomClients.delete(file);
+        const tail = roomTails.get(file);
+        if (tail) {
+          try {
+            tail.watcher.close();
+          } catch {
+            // ignore
+          }
+          roomTails.delete(file);
+        }
+      }
+    }
+    delete ws.__roomFile;
+  }
+
+  function broadcast(file: string, payload: unknown) {
+    const set = roomClients.get(file);
+    if (!set || set.size === 0) return;
+    const data = JSON.stringify(payload);
+    for (const ws of set) {
+      try {
+        if (ws.readyState === 1) ws.send(data);
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  async function ensureTail(file: string) {
+    if (roomTails.has(file)) return;
+
+    await ensureChatFile(file);
+    let size = 0;
+    try {
+      const st = await fsSync.promises.stat(file);
+      size = st.size;
+    } catch {
+      size = 0;
+    }
+
+    // Watch for new lines and stream them to subscribers.
+    const watcher = fsSync.watch(file, { persistent: false }, async (eventType) => {
+      if (eventType !== "change") return;
+      try {
+        const st = await fsSync.promises.stat(file);
+        if (st.size <= size) {
+          size = st.size;
+          return;
+        }
+        const fd = await fsSync.promises.open(file, "r");
+        try {
+          const buf = Buffer.alloc(st.size - size);
+          await fd.read(buf, 0, buf.length, size);
+          size = st.size;
+          const chunk = buf.toString("utf8");
+          for (const line of chunk.split(/\r?\n/)) {
+            if (!line.trim()) continue;
+            try {
+              const message = JSON.parse(line);
+              broadcast(file, { type: "chat_message", message });
+            } catch {
+              // ignore malformed line
+            }
+          }
+        } finally {
+          await fd.close();
+        }
+      } catch {
+        // ignore
+      }
+    });
+
+    roomTails.set(file, { watcher, size });
+  }
+
+
   server = http.createServer(async (req, res) => {
     try {
       const url = req.url || "/";
@@ -179,6 +293,135 @@ async function startKitchen(api: OpenClawPluginApi, cfg: KitchenConfig) {
       api.logger.error(`[kitchen] request error: ${e instanceof Error ? e.message : String(e)}`);
       res.statusCode = 500;
       res.end("Internal Server Error");
+    }
+  });
+
+  server!.on("upgrade", (req, socket, head) => {
+    try {
+      const url = req.url || "/";
+      const reqUrl = new URL(url, `http://${host}:${port}`);
+      if (reqUrl.pathname !== "/ws/chat") return;
+
+      const shouldProtect = authMode !== "off" && !isLocalhost(host) && authToken.trim();
+      const isLocalRequest = isLoopbackRemoteAddress(req.socket.remoteAddress);
+
+      if (shouldProtect && !(authMode === "local" && isLocalRequest)) {
+        const cookies = parseCookies(req);
+        const hasQaCookie = qaToken.trim() && cookies.kitchenQaToken === qaToken;
+        const creds = parseBasicAuth(req);
+        const ok = hasQaCookie || (creds && creds.user === "kitchen" && creds.pass === authToken);
+        if (!ok) {
+          socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+          socket.destroy();
+          return;
+        }
+      }
+
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        wss.emit("connection", ws, req);
+      });
+    } catch {
+      socket.destroy();
+    }
+  });
+
+  wss.on("connection", async (ws: ChatSocket, req) => {
+    try {
+      const url = req.url || "/";
+      const reqUrl = new URL(url, `http://${host}:${port}`);
+      const teamId = String(reqUrl.searchParams.get("teamId") || "").trim();
+      const roomId = String(reqUrl.searchParams.get("roomId") || "").trim();
+      if (!teamId || !roomId) {
+        ws.send(JSON.stringify({ type: "error", error: "teamId and roomId are required" }));
+        ws.close();
+        return;
+      }
+
+      const teamDir = await getTeamWorkspaceDir(teamId);
+      const rr = resolveRoomFile(teamDir, roomId);
+      if (!rr.ok) {
+        ws.send(JSON.stringify({ type: "error", error: rr.error }));
+        ws.close();
+        return;
+      }
+
+      await ensureTail(rr.file);
+      addClient(rr.file, ws);
+
+      ws.on("message", async (raw: Buffer) => {
+        let msg: unknown;
+        try {
+          msg = JSON.parse(String(raw || ""));
+        } catch {
+          ws.send(JSON.stringify({ type: "error", error: "Invalid JSON" }));
+          return;
+        }
+
+        if (!msg || typeof msg !== "object") return;
+        const obj = msg as Record<string, unknown>;
+        const type = String(obj.type || "");
+
+        if (type === "subscribe") {
+          const nextTeamId = String(obj.teamId || teamId).trim();
+          const nextRoomId = String(obj.roomId || "").trim();
+          if (!nextRoomId) {
+            ws.send(JSON.stringify({ type: "error", error: "roomId is required" }));
+            return;
+          }
+          const nextTeamDir = await getTeamWorkspaceDir(nextTeamId);
+          const r2 = resolveRoomFile(nextTeamDir, nextRoomId);
+          if (!r2.ok) {
+            ws.send(JSON.stringify({ type: "error", error: r2.error }));
+            return;
+          }
+          await ensureTail(r2.file);
+          removeClient(ws);
+          addClient(r2.file, ws);
+          return;
+        }
+
+        if (type === "post") {
+          const postTeamId = String(obj.teamId || teamId).trim();
+          const postRoomId = String(obj.roomId || roomId).trim();
+          const text = String(obj.text || "");
+          if (!text.trim()) {
+            ws.send(JSON.stringify({ type: "error", error: "text is required" }));
+            return;
+          }
+          const author = obj.author && typeof obj.author === "object" ? (obj.author as Record<string, unknown>) : {};
+
+          const postTeamDir = await getTeamWorkspaceDir(postTeamId);
+          const r = await appendChatMessage({
+            teamDir: postTeamDir,
+            roomId: postRoomId,
+            text,
+            author: {
+              kind: "human",
+              id: String(author.id || "kitchen"),
+              label: author.label ? String(author.label) : undefined,
+            },
+          });
+
+          if (!r.ok) {
+            ws.send(JSON.stringify({ type: "error", error: r.error }));
+            return;
+          }
+
+          // The file watcher will fan this out to every subscriber, including the sender.
+          // Avoid an immediate second broadcast here, or websocket posts will appear twice.
+        }
+      });
+
+      ws.on("close", () => removeClient(ws));
+      ws.on("error", () => removeClient(ws));
+    } catch (e: unknown) {
+      try {
+        const msg = e instanceof Error ? e.message : String(e);
+        ws.send(JSON.stringify({ type: "error", error: msg || "connection error" }));
+      } catch {}
+      try {
+        ws.close();
+      } catch {}
     }
   });
 
