@@ -12,7 +12,7 @@ export default async function CronJobsPage({
   return (
     <div className="w-full">
       <div className="flex items-baseline justify-between gap-4">
-        <h1 className="text-2xl font-semibold tracking-tight">Cron Jobs (recipe-installed)</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Cron Jobs</h1>
         <div className="flex gap-3">
           <Link
             href="/settings"
@@ -29,8 +29,8 @@ export default async function CronJobsPage({
         </div>
       </div>
       <p className="mt-2 text-sm text-[color:var(--ck-text-secondary)]">
-        This page only shows cron jobs installed by recipes (based on the scaffold mapping file
-        <code className="ml-1">notes/cron-jobs.json</code> in the team workspace).
+        All registered cron jobs, including recipe-installed and manually created.
+        {team ? " Filtered to jobs installed by this team\u2019s recipes." : ""}
       </p>
 
       <div className="mt-6">
