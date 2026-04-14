@@ -5,6 +5,8 @@ import { useToast } from "@/components/ToastProvider";
 import { DeleteCronJobModal } from "@/components/delete-modals";
 import { EditCronJobModal } from "@/components/EditCronJobModal";
 import { CreateCronJobModal } from "@/components/CreateCronJobModal";
+import { ConfirmationModal } from "@/components/ConfirmationModal";
+import { useRunSelection } from "@/hooks/useRunSelection";
 import { errorMessage } from "@/lib/errors";
 import { fetchJson } from "@/lib/fetch-json";
 
@@ -55,6 +57,12 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
 
   const [createOpen, setCreateOpen] = useState(false);
 
+  // Bulk action state
+  type BulkAction = "enable" | "disable" | "delete";
+  const [bulkModalAction, setBulkModalAction] = useState<BulkAction | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkError, setBulkError] = useState<string | null>(null);
+
   const sorted = useMemo(() => {
     return [...jobs].sort((a, b) => {
       const ae = isEnabled(a);
@@ -63,6 +71,55 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
       return String(a.name ?? "").localeCompare(String(b.name ?? ""));
     });
   }, [jobs]);
+
+  const visibleIds = useMemo(() => sorted.map((j) => j.id), [sorted]);
+  const { selected, toggle, allSelected, toggleAll, clear, count } = useRunSelection(visibleIds);
+
+  const selectedEnabledCount = useMemo(
+    () => sorted.filter((j) => selected.has(j.id) && isEnabled(j)).length,
+    [sorted, selected],
+  );
+  const selectedDisabledCount = useMemo(
+    () => sorted.filter((j) => selected.has(j.id) && !isEnabled(j)).length,
+    [sorted, selected],
+  );
+
+  function openBulkModal(action: BulkAction) {
+    setBulkError(null);
+    setBulkModalAction(action);
+  }
+
+  async function confirmBulkAction() {
+    if (!bulkModalAction) return;
+    setBulkBusy(true);
+    setBulkError(null);
+    try {
+      const ids = Array.from(selected);
+      const json = await fetchJson<{ ok?: boolean; errors?: Array<{ id: string; error?: string }> }>(
+        "/api/cron/bulk",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ids, action: bulkModalAction }),
+        },
+      );
+      if (!json.ok) {
+        const errMsg = json.errors?.map((e) => `${e.id}: ${e.error}`).join("; ") || "Bulk action failed";
+        throw new Error(errMsg);
+      }
+      const label = bulkModalAction === "delete" ? "Deleted" : bulkModalAction === "enable" ? "Enabled" : "Disabled";
+      toast.push({ kind: "success", message: `${label} ${ids.length} cron job${ids.length !== 1 ? "s" : ""}.` });
+      clear();
+      setBulkModalAction(null);
+      await refresh();
+    } catch (e: unknown) {
+      const msg = errorMessage(e);
+      setBulkError(msg);
+      toast.push({ kind: "error", message: msg });
+    } finally {
+      setBulkBusy(false);
+    }
+  }
 
   const liveEditJob = useMemo(() => {
     if (!editJob) return null;
@@ -149,11 +206,22 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
       <div>
         <div className="ck-card p-4">
         <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold">All Cron Jobs</h2>
-            <p className="mt-1 text-sm text-[color:var(--ck-text-secondary)]">
-              {jobs.length} job{jobs.length !== 1 ? "s" : ""} total · {jobs.filter((j) => isEnabled(j)).length} enabled
-            </p>
+          <div className="flex items-center gap-3">
+            {sorted.length > 0 && (
+              <input
+                type="checkbox"
+                checked={allSelected && sorted.length > 0}
+                onChange={toggleAll}
+                className="accent-[var(--ck-accent-red)]"
+                aria-label="Select all cron jobs"
+              />
+            )}
+            <div>
+              <h2 className="text-lg font-semibold">All Cron Jobs</h2>
+              <p className="mt-1 text-sm text-[color:var(--ck-text-secondary)]">
+                {jobs.length} job{jobs.length !== 1 ? "s" : ""} total · {jobs.filter((j) => isEnabled(j)).length} enabled
+              </p>
+            </div>
           </div>
           <div className="flex gap-2">
             <button
@@ -184,6 +252,14 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
       <div className="mt-6 space-y-3">
         {sorted.map((j) => (
           <div key={j.id} className="ck-card px-4 py-3">
+            <div className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                checked={selected.has(j.id)}
+                onChange={() => toggle(j.id)}
+                className="mt-1.5 shrink-0 accent-[var(--ck-accent-red)]"
+                aria-label={`Select ${j.name ?? j.id}`}
+              />
             <div
               role="button"
               tabIndex={0}
@@ -194,7 +270,7 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
                   setExpandedId((cur) => (cur === j.id ? null : j.id));
                 }
               }}
-              className="w-full cursor-pointer text-left"
+              className="min-w-0 flex-1 cursor-pointer text-left"
             >
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
@@ -264,9 +340,106 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
               </pre>
             ) : null}
           </div>
+          </div>
         ))}
       </div>
     </div>
+
+      {count > 0 && (
+        <div className="sticky bottom-4 mt-4 flex items-center justify-between rounded-xl border border-white/10 bg-black/80 backdrop-blur-md px-4 py-3 shadow-lg">
+          <span className="text-sm text-[color:var(--ck-text-secondary)]">
+            {count} job{count !== 1 ? "s" : ""} selected
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={clear}
+              className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
+            >
+              Clear
+            </button>
+            {selectedDisabledCount > 0 && (
+              <button
+                type="button"
+                onClick={() => openBulkModal("enable")}
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
+              >
+                Enable{selectedDisabledCount < count ? ` (${selectedDisabledCount})` : ""}
+              </button>
+            )}
+            {selectedEnabledCount > 0 && (
+              <button
+                type="button"
+                onClick={() => openBulkModal("disable")}
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
+              >
+                Disable{selectedEnabledCount < count ? ` (${selectedEnabledCount})` : ""}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => openBulkModal("delete")}
+              className="rounded-lg bg-[var(--ck-accent-red)] px-3 py-1.5 text-xs font-medium text-white hover:bg-[var(--ck-accent-red-hover)]"
+            >
+              Delete selected
+            </button>
+          </div>
+        </div>
+      )}
+
+      <ConfirmationModal
+        open={bulkModalAction !== null}
+        onClose={() => { setBulkModalAction(null); setBulkError(null); }}
+        title={
+          bulkModalAction === "delete" ? "Delete Cron Jobs"
+            : bulkModalAction === "enable" ? "Enable Cron Jobs"
+            : "Disable Cron Jobs"
+        }
+        confirmLabel={
+          bulkModalAction === "delete" ? "Delete"
+            : bulkModalAction === "enable" ? "Enable"
+            : "Disable"
+        }
+        confirmBusyLabel={
+          bulkModalAction === "delete" ? "Deleting..."
+            : bulkModalAction === "enable" ? "Enabling..."
+            : "Disabling..."
+        }
+        onConfirm={confirmBulkAction}
+        busy={bulkBusy}
+        error={bulkError}
+        confirmButtonClassName={
+          bulkModalAction === "delete"
+            ? undefined
+            : "rounded-lg bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] transition-colors hover:bg-[var(--ck-accent-red-hover)] disabled:opacity-50"
+        }
+      >
+        <p className="mt-3 text-sm text-[color:var(--ck-text-secondary)]">
+          {bulkModalAction === "delete" ? (
+            <>
+              Are you sure you want to permanently delete{" "}
+              <strong className="text-[color:var(--ck-text-primary)]">{count} cron job{count !== 1 ? "s" : ""}</strong>?
+              This action cannot be undone.
+            </>
+          ) : bulkModalAction === "enable" ? (
+            <>
+              Enable{" "}
+              <strong className="text-[color:var(--ck-text-primary)]">{selectedDisabledCount} cron job{selectedDisabledCount !== 1 ? "s" : ""}</strong>?
+              {selectedEnabledCount > 0 && (
+                <span> ({selectedEnabledCount} already enabled will be skipped.)</span>
+              )}
+            </>
+          ) : (
+            <>
+              Disable{" "}
+              <strong className="text-[color:var(--ck-text-primary)]">{selectedEnabledCount} cron job{selectedEnabledCount !== 1 ? "s" : ""}</strong>?
+              {selectedDisabledCount > 0 && (
+                <span> ({selectedDisabledCount} already disabled will be skipped.)</span>
+              )}
+            </>
+          )}
+        </p>
+      </ConfirmationModal>
 
       <DeleteCronJobModal
         open={deleteOpen}
