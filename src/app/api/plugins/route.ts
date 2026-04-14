@@ -1,13 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { discoverKitchenPlugins, getPluginsForTeamType } from "@/lib/kitchen-plugins";
+import { resolveTeamDir, getEnabledPlugins } from "@/lib/team-plugins";
 
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const teamType = searchParams.get('teamType');
 
+    const teamId = searchParams.get('teamId');
+
     let plugins;
-    if (teamType) {
+    if (teamId) {
+      const teamDir = await resolveTeamDir(teamId);
+      const enabled = await getEnabledPlugins(teamDir);
+      plugins = Array.from(discoverKitchenPlugins().values()).filter((plugin) => enabled.includes(plugin.id));
+    } else if (teamType) {
       plugins = getPluginsForTeamType(teamType);
     } else {
       plugins = Array.from(discoverKitchenPlugins().values());

@@ -98,7 +98,7 @@ export default function TeamEditor({ teamId, teamName, initialTab }: { teamId: s
   const [teamAgentsLoading, setTeamAgentsLoading] = useState(false);
   
   // Extract team type from recipe frontmatter
-  const DEFAULT_TEAM_TYPE = 'marketing-team';
+  const DEFAULT_TEAM_TYPE = '';
   
   const [teamType, setTeamType] = useState<string>(DEFAULT_TEAM_TYPE);
 

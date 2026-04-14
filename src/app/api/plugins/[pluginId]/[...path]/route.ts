@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { discoverKitchenPlugins, createPluginContext } from "@/lib/kitchen-plugins";
+import { isPluginEnabledForTeam, resolveTeamDir } from "@/lib/team-plugins";
 import { createRequire } from "module";
 
 // createRequire gives us a real require() that works in ESM.
@@ -70,10 +71,17 @@ async function handlePluginApiRequest(
     const apiModule = _loadPlugin(_cjsRequire, plugin.apiRoutes);
     
     // Get team directory from query params or headers
-    const teamId = request.nextUrl.searchParams.get('team') || 
+    const teamId = request.nextUrl.searchParams.get('teamId') || 
+                   request.nextUrl.searchParams.get('team') || 
                    request.headers.get('x-team-id') || 
                    'default';
-    const teamDir = `~/.openclaw/workspace-${teamId}`;
+    if (teamId !== 'default' && !(await isPluginEnabledForTeam(teamId, pluginId))) {
+      return NextResponse.json(
+        { error: 'Plugin is not enabled for this team' },
+        { status: 403 }
+      );
+    }
+    const teamDir = teamId === 'default' ? `~/.openclaw/workspace-${teamId}` : await resolveTeamDir(teamId);
     
     // Get auth token from session/headers
     const authToken = request.headers.get('authorization') || 

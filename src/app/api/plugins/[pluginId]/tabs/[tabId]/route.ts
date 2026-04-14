@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readFileSync, existsSync } from "fs";
 import { discoverKitchenPlugins } from "@/lib/kitchen-plugins";
+import { isPluginEnabledForTeam } from "@/lib/team-plugins";
 
 export async function GET(
   request: NextRequest,
@@ -8,6 +9,7 @@ export async function GET(
 ) {
   try {
     const { pluginId, tabId } = await params;
+    const teamId = request.nextUrl.searchParams.get('teamId');
     const plugins = discoverKitchenPlugins();
     const plugin = plugins.get(pluginId);
 
@@ -15,6 +17,13 @@ export async function GET(
       return NextResponse.json(
         { error: 'Plugin not found' },
         { status: 404 }
+      );
+    }
+
+    if (teamId && !(await isPluginEnabledForTeam(teamId, pluginId))) {
+      return NextResponse.json(
+        { error: 'Plugin is not enabled for this team' },
+        { status: 403 }
       );
     }
 
