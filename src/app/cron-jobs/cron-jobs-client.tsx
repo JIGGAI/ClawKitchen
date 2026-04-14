@@ -402,13 +402,13 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
                 </div>
               </div>
             </div>
+          </div>
 
             {expandedId === j.id ? (
               <pre className="mt-3 overflow-x-auto rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-[color:var(--ck-text-primary)]">
                 {JSON.stringify(j, null, 2)}
               </pre>
             ) : null}
-          </div>
           </div>
         ))}
       </div>
