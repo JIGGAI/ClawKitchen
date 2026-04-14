@@ -161,7 +161,7 @@ function loadPluginManifest(packagePath: string): KitchenPluginManifest | null {
  * Create isolated SQLite database for a plugin
  */
 export function createPluginDb(pluginId: string): ReturnType<typeof drizzle> {
-  const dbDir = resolve(process.env.HOME || '.', '.openclaw', 'kitchen', 'plugins', pluginId);
+  const dbDir = resolve(homedir(), '.openclaw', 'kitchen', 'plugins', pluginId);
   const dbPath = join(dbDir, `${pluginId}.db`);
 
   // Ensure directory exists
