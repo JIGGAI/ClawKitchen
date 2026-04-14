@@ -1890,7 +1890,7 @@ export default function WorkflowsEditorClient({
                             setHandoffIgLoading(prev => ({ ...prev, [kitchenTeamIdInsp]: true }));
                             try {
                               const pk = (() => { try { return JSON.parse(localStorage.getItem(`ck-postiz-${kitchenTeamIdInsp}`) || '{}').apiKey || ''; } catch { return ''; } })();
-                              const r = await fetch(`/api/plugins/marketing/drivers?team=${encodeURIComponent(kitchenTeamIdInsp)}`, { headers: pk ? { 'x-postiz-api-key': pk } : {} });
+                              const r = await fetch(`/api/plugins/marketing/drivers?teamId=${encodeURIComponent(kitchenTeamIdInsp)}`, { headers: pk ? { 'x-postiz-api-key': pk } : {} });
                               const j = await r.json();
                               const ig = (j.drivers || []).filter((d: Record<string, unknown>) => d.platform === 'instagram' && d.backend === 'postiz' && d.integrationId).map((d: Record<string, unknown>) => ({ integrationId: String(d.integrationId), displayName: String(d.displayName || 'Instagram'), username: d.username ? String(d.username) : undefined }));
                               setHandoffIgAccounts(prev => ({ ...prev, [kitchenTeamIdInsp]: ig }));
@@ -2478,7 +2478,7 @@ export default function WorkflowsEditorClient({
                                 setHandoffIgLoading((prev) => ({ ...prev, [tid]: true }));
                                 try {
                                   const postizKey = (() => { try { const s = localStorage.getItem(`ck-postiz-${tid}`); return s ? JSON.parse(s).apiKey || '' : ''; } catch { return ''; } })();
-                                  const res = await fetch(`/api/plugins/marketing/drivers?team=${encodeURIComponent(tid)}`, {
+                                  const res = await fetch(`/api/plugins/marketing/drivers?teamId=${encodeURIComponent(tid)}`, {
                                     headers: postizKey ? { 'x-postiz-api-key': postizKey } : {},
                                   });
                                   const json = await res.json();
