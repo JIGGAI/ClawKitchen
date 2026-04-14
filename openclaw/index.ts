@@ -2,7 +2,7 @@ import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import http from "node:http";
 import path from "node:path";
 import fs from "node:fs";
-import { execSync } from "node:child_process";
+
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 
@@ -382,7 +382,7 @@ const kitchenPlugin = {
         pluginsCmd
           .command("install <package>")
           .description("Install a Kitchen plugin from npm (e.g. @jiggai/kitchen-plugin-marketing)")
-          .action((pkg: string) => {
+          .action(async (pkg: string) => {
             fs.mkdirSync(pluginsDir, { recursive: true });
             // Ensure a package.json exists so npm install --save works
             const pjPath = path.join(pluginsDir, 'package.json');
@@ -391,11 +391,16 @@ const kitchenPlugin = {
             }
             console.log(`Installing ${pkg}...`);
             try {
-              // eslint-disable-next-line sonarjs/os-command -- user-initiated CLI, pkg comes from commander argv
-              execSync('npm install --save ' + pkg, { cwd: pluginsDir, stdio: 'inherit' });
+              const res = await api.runtime.system.runCommandWithTimeout(
+                ['npm', 'install', '--save', pkg],
+                { timeoutMs: 120_000, cwd: pluginsDir },
+              );
+              if (res.code !== 0) throw new Error(res.stderr || res.stdout || 'npm install failed');
+              if (res.stdout) console.log(res.stdout);
               console.log(`\n✅ Plugin ${pkg} installed. Restart the gateway to activate.`);
-            } catch {
+            } catch (e) {
               console.error(`\n❌ Failed to install ${pkg}. Check the package name and try again.`);
+              if (e instanceof Error && e.message) console.error(e.message);
               process.exit(1);
             }
           });
@@ -403,7 +408,7 @@ const kitchenPlugin = {
         pluginsCmd
           .command("remove <package>")
           .description("Remove a Kitchen plugin")
-          .action((pkg: string) => {
+          .action(async (pkg: string) => {
             const pjPath = path.join(pluginsDir, 'package.json');
             if (!fs.existsSync(pjPath)) {
               console.error('No plugins installed.');
@@ -411,11 +416,16 @@ const kitchenPlugin = {
             }
             console.log(`Removing ${pkg}...`);
             try {
-              // eslint-disable-next-line sonarjs/os-command -- user-initiated CLI, pkg comes from commander argv
-              execSync('npm uninstall ' + pkg, { cwd: pluginsDir, stdio: 'inherit' });
+              const res = await api.runtime.system.runCommandWithTimeout(
+                ['npm', 'uninstall', pkg],
+                { timeoutMs: 60_000, cwd: pluginsDir },
+              );
+              if (res.code !== 0) throw new Error(res.stderr || res.stdout || 'npm uninstall failed');
+              if (res.stdout) console.log(res.stdout);
               console.log(`\n✅ Plugin ${pkg} removed. Restart the gateway to apply.`);
-            } catch {
+            } catch (e) {
               console.error(`\n❌ Failed to remove ${pkg}.`);
+              if (e instanceof Error && e.message) console.error(e.message);
               process.exit(1);
             }
           });
