@@ -4,6 +4,7 @@ interface Plugin {
   id: string;
   name: string;
   teamTypes: string[];
+  enabled: boolean;
   tabs: {
     id: string;
     label: string;
@@ -16,9 +17,6 @@ interface PluginTabsProps {
   teamId: string;
 }
 
-/* ------------------------------------------------------------------ */
-/*  Collapsible section                                                */
-/* ------------------------------------------------------------------ */
 function Section({
   title,
   defaultOpen = true,
@@ -49,39 +47,37 @@ function Section({
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Main component                                                     */
-/* ------------------------------------------------------------------ */
 export default function PluginTabs({ teamType, teamId }: PluginTabsProps) {
   const [plugins, setPlugins] = useState<Plugin[]>([]);
   const [activeTab, setActiveTab] = useState<Record<string, string>>({});
   const [loadedTabs, setLoadedTabs] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [savingPluginId, setSavingPluginId] = useState<string>('');
 
-  /* ---- discover plugins ---- */
-  useEffect(() => {
-    async function loadPlugins() {
-      try {
-        const response = await fetch(`/api/plugins?teamType=${encodeURIComponent(teamType)}`);
-        const data = await response.json();
-        if (data.success && Array.isArray(data.plugins)) {
-          setPlugins(data.plugins);
-          const initial: Record<string, string> = {};
-          for (const p of data.plugins) {
-            if (p.tabs.length > 0) initial[p.id] = p.tabs[0].id;
-          }
-          setActiveTab(initial);
+  const loadPlugins = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/teams/plugins?teamId=${encodeURIComponent(teamId)}`);
+      const data = await response.json();
+      if (data.ok && Array.isArray(data.plugins)) {
+        setPlugins(data.plugins);
+        const initial: Record<string, string> = {};
+        for (const p of data.plugins) {
+          if (p.enabled && p.tabs.length > 0) initial[p.id] = p.tabs[0].id;
         }
-      } catch (error) {
-        console.error('Failed to load plugins:', error);
-      } finally {
-        setLoading(false);
+        setActiveTab(initial);
       }
+    } catch (error) {
+      console.error('Failed to load plugins:', error);
+    } finally {
+      setLoading(false);
     }
-    loadPlugins();
-  }, [teamType]);
+  }, [teamId]);
 
-  /* ---- expose KitchenPlugin global for tab bundles ---- */
+  useEffect(() => {
+    void loadPlugins();
+  }, [loadPlugins]);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const w = window as unknown as {
@@ -98,31 +94,27 @@ export default function PluginTabs({ teamType, teamId }: PluginTabsProps) {
       getTab(pluginId, tabId) { return this.registeredTabs.get(`${pluginId}:${tabId}`); },
     };
     w.React = React;
-    // Expose ReactDOM so plugin tabs can use createPortal for fullscreen modals
     import('react-dom').then((mod) => {
-       
       (window as unknown as Record<string, unknown>).ReactDOM = mod;
     }).catch(() => { /* fallback: plugins render in-place */ });
   }, []);
 
-  /* ---- lazy-load a tab bundle ---- */
   const loadPluginTab = useCallback(async (pluginId: string, tabId: string) => {
     const tabKey = `${pluginId}:${tabId}`;
     if (loadedTabs.has(tabKey)) return;
     try {
-      const response = await fetch(`/api/plugins/${pluginId}/tabs/${tabId}`);
+      const response = await fetch(`/api/plugins/${pluginId}/tabs/${tabId}?teamId=${encodeURIComponent(teamId)}`);
       const bundleCode = await response.text();
-       
       new Function(bundleCode)();
       setLoadedTabs(prev => new Set([...prev, tabKey]));
     } catch (error) {
       console.error(`Failed to load plugin tab ${pluginId}:${tabId}:`, error);
     }
-  }, [loadedTabs]);
+  }, [loadedTabs, teamId]);
 
-  /* ---- auto-load first tab for each plugin on discovery ---- */
   useEffect(() => {
     for (const plugin of plugins) {
+      if (!plugin.enabled) continue;
       const tabId = activeTab[plugin.id];
       if (!tabId) continue;
       const tabKey = `${plugin.id}:${tabId}`;
@@ -138,7 +130,26 @@ export default function PluginTabs({ teamType, teamId }: PluginTabsProps) {
     if (!loadedTabs.has(tabKey)) await loadPluginTab(pluginId, tabId);
   }, [loadedTabs, loadPluginTab]);
 
-  /* ---- render a plugin's active tab ---- */
+  const handlePluginToggle = useCallback(async (pluginId: string, enabled: boolean) => {
+    setSavingPluginId(pluginId);
+    try {
+      const response = await fetch('/api/teams/plugins', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teamId, pluginId, enabled }),
+      });
+      if (!response.ok) throw new Error('Failed to update plugin');
+      if (!enabled) {
+        setLoadedTabs((prev) => new Set(Array.from(prev).filter((key) => !key.startsWith(`${pluginId}:`))));
+      }
+      await loadPlugins();
+    } catch (error) {
+      console.error('Failed to update plugin state:', error);
+    } finally {
+      setSavingPluginId('');
+    }
+  }, [loadPlugins, teamId]);
+
   const renderTabContent = (plugin: Plugin) => {
     const currentTabId = activeTab[plugin.id];
     if (!currentTabId) return null;
@@ -156,13 +167,10 @@ export default function PluginTabs({ teamType, teamId }: PluginTabsProps) {
       );
     }
 
-    // Pass team context into plugin tabs so they can call the plugin API.
-    // Plugin tabs are dynamically loaded bundles — cast to accept props.
     const Comp = TabComponent as React.ComponentType<Record<string, unknown>>;
     return React.createElement(Comp, { teamId, teamType, pluginId: plugin.id });
   };
 
-  /* ---- loading state ---- */
   if (loading) {
     return (
       <div className="ck-card p-4">
@@ -176,7 +184,6 @@ export default function PluginTabs({ teamType, teamId }: PluginTabsProps) {
 
   return (
     <div className="space-y-4">
-      {/* Install instructions (collapsed by default) */}
       <Section title="Installing Plugins" defaultOpen={plugins.length === 0}>
         <div className="space-y-2 text-sm text-[color:var(--ck-text-secondary)]">
           <p>Install Kitchen plugins via the CLI:</p>
@@ -190,39 +197,62 @@ export default function PluginTabs({ teamType, teamId }: PluginTabsProps) {
         </div>
       </Section>
 
-      {/* One collapsible section per plugin */}
       {plugins.map(plugin => (
         <Section key={plugin.id} title={plugin.name} defaultOpen>
-          {/* Pill tabs */}
-          <div className="mt-2 mb-4 flex flex-wrap gap-2">
-            {plugin.tabs.map(tab => {
-              const isActive = activeTab[plugin.id] === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => handleTabClick(plugin.id, tab.id)}
-                  className={
-                    isActive
-                      ? "rounded-lg bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)]"
-                      : "rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] hover:bg-white/10"
-                  }
-                >
-                  {tab.label}
-                </button>
-              );
-            })}
+          <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-3 text-sm">
+            <div>
+              <div className="text-[color:var(--ck-text-primary)]">{plugin.enabled ? 'Enabled for this team' : 'Installed, but disabled for this team'}</div>
+              <div className="text-xs text-[color:var(--ck-text-tertiary)]">
+                Supported team types: {plugin.teamTypes.join(', ') || 'any'}
+              </div>
+            </div>
+            <button
+              type="button"
+              disabled={savingPluginId === plugin.id}
+              onClick={() => handlePluginToggle(plugin.id, !plugin.enabled)}
+              className={plugin.enabled
+                ? 'rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10 disabled:opacity-60'
+                : 'rounded-lg bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] disabled:opacity-60'}
+            >
+              {savingPluginId === plugin.id ? 'Saving…' : plugin.enabled ? 'Disable' : 'Enable'}
+            </button>
           </div>
 
-          {/* Tab content */}
-          {renderTabContent(plugin)}
+          {!plugin.enabled ? (
+            <div className="rounded-lg border border-dashed border-white/10 px-4 py-6 text-sm text-[color:var(--ck-text-tertiary)]">
+              Enable this plugin for this team to load its tabs.
+            </div>
+          ) : (
+            <>
+              <div className="mt-2 mb-4 flex flex-wrap gap-2">
+                {plugin.tabs.map(tab => {
+                  const isActive = activeTab[plugin.id] === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => handleTabClick(plugin.id, tab.id)}
+                      className={
+                        isActive
+                          ? "rounded-lg bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)]"
+                          : "rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] hover:bg-white/10"
+                      }
+                    >
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {renderTabContent(plugin)}
+            </>
+          )}
         </Section>
       ))}
 
-      {/* Empty state */}
       {plugins.length === 0 && (
         <div className="ck-card p-4">
           <div className="py-8 text-center text-sm text-[color:var(--ck-text-tertiary)]">
-            No plugins installed for this team type.
+            No Kitchen plugins are installed.
           </div>
         </div>
       )}
