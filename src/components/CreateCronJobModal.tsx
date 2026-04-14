@@ -48,20 +48,20 @@ export function CreateCronJobModal({ open, onClose, onCreated }: CreateCronJobMo
     <Modal open={open} onClose={onClose} title="Create Cron Job" size="lg">
       <div className="max-h-[70vh] overflow-y-auto">
         <CronJobForm formData={formData} updateField={updateField} />
-        
+
         {error && (
-          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+          <div className="mt-4 rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">
             {error}
           </div>
         )}
       </div>
-      
-      <div className="flex justify-end gap-2 mt-6 pt-4 border-t">
+
+      <div className="mt-6 flex items-center justify-end gap-2 border-t border-white/10 pt-4">
         <button
           type="button"
           onClick={onClose}
-          className="px-4 py-2 text-gray-600 hover:text-gray-800"
           disabled={loading}
+          className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
         >
           Cancel
         </button>
@@ -69,7 +69,7 @@ export function CreateCronJobModal({ open, onClose, onCreated }: CreateCronJobMo
           type="button"
           onClick={handleCreate}
           disabled={loading || !formData.name}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="rounded-lg bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] transition-colors hover:bg-[var(--ck-accent-red-hover)] disabled:opacity-50"
         >
           {loading ? "Creating..." : "Create Job"}
         </button>
