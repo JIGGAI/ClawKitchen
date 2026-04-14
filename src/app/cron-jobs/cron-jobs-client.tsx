@@ -60,8 +60,10 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
   // Bulk action state
   type BulkAction = "enable" | "disable" | "delete";
   const [bulkModalAction, setBulkModalAction] = useState<BulkAction | null>(null);
-  const [bulkBusy, setBulkBusy] = useState(false);
-  const [bulkError, setBulkError] = useState<string | null>(null);
+  const [bulkConfirmed, setBulkConfirmed] = useState(false);
+  type JobStatus = "pending" | "in-progress" | "done" | "skipped" | "error";
+  const [bulkJobStatuses, setBulkJobStatuses] = useState<Map<string, { status: JobStatus; error?: string }>>(new Map());
+  const [bulkRunning, setBulkRunning] = useState(false);
 
   const sorted = useMemo(() => {
     return [...jobs].sort((a, b) => {
@@ -85,40 +87,107 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
   );
 
   function openBulkModal(action: BulkAction) {
-    setBulkError(null);
+    setBulkConfirmed(false);
+    setBulkJobStatuses(new Map());
+    setBulkRunning(false);
     setBulkModalAction(action);
+  }
+
+  function closeBulkModal() {
+    if (bulkRunning) return; // don't close while processing
+    setBulkModalAction(null);
+    setBulkConfirmed(false);
+    setBulkJobStatuses(new Map());
+  }
+
+  /** Return the label shown for a job in the progress list. */
+  function jobLabel(id: string): string {
+    const j = jobs.find((x) => x.id === id);
+    return j?.name ?? id;
+  }
+
+  /** Which jobs to actually act on (skip already-in-desired-state). */
+  function bulkTargetIds(): { actionable: string[]; skipped: string[] } {
+    const ids = Array.from(selected);
+    if (!bulkModalAction || bulkModalAction === "delete") return { actionable: ids, skipped: [] };
+    const wantEnabled = bulkModalAction === "enable";
+    const actionable: string[] = [];
+    const skipped: string[] = [];
+    for (const id of ids) {
+      const j = jobs.find((x) => x.id === id);
+      if (j && isEnabled(j) === wantEnabled) skipped.push(id);
+      else actionable.push(id);
+    }
+    return { actionable, skipped };
   }
 
   async function confirmBulkAction() {
     if (!bulkModalAction) return;
-    setBulkBusy(true);
-    setBulkError(null);
-    try {
-      const ids = Array.from(selected);
-      const json = await fetchJson<{ ok?: boolean; errors?: Array<{ id: string; error?: string }> }>(
-        "/api/cron/bulk",
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ ids, action: bulkModalAction }),
-        },
-      );
-      if (!json.ok) {
-        const errMsg = json.errors?.map((e) => `${e.id}: ${e.error}`).join("; ") || "Bulk action failed";
-        throw new Error(errMsg);
+    setBulkConfirmed(true);
+    setBulkRunning(true);
+
+    const { actionable, skipped } = bulkTargetIds();
+
+    // Initialize statuses
+    const initial = new Map<string, { status: JobStatus; error?: string }>();
+    for (const id of actionable) initial.set(id, { status: "pending" });
+    for (const id of skipped) initial.set(id, { status: "skipped" });
+    setBulkJobStatuses(new Map(initial));
+
+    const actionLabel = bulkModalAction;
+    let doneCount = 0;
+    let errCount = 0;
+
+    for (const id of actionable) {
+      // Mark in-progress
+      setBulkJobStatuses((prev) => {
+        const next = new Map(prev);
+        next.set(id, { status: "in-progress" });
+        return next;
+      });
+
+      try {
+        if (actionLabel === "delete") {
+          const json = await fetchJson<{ ok?: boolean; error?: string }>("/api/cron/delete", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ id }),
+          });
+          if (!json.ok) throw new Error(json.error || "Delete failed");
+        } else {
+          const json = await fetchJson<{ ok?: boolean; error?: string }>("/api/cron/job", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ id, action: actionLabel }),
+          });
+          if (!json.ok) throw new Error(json.error || `${actionLabel} failed`);
+        }
+        doneCount++;
+        setBulkJobStatuses((prev) => {
+          const next = new Map(prev);
+          next.set(id, { status: "done" });
+          return next;
+        });
+      } catch (e: unknown) {
+        errCount++;
+        setBulkJobStatuses((prev) => {
+          const next = new Map(prev);
+          next.set(id, { status: "error", error: errorMessage(e) });
+          return next;
+        });
       }
-      const label = bulkModalAction === "delete" ? "Deleted" : bulkModalAction === "enable" ? "Enabled" : "Disabled";
-      toast.push({ kind: "success", message: `${label} ${ids.length} cron job${ids.length !== 1 ? "s" : ""}.` });
-      clear();
-      setBulkModalAction(null);
-      await refresh();
-    } catch (e: unknown) {
-      const msg = errorMessage(e);
-      setBulkError(msg);
-      toast.push({ kind: "error", message: msg });
-    } finally {
-      setBulkBusy(false);
     }
+
+    setBulkRunning(false);
+
+    const verb = actionLabel === "delete" ? "Deleted" : actionLabel === "enable" ? "Enabled" : "Disabled";
+    if (errCount === 0) {
+      toast.push({ kind: "success", message: `${verb} ${doneCount} cron job${doneCount !== 1 ? "s" : ""}.` });
+    } else {
+      toast.push({ kind: "error", message: `${verb} ${doneCount}, ${errCount} failed.` });
+    }
+    clear();
+    await refresh();
   }
 
   const liveEditJob = useMemo(() => {
@@ -388,8 +457,8 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
       )}
 
       <ConfirmationModal
-        open={bulkModalAction !== null}
-        onClose={() => { setBulkModalAction(null); setBulkError(null); }}
+        open={bulkModalAction !== null && !bulkConfirmed}
+        onClose={closeBulkModal}
         title={
           bulkModalAction === "delete" ? "Delete Cron Jobs"
             : bulkModalAction === "enable" ? "Enable Cron Jobs"
@@ -400,14 +469,7 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
             : bulkModalAction === "enable" ? "Enable"
             : "Disable"
         }
-        confirmBusyLabel={
-          bulkModalAction === "delete" ? "Deleting..."
-            : bulkModalAction === "enable" ? "Enabling..."
-            : "Disabling..."
-        }
         onConfirm={confirmBulkAction}
-        busy={bulkBusy}
-        error={bulkError}
         confirmButtonClassName={
           bulkModalAction === "delete"
             ? undefined
@@ -440,6 +502,74 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
           )}
         </p>
       </ConfirmationModal>
+
+      {/* Live progress modal */}
+      {bulkModalAction !== null && bulkConfirmed && (
+        <div className="fixed inset-0 z-[200]">
+          <div className="fixed inset-0 bg-black/60" aria-hidden="true" />
+          <div className="fixed inset-0 overflow-y-auto" role="dialog" aria-modal="true">
+            <div className="flex min-h-full items-center justify-center p-4">
+              <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-[color:var(--ck-bg-soft)] p-5 shadow-[var(--ck-shadow-2)]">
+                <h2 className="text-lg font-semibold text-[color:var(--ck-text-primary)]">
+                  {bulkModalAction === "delete" ? "Deleting" : bulkModalAction === "enable" ? "Enabling" : "Disabling"} Cron Jobs
+                </h2>
+                <div className="mt-4 max-h-80 space-y-1 overflow-y-auto rounded-lg border border-white/10 bg-black/30 p-3 font-mono text-xs">
+                  {Array.from(bulkJobStatuses.entries()).map(([id, { status, error }]) => (
+                    <div key={id} className="flex items-center gap-2">
+                      <span className="shrink-0 w-4 text-center">
+                        {status === "pending" && <span className="text-[color:var(--ck-text-tertiary)]">·</span>}
+                        {status === "in-progress" && <span className="text-yellow-400 animate-pulse">▸</span>}
+                        {status === "done" && <span className="text-green-400">✓</span>}
+                        {status === "skipped" && <span className="text-[color:var(--ck-text-tertiary)]">–</span>}
+                        {status === "error" && <span className="text-red-400">✗</span>}
+                      </span>
+                      <span className={
+                        status === "done" ? "text-green-400"
+                          : status === "in-progress" ? "text-yellow-400"
+                          : status === "error" ? "text-red-400"
+                          : "text-[color:var(--ck-text-tertiary)]"
+                      }>
+                        {jobLabel(id)}
+                      </span>
+                      <span className="ml-auto shrink-0 text-[10px]">
+                        {status === "pending" && ""}
+                        {status === "in-progress" && (
+                          <span className="text-yellow-400">
+                            {bulkModalAction === "delete" ? "deleting..." : bulkModalAction === "enable" ? "enabling..." : "disabling..."}
+                          </span>
+                        )}
+                        {status === "done" && (
+                          <span className="text-green-400">
+                            {bulkModalAction === "delete" ? "deleted" : bulkModalAction === "enable" ? "enabled" : "disabled"}
+                          </span>
+                        )}
+                        {status === "skipped" && (
+                          <span className="text-[color:var(--ck-text-tertiary)]">
+                            already {bulkModalAction === "enable" ? "enabled" : "disabled"}
+                          </span>
+                        )}
+                        {status === "error" && (
+                          <span className="text-red-400" title={error}>{error ?? "failed"}</span>
+                        )}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 flex items-center justify-end">
+                  <button
+                    type="button"
+                    disabled={bulkRunning}
+                    onClick={closeBulkModal}
+                    className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10 disabled:opacity-40"
+                  >
+                    {bulkRunning ? "Processing..." : "Close"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <DeleteCronJobModal
         open={deleteOpen}
