@@ -1,9 +1,7 @@
 import { readFileSync, existsSync, readdirSync } from 'fs';
 import { join, resolve } from 'path';
 import { homedir } from 'os';
-import Database from 'better-sqlite3';
 import { eq } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 export interface KitchenPluginManifest {
@@ -20,8 +18,30 @@ export interface KitchenPluginManifest {
   migrations?: string;
 }
 
+type PluginConfigRow = {
+  value: string | null;
+};
+
+type PluginDb = {
+  select(): {
+    from(table: typeof configTable): {
+      where(condition: unknown): {
+        get(): PluginConfigRow | undefined;
+      };
+    };
+  };
+  insert(table: typeof configTable): {
+    values(row: { key: string; value: string; updatedAt: string }): {
+      onConflictDoUpdate(opts: {
+        target: typeof configTable.key;
+        set: { value: string; updatedAt: string };
+      }): void;
+    };
+  };
+};
+
 export interface KitchenPluginContext {
-  db: ReturnType<typeof drizzle>;
+  db: PluginDb;
   teamDir: string;
   encrypt(data: unknown): string;
   decrypt(blob: string): unknown;
@@ -160,7 +180,7 @@ function loadPluginManifest(packagePath: string): KitchenPluginManifest | null {
 /**
  * Create isolated SQLite database for a plugin
  */
-export function createPluginDb(pluginId: string): ReturnType<typeof drizzle> {
+export function createPluginDb(pluginId: string): PluginDb {
   const dbDir = resolve(homedir(), '.openclaw', 'kitchen', 'plugins', pluginId);
   const dbPath = join(dbDir, `${pluginId}.db`);
 
@@ -177,6 +197,12 @@ export function createPluginDb(pluginId: string): ReturnType<typeof drizzle> {
     // Directory might already exist
   }
 
+  // Lazy-load sqlite so plugin discovery routes do not require the native module.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const Database = require('better-sqlite3');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { drizzle } = require('drizzle-orm/better-sqlite3');
+
   const sqlite = new Database(dbPath);
   const db = drizzle(sqlite, { schema: { config: configTable } });
 
@@ -189,7 +215,7 @@ export function createPluginDb(pluginId: string): ReturnType<typeof drizzle> {
     )
   `);
 
-  return db;
+  return db as unknown as PluginDb;
 }
 
 /**
