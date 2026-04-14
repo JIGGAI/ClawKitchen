@@ -72,7 +72,6 @@
     ".next/package.json"
   ],
   "dependencies": {
-    "@jiggai/kitchen-plugin-marketing": "^0.2.1",
     "better-sqlite3": "^12.8.0",
     "drizzle-kit": "^0.31.10",
     "drizzle-orm": "^0.45.2",
