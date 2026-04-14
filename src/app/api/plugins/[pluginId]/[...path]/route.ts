@@ -71,7 +71,8 @@ async function handlePluginApiRequest(
     const apiModule = _loadPlugin(_cjsRequire, plugin.apiRoutes);
     
     // Get team directory from query params or headers
-    const teamId = request.nextUrl.searchParams.get('team') || 
+    const teamId = request.nextUrl.searchParams.get('teamId') || 
+                   request.nextUrl.searchParams.get('team') || 
                    request.headers.get('x-team-id') || 
                    'default';
     if (teamId !== 'default' && !(await isPluginEnabledForTeam(teamId, pluginId))) {
