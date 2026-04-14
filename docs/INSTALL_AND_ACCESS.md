@@ -128,6 +128,7 @@ Common reasons to restart:
 - Installed or updated a Kitchen plugin (`openclaw kitchen plugins install ...`)
 - Changed plugin configuration
 - Plugin tabs showing stale content
+- Plugin API routes are failing and you need a fresh plugin/bootstrap load
 
 ## When a restart is needed
 
@@ -139,6 +140,8 @@ ClawKitchen reflects live OpenClaw and plugin state, but some changes still requ
 - change channel or binding config that the running process must reload
 
 For plugin changes, use `openclaw kitchen restart`. For deeper config changes, use `openclaw gateway restart`.
+
+If a remote install shows plugin route failures mentioning `better-sqlite3-...`, you are likely running an older Kitchen or plugin build that still loads sqlite bindings too early during bootstrap. Update both packages, then restart Kitchen.
 
 ## A good expectation to set
 

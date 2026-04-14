@@ -66,6 +66,13 @@ This clears the plugin cache and reloads all plugin bundles without restarting t
 
 If `restart` reports Kitchen is not running, check `openclaw kitchen status` first.
 
+If plugin routes return `500` on a remote Kitchen install, check the gateway/Kitchen logs before assuming it is an enablement issue. In particular, errors like:
+
+- `Failed to load external module better-sqlite3-...`
+- `Cannot find module 'better-sqlite3-...'`
+
+mean the plugin bootstrap is crashing during module load. Update Kitchen and the affected plugin to a build that lazy-loads sqlite bindings, then restart Kitchen so plugin discovery can complete.
+
 ## Checking Kitchen health
 
 The quickest way to verify Kitchen state:
