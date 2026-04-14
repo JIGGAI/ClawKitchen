@@ -45,6 +45,7 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
   const [jobs, setJobs] = useState<CronJob[]>([]);
   const [msg, setMsg] = useState<string>("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<"all" | "enabled" | "disabled">("all");
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string>("");
@@ -74,16 +75,22 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
     });
   }, [jobs]);
 
-  const visibleIds = useMemo(() => sorted.map((j) => j.id), [sorted]);
+  const filtered = useMemo(() => {
+    if (statusFilter === "all") return sorted;
+    const wantEnabled = statusFilter === "enabled";
+    return sorted.filter((j) => isEnabled(j) === wantEnabled);
+  }, [sorted, statusFilter]);
+
+  const visibleIds = useMemo(() => filtered.map((j) => j.id), [filtered]);
   const { selected, toggle, allSelected, toggleAll, clear, count } = useRunSelection(visibleIds);
 
   const selectedEnabledCount = useMemo(
-    () => sorted.filter((j) => selected.has(j.id) && isEnabled(j)).length,
-    [sorted, selected],
+    () => filtered.filter((j) => selected.has(j.id) && isEnabled(j)).length,
+    [filtered, selected],
   );
   const selectedDisabledCount = useMemo(
-    () => sorted.filter((j) => selected.has(j.id) && !isEnabled(j)).length,
-    [sorted, selected],
+    () => filtered.filter((j) => selected.has(j.id) && !isEnabled(j)).length,
+    [filtered, selected],
   );
 
   function openBulkModal(action: BulkAction) {
@@ -276,10 +283,10 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
         <div className="ck-card p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {sorted.length > 0 && (
+            {filtered.length > 0 && (
               <input
                 type="checkbox"
-                checked={allSelected && sorted.length > 0}
+                checked={allSelected && filtered.length > 0}
                 onChange={toggleAll}
                 className="accent-[var(--ck-accent-red)]"
                 aria-label="Select all cron jobs"
@@ -288,11 +295,22 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
             <div>
               <h2 className="text-lg font-semibold">All Cron Jobs</h2>
               <p className="mt-1 text-sm text-[color:var(--ck-text-secondary)]">
-                {jobs.length} job{jobs.length !== 1 ? "s" : ""} total · {jobs.filter((j) => isEnabled(j)).length} enabled
+                {statusFilter !== "all"
+                  ? `${filtered.length} of ${jobs.length} job${jobs.length !== 1 ? "s" : ""} (${statusFilter})`
+                  : `${jobs.length} job${jobs.length !== 1 ? "s" : ""} total · ${jobs.filter((j) => isEnabled(j)).length} enabled`}
               </p>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as "all" | "enabled" | "disabled")}
+              className="rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-sm text-[color:var(--ck-text-primary)]"
+            >
+              <option value="all">All</option>
+              <option value="enabled">Enabled</option>
+              <option value="disabled">Disabled</option>
+            </select>
             <button
               type="button"
               onClick={() => setCreateOpen(true)}
@@ -319,7 +337,7 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
       ) : null}
 
       <div className="mt-6 space-y-3">
-        {sorted.map((j) => (
+        {filtered.map((j) => (
           <div key={j.id} className="ck-card px-4 py-3">
             <div className="flex items-start gap-3">
               <input
