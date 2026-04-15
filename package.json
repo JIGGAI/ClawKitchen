@@ -1,9 +1,9 @@
 {
   "name": "@jiggai/kitchen",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "main": "openclaw/index.ts",
   "description": "ClawKitchen - Web-based dashboard for OpenClaw agent teams, workflows, and automation",
-  "author": "@rjdjohnston \u00b7 rjdjohnston",
+  "author": "@rjdjohnston · rjdjohnston",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
