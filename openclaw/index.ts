@@ -109,6 +109,22 @@ async function startKitchen(api: OpenClawPluginApi, cfg: KitchenConfig) {
 
   const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
+  // Ensure better-sqlite3 native binary is compiled for this platform.
+  // openclaw installs plugins with --ignore-scripts, so node-gyp never runs.
+  const sqliteBindingPath = path.join(rootDir, "node_modules", "better-sqlite3", "build", "Release", "better_sqlite3.node");
+  if (!fs.existsSync(sqliteBindingPath)) {
+    api.logger.info("[kitchen] better-sqlite3 native binary missing — rebuilding for this platform...");
+    const res = await api.runtime.system.runCommandWithTimeout(
+      ["npm", "rebuild", "better-sqlite3"],
+      { timeoutMs: 120_000, cwd: rootDir },
+    );
+    if (res.code !== 0) {
+      api.logger.error(`[kitchen] failed to rebuild better-sqlite3: ${res.stderr || res.stdout}`);
+    } else {
+      api.logger.info("[kitchen] better-sqlite3 rebuilt successfully.");
+    }
+  }
+
   const app = next({ dev, dir: rootDir });
   await app.prepare();
   const handle = app.getRequestHandler();
