@@ -10,6 +10,9 @@ const nextConfig: NextConfig = {
 
   // Required so we can ship a prebuilt server bundle (no npm commands for end users).
   output: "standalone",
+
+  // Tell Next.js not to bundle better-sqlite3 (native module).
+  serverExternalPackages: ["better-sqlite3"],
 };
 
 export default nextConfig;
