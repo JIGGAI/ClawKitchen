@@ -1889,10 +1889,25 @@ export default function WorkflowsEditorClient({
                           (async () => {
                             setHandoffIgLoading(prev => ({ ...prev, [kitchenTeamIdInsp]: true }));
                             try {
-                              const pk = (() => { try { return JSON.parse(localStorage.getItem(`ck-postiz-${kitchenTeamIdInsp}`) || '{}').apiKey || ''; } catch { return ''; } })();
-                              const r = await fetch(`/api/plugins/marketing/drivers?teamId=${encodeURIComponent(kitchenTeamIdInsp)}`, { headers: pk ? { 'x-postiz-api-key': pk } : {} });
+                              const pk = (() => {
+                                try {
+                                  return JSON.parse(localStorage.getItem(`ck-postiz-${kitchenTeamIdInsp}`) || '{}').apiKey || '';
+                                } catch {
+                                  return '';
+                                }
+                              })();
+                              const r = await fetch(
+                                `/api/plugins/marketing/drivers?team=${encodeURIComponent(kitchenTeamIdInsp)}&teamId=${encodeURIComponent(kitchenTeamIdInsp)}`,
+                                { headers: pk ? { 'x-postiz-api-key': pk } : {} }
+                              );
                               const j = await r.json();
-                              const ig = (j.drivers || []).filter((d: Record<string, unknown>) => d.platform === 'instagram' && d.backend === 'postiz' && d.integrationId).map((d: Record<string, unknown>) => ({ integrationId: String(d.integrationId), displayName: String(d.displayName || 'Instagram'), username: d.username ? String(d.username) : undefined }));
+                              const ig = (j.drivers || [])
+                                .filter((d: Record<string, unknown>) => d.platform === 'instagram' && d.integrationId)
+                                .map((d: Record<string, unknown>) => ({
+                                  integrationId: String(d.integrationId),
+                                  displayName: String(d.displayName || d.username || 'Instagram'),
+                                  username: d.username ? String(d.username) : undefined,
+                                }));
                               setHandoffIgAccounts(prev => ({ ...prev, [kitchenTeamIdInsp]: ig }));
                             } catch {}
                             setHandoffIgLoading(prev => ({ ...prev, [kitchenTeamIdInsp]: false }));
@@ -2477,17 +2492,27 @@ export default function WorkflowsEditorClient({
                                 if (!tid || handoffIgAccounts[tid] || handoffIgLoading[tid]) return;
                                 setHandoffIgLoading((prev) => ({ ...prev, [tid]: true }));
                                 try {
-                                  const postizKey = (() => { try { const s = localStorage.getItem(`ck-postiz-${tid}`); return s ? JSON.parse(s).apiKey || '' : ''; } catch { return ''; } })();
-                                  const res = await fetch(`/api/plugins/marketing/drivers?teamId=${encodeURIComponent(tid)}`, {
-                                    headers: postizKey ? { 'x-postiz-api-key': postizKey } : {},
-                                  });
+                                  const postizKey = (() => {
+                                    try {
+                                      const s = localStorage.getItem(`ck-postiz-${tid}`);
+                                      return s ? JSON.parse(s).apiKey || '' : '';
+                                    } catch {
+                                      return '';
+                                    }
+                                  })();
+                                  const res = await fetch(
+                                    `/api/plugins/marketing/drivers?team=${encodeURIComponent(tid)}&teamId=${encodeURIComponent(tid)}`,
+                                    {
+                                      headers: postizKey ? { 'x-postiz-api-key': postizKey } : {},
+                                    }
+                                  );
                                   const json = await res.json();
                                   const drivers = Array.isArray(json?.drivers) ? json.drivers : [];
                                   const ig = drivers
-                                    .filter((d: Record<string, unknown>) => d?.platform === 'instagram' && d?.backend === 'postiz' && d?.integrationId)
+                                    .filter((d: Record<string, unknown>) => d?.platform === 'instagram' && d?.integrationId)
                                     .map((d: Record<string, unknown>) => ({
                                       integrationId: String(d.integrationId),
-                                      displayName: String(d.displayName || 'Instagram'),
+                                      displayName: String(d.displayName || d.username || 'Instagram'),
                                       username: d.username ? String(d.username) : undefined,
                                     }));
                                   setHandoffIgAccounts((prev) => ({ ...prev, [tid]: ig }));
