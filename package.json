@@ -3,7 +3,7 @@
   "version": "0.5.3",
   "main": "openclaw/index.ts",
   "description": "ClawKitchen - Web-based dashboard for OpenClaw agent teams, workflows, and automation",
-  "author": "@rjdjohnston · rjdjohnston",
+  "author": "@rjdjohnston \u00b7 rjdjohnston",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -31,7 +31,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "NODE_ENV=production next build",
+    "build": "rm -rf .next && NODE_ENV=production next build",
     "postbuild": "node scripts/copy-standalone-static.mjs",
     "start": "next start",
     "lint": "eslint",
