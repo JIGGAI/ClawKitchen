@@ -43,6 +43,14 @@ export async function DELETE(
   return handlePluginApiRequest(request, resolvedParams, 'DELETE');
 }
 
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ pluginId: string; path: string[] }> }
+) {
+  const resolvedParams = await params;
+  return handlePluginApiRequest(request, resolvedParams, 'PATCH');
+}
+
 async function handlePluginApiRequest(
   request: NextRequest,
   { pluginId, path }: { pluginId: string; path: string[] },
