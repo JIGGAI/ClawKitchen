@@ -244,3 +244,6 @@ openclaw gateway restart
 ```
 
 Then hard refresh the browser.
+
+
+<!-- rebuild-trigger --> 2026-04-15 artifact refresh
