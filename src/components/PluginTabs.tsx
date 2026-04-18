@@ -53,6 +53,16 @@ export default function PluginTabs({ teamType, teamId }: PluginTabsProps) {
   const [loadedTabs, setLoadedTabs] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [savingPluginId, setSavingPluginId] = useState<string>('');
+  const [showSettings, setShowSettings] = useState<Record<string, boolean>>({});
+  const [pluginConfig, setPluginConfig] = useState<Record<string, Record<string, unknown>>>({});
+  const [savingConfig, setSavingConfig] = useState(false);
+
+  const GearIcon = () => (
+    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="10" cy="10" r="3"/>
+      <path d="M10 1.5v2M10 16.5v2M3.4 3.4l1.4 1.4M15.2 15.2l1.4 1.4M1.5 10h2M16.5 10h2M3.4 16.6l1.4-1.4M15.2 4.8l1.4-1.4"/>
+    </svg>
+  );
 
   const loadPlugins = useCallback(async () => {
     setLoading(true);
@@ -150,6 +160,36 @@ export default function PluginTabs({ teamType, teamId }: PluginTabsProps) {
     }
   }, [loadPlugins, teamId]);
 
+  const handleSettingsToggle = async (pluginId: string) => {
+    const isOpen = !showSettings[pluginId];
+    setShowSettings(prev => ({ ...prev, [pluginId]: isOpen }));
+    if (isOpen && !pluginConfig[pluginId]) {
+      try {
+        const res = await fetch(`/api/plugins/${pluginId}/config?team=${teamId}`);
+        const data = await res.json();
+        setPluginConfig(prev => ({ ...prev, [pluginId]: data?.config || data?.data?.config || {} }));
+      } catch {
+        setPluginConfig(prev => ({ ...prev, [pluginId]: {} }));
+      }
+    }
+  };
+
+  const handleSaveConfig = async (pluginId: string, key: string, value: string) => {
+    setSavingConfig(true);
+    try {
+      await fetch(`/api/plugins/${pluginId}/config?team=${teamId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [key]: value }),
+      });
+      setPluginConfig(prev => ({
+        ...prev,
+        [pluginId]: { ...(prev[pluginId] || {}), [key]: value },
+      }));
+    } catch { /* ignore */ }
+    setSavingConfig(false);
+  };
+
   const renderTabContent = (plugin: Plugin) => {
     const currentTabId = activeTab[plugin.id];
     if (!currentTabId) return null;
@@ -206,16 +246,32 @@ export default function PluginTabs({ teamType, teamId }: PluginTabsProps) {
                 Supported team types: {plugin.teamTypes.join(', ') || 'any'}
               </div>
             </div>
-            <button
-              type="button"
-              disabled={savingPluginId === plugin.id}
-              onClick={() => handlePluginToggle(plugin.id, !plugin.enabled)}
-              className={plugin.enabled
-                ? 'rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10 disabled:opacity-60'
-                : 'rounded-lg bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] disabled:opacity-60'}
-            >
-              {savingPluginId === plugin.id ? 'Saving…' : plugin.enabled ? 'Disable' : 'Enable'}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={savingPluginId === plugin.id}
+                onClick={() => handlePluginToggle(plugin.id, !plugin.enabled)}
+                className={plugin.enabled
+                  ? 'rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10 disabled:opacity-60'
+                  : 'rounded-lg bg-[var(--ck-accent-red)] px-3 py-2 text-sm font-medium text-white shadow-[var(--ck-shadow-1)] disabled:opacity-60'}
+              >
+                {savingPluginId === plugin.id ? 'Saving…' : plugin.enabled ? 'Disable' : 'Enable'}
+              </button>
+              {plugin.enabled && (
+                <button
+                  type="button"
+                  onClick={() => handleSettingsToggle(plugin.id)}
+                  title="Plugin settings"
+                  className={`rounded-lg border px-2 py-2 text-sm ${
+                    showSettings[plugin.id]
+                      ? 'border-[var(--ck-accent-red)]/30 bg-[var(--ck-accent-red)]/10 text-[var(--ck-accent-red)]'
+                      : 'border-white/10 bg-white/5 text-[color:var(--ck-text-primary)] hover:bg-white/10'
+                  }`}
+                >
+                  <GearIcon />
+                </button>
+              )}
+            </div>
           </div>
 
           {!plugin.enabled ? (
@@ -243,7 +299,49 @@ export default function PluginTabs({ teamType, teamId }: PluginTabsProps) {
                 })}
               </div>
 
-              {renderTabContent(plugin)}
+              {showSettings[plugin.id] ? (
+                <div className="ck-card mt-2 p-4">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h3 className="text-base font-semibold text-[color:var(--ck-text-primary)]">Plugin Settings</h3>
+                    <button
+                      type="button"
+                      onClick={() => setShowSettings(prev => ({ ...prev, [plugin.id]: false }))}
+                      className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-[color:var(--ck-text-primary)] hover:bg-white/10"
+                    >
+                      Back to tabs
+                    </button>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="rounded-lg border border-white/5 bg-white/[0.02] p-4">
+                      <h4 className="mb-3 text-sm font-medium text-[color:var(--ck-text-primary)]">Media Generation</h4>
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <div className="text-sm text-[color:var(--ck-text-primary)]">Image compression quality</div>
+                          <div className="text-xs text-[color:var(--ck-text-tertiary)]">
+                            Generated images are compressed to JPEG at this quality. Lower = smaller files. Default: 70
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min={1}
+                            max={100}
+                            defaultValue={Number(pluginConfig[plugin.id]?.imageCompressionQuality) || 70}
+                            className="w-20 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-center text-sm text-[color:var(--ck-text-primary)]"
+                            onBlur={(e) => handleSaveConfig(plugin.id, 'imageCompressionQuality', e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                          />
+                          {savingConfig && (
+                            <span className="text-xs text-[color:var(--ck-text-tertiary)]">Saving…</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                renderTabContent(plugin)
+              )}
             </>
           )}
         </Section>
