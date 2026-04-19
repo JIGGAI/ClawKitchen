@@ -390,8 +390,25 @@ export default function WorkflowsEditorClient({
   const [handoffTeams, setHandoffTeams] = useState<string[]>([]);
   const [handoffWorkflows, setHandoffWorkflows] = useState<Record<string, Array<{ id: string; name?: string }>>>({});
   const [handoffTeamsLoading, setHandoffTeamsLoading] = useState(false);
-  const [handoffIgAccounts, setHandoffIgAccounts] = useState<Record<string, Array<{ integrationId: string; displayName: string; username?: string }>>>({});
-  const [handoffIgLoading, setHandoffIgLoading] = useState<Record<string, boolean>>({});
+  // Generic per-platform account cache for handoff nodes. Key format: `${teamId}::${canonicalPlatform}`.
+  // Each account carries `identifier` (raw Postiz type e.g. `instagram-standalone`) so workflows
+  // stay variant-aware at publish time even when the UI groups variants together.
+  const [handoffAccounts, setHandoffAccounts] = useState<Record<string, Array<{ integrationId: string; displayName: string; username?: string; identifier: string }>>>({});
+  const [handoffAccountsLoading, setHandoffAccountsLoading] = useState<Record<string, boolean>>({});
+
+  // Extract the platform a per-platform post workflow targets. Convention:
+  //   social-post-to-<platform>-v<N>  (platform may contain hyphens, e.g. google-business)
+  // Returns null for workflows that don't follow this convention (e.g. social-execution-from-handoff),
+  // in which case the picker stays hidden.
+  const extractPlatformFromWorkflowId = (workflowId: string): string | null => {
+    const m = String(workflowId || '').match(/^social-post-to-(.+)-v\d+$/i);
+    return m ? m[1].toLowerCase() : null;
+  };
+  // Collapse Postiz variants (instagram-standalone → instagram, facebook-page → facebook).
+  const canonicalPlatform = (identifier: string): string => {
+    return String(identifier || '').toLowerCase().replace(/-standalone$/, '').replace(/-page$/, '');
+  };
+  const accountsKey = (tid: string, platform: string) => `${tid}::${canonicalPlatform(platform)}`;
   const [showRawConfig, setShowRawConfig] = useState<Record<string, boolean>>({});
 
   const approvalBindingsNeedsKitchenUpdate = useMemo(() => {
@@ -1867,11 +1884,13 @@ export default function WorkflowsEditorClient({
                         const variableMappingInsp = (cfg.variableMapping || {}) as Record<string, string>;
                         const handoffModeInsp = String(cfg.mode ?? 'fire-and-forget');
                         const kitchenTeamIdInsp = String(variableMappingInsp.kitchenTeamId ?? '').includes('{{') ? teamId : String(variableMappingInsp.kitchenTeamId ?? teamId);
-                        const igOptsInsp = handoffIgAccounts[kitchenTeamIdInsp] || [];
-                        const igLoadingInsp = !!handoffIgLoading[kitchenTeamIdInsp];
+                        const targetPlatformInsp = extractPlatformFromWorkflowId(targetWorkflowIdInsp);
+                        const accountsKeyInsp = kitchenTeamIdInsp && targetPlatformInsp ? accountsKey(kitchenTeamIdInsp, targetPlatformInsp) : '';
+                        const accountOptsInsp = accountsKeyInsp ? (handoffAccounts[accountsKeyInsp] || []) : [];
+                        const accountsLoadingInsp = accountsKeyInsp ? !!handoffAccountsLoading[accountsKeyInsp] : false;
                         const currentIdsInsp = String(variableMappingInsp.integrationIds ?? variableMappingInsp.integrationId ?? '').split(',').map((s: string) => s.trim()).filter(Boolean);
                         const targetWfsInsp = handoffWorkflows[targetTeamIdInsp] || [];
-                        const showIgPickerInsp = targetWorkflowIdInsp.toLowerCase().includes('instagram') || Object.prototype.hasOwnProperty.call(variableMappingInsp, 'integrationId') || Object.prototype.hasOwnProperty.call(variableMappingInsp, 'integrationIds');
+                        const showPickerInsp = !!targetPlatformInsp;
 
                         const updateCfgInsp = (patch: Record<string, unknown>) => {
                           const nextCfg = { ...cfg, ...patch };
@@ -1885,9 +1904,9 @@ export default function WorkflowsEditorClient({
                         if (targetTeamIdInsp && !handoffWorkflows[targetTeamIdInsp]) {
                           (async () => { try { const r = await fetch(`/api/teams/workflows?teamId=${encodeURIComponent(targetTeamIdInsp)}`); const j = await r.json(); if (j.ok && j.files) setHandoffWorkflows(prev => ({ ...prev, [targetTeamIdInsp]: j.files.map((f: string) => ({ id: f.replace(/\.workflow\.json$/, '') })) })); } catch {} })();
                         }
-                        if (showIgPickerInsp && kitchenTeamIdInsp && !handoffIgAccounts[kitchenTeamIdInsp] && !handoffIgLoading[kitchenTeamIdInsp]) {
+                        if (showPickerInsp && kitchenTeamIdInsp && targetPlatformInsp && !handoffAccounts[accountsKeyInsp] && !handoffAccountsLoading[accountsKeyInsp]) {
                           (async () => {
-                            setHandoffIgLoading(prev => ({ ...prev, [kitchenTeamIdInsp]: true }));
+                            setHandoffAccountsLoading(prev => ({ ...prev, [accountsKeyInsp]: true }));
                             try {
                               const pk = (() => {
                                 try {
@@ -1897,20 +1916,22 @@ export default function WorkflowsEditorClient({
                                 }
                               })();
                               const r = await fetch(
-                                `/api/plugins/marketing/drivers?team=${encodeURIComponent(kitchenTeamIdInsp)}&teamId=${encodeURIComponent(kitchenTeamIdInsp)}`,
+                                `/api/plugins/marketing/integrations?team=${encodeURIComponent(kitchenTeamIdInsp)}&teamId=${encodeURIComponent(kitchenTeamIdInsp)}`,
                                 { headers: pk ? { 'x-postiz-api-key': pk } : {} }
                               );
                               const j = await r.json();
-                              const ig = (j.drivers || [])
-                                .filter((d: Record<string, unknown>) => d.platform === 'instagram' && d.integrationId)
-                                .map((d: Record<string, unknown>) => ({
-                                  integrationId: String(d.integrationId),
-                                  displayName: String(d.displayName || d.username || 'Instagram'),
-                                  username: d.username ? String(d.username) : undefined,
+                              const target = canonicalPlatform(targetPlatformInsp);
+                              const filtered = (j.integrations || [])
+                                .filter((i: Record<string, unknown>) => canonicalPlatform(String(i.identifier || '')) === target && !i.disabled && i.id)
+                                .map((i: Record<string, unknown>) => ({
+                                  integrationId: String(i.id),
+                                  identifier: String(i.identifier || ''),
+                                  displayName: String(i.name || targetPlatformInsp),
+                                  username: i.username ? String(i.username) : undefined,
                                 }));
-                              setHandoffIgAccounts(prev => ({ ...prev, [kitchenTeamIdInsp]: ig }));
+                              setHandoffAccounts(prev => ({ ...prev, [accountsKeyInsp]: filtered }));
                             } catch {}
-                            setHandoffIgLoading(prev => ({ ...prev, [kitchenTeamIdInsp]: false }));
+                            setHandoffAccountsLoading(prev => ({ ...prev, [accountsKeyInsp]: false }));
                           })();
                         }
 
@@ -1944,12 +1965,13 @@ export default function WorkflowsEditorClient({
                               </label>
                             ) : null}
 
-                            {showIgPickerInsp && igOptsInsp.length > 0 ? (
+                            {showPickerInsp && targetPlatformInsp && accountOptsInsp.length > 0 ? (
                               <div>
-                                <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">instagram accounts</div>
+                                <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">{targetPlatformInsp} accounts</div>
                                 <div className="mt-1 space-y-1">
-                                  {igOptsInsp.map((opt) => {
+                                  {accountOptsInsp.map((opt) => {
                                     const checked = currentIdsInsp.includes(opt.integrationId);
+                                    const variantSuffix = opt.identifier && opt.identifier !== targetPlatformInsp ? ` (${opt.identifier})` : '';
                                     return (
                                       <label key={opt.integrationId} className="flex items-center gap-2 cursor-pointer rounded-lg border border-white/10 bg-white/5 px-2 py-1 hover:bg-white/10">
                                         <input type="checkbox" checked={checked} onChange={() => {
@@ -1958,14 +1980,14 @@ export default function WorkflowsEditorClient({
                                           if (next.length > 0) nextVm.integrationIds = next.join(','); else delete nextVm.integrationIds;
                                           updateCfgInsp({ variableMapping: nextVm });
                                         }} className="accent-[var(--ck-accent-red)]" />
-                                        <div><div className="text-xs text-[color:var(--ck-text-primary)]">{opt.displayName}</div>{opt.username ? <div className="text-[10px] text-[color:var(--ck-text-tertiary)]">{opt.username}</div> : null}</div>
+                                        <div><div className="text-xs text-[color:var(--ck-text-primary)]">{opt.displayName}{variantSuffix}</div>{opt.username ? <div className="text-[10px] text-[color:var(--ck-text-tertiary)]">{opt.username}</div> : null}</div>
                                       </label>
                                     );
                                   })}
                                 </div>
                               </div>
                             ) : null}
-                            {showIgPickerInsp && igLoadingInsp ? <div className="text-[10px] text-[color:var(--ck-text-tertiary)]">Loading accounts…</div> : null}
+                            {showPickerInsp && accountsLoadingInsp ? <div className="text-[10px] text-[color:var(--ck-text-tertiary)]">Loading accounts…</div> : null}
                           </div>
                         );
                       })() : null}
@@ -2488,9 +2510,10 @@ export default function WorkflowsEditorClient({
                                 } catch { /* ignore */ }
                               };
 
-                              const loadInstagramAccounts = async (tid: string) => {
-                                if (!tid || handoffIgAccounts[tid] || handoffIgLoading[tid]) return;
-                                setHandoffIgLoading((prev) => ({ ...prev, [tid]: true }));
+                              const loadAccountsForPlatform = async (tid: string, platform: string) => {
+                                const key = accountsKey(tid, platform);
+                                if (!tid || !platform || handoffAccounts[key] || handoffAccountsLoading[key]) return;
+                                setHandoffAccountsLoading((prev) => ({ ...prev, [key]: true }));
                                 try {
                                   const postizKey = (() => {
                                     try {
@@ -2500,24 +2523,28 @@ export default function WorkflowsEditorClient({
                                       return '';
                                     }
                                   })();
+                                  // Use /integrations (raw Postiz identifier per account) so we can
+                                  // group variants (instagram / instagram-standalone) under the same platform.
                                   const res = await fetch(
-                                    `/api/plugins/marketing/drivers?team=${encodeURIComponent(tid)}&teamId=${encodeURIComponent(tid)}`,
+                                    `/api/plugins/marketing/integrations?team=${encodeURIComponent(tid)}&teamId=${encodeURIComponent(tid)}`,
                                     {
                                       headers: postizKey ? { 'x-postiz-api-key': postizKey } : {},
                                     }
                                   );
                                   const json = await res.json();
-                                  const drivers = Array.isArray(json?.drivers) ? json.drivers : [];
-                                  const ig = drivers
-                                    .filter((d: Record<string, unknown>) => d?.platform === 'instagram' && d?.integrationId)
-                                    .map((d: Record<string, unknown>) => ({
-                                      integrationId: String(d.integrationId),
-                                      displayName: String(d.displayName || d.username || 'Instagram'),
-                                      username: d.username ? String(d.username) : undefined,
+                                  const integrations = Array.isArray(json?.integrations) ? json.integrations : [];
+                                  const target = canonicalPlatform(platform);
+                                  const filtered = integrations
+                                    .filter((i: Record<string, unknown>) => canonicalPlatform(String(i?.identifier || '')) === target && !i?.disabled && i?.id)
+                                    .map((i: Record<string, unknown>) => ({
+                                      integrationId: String(i.id),
+                                      identifier: String(i.identifier || ''),
+                                      displayName: String(i.name || platform),
+                                      username: i.username ? String(i.username) : undefined,
                                     }));
-                                  setHandoffIgAccounts((prev) => ({ ...prev, [tid]: ig }));
+                                  setHandoffAccounts((prev) => ({ ...prev, [key]: filtered }));
                                 } catch { /* ignore */ }
-                                setHandoffIgLoading((prev) => ({ ...prev, [tid]: false }));
+                                setHandoffAccountsLoading((prev) => ({ ...prev, [key]: false }));
                               };
 
                               // Resolve kitchenTeamId from variable mapping (if literal)
@@ -2531,16 +2558,21 @@ export default function WorkflowsEditorClient({
                               if (targetTeamId && !handoffWorkflows[targetTeamId]) {
                                 loadWorkflows(targetTeamId);
                               }
-                              // Auto-load IG accounts when target workflow looks Instagram-related
-                              const showIgPicker = targetWorkflowId.toLowerCase().includes('instagram') || Object.prototype.hasOwnProperty.call(variableMapping, 'integrationId') || Object.prototype.hasOwnProperty.call(variableMapping, 'integrationIds');
-                              if (showIgPicker && kitchenTeamId && !handoffIgAccounts[kitchenTeamId] && !handoffIgLoading[kitchenTeamId]) {
-                                loadInstagramAccounts(kitchenTeamId);
+                              // Derive target platform from the target workflow's name. Picker only
+                              // shows when the target is a known per-platform post workflow
+                              // (social-post-to-<platform>-vN); otherwise the handoff is generic
+                              // and no per-platform account selection applies here.
+                              const targetPlatform = extractPlatformFromWorkflowId(targetWorkflowId);
+                              const showPicker = !!targetPlatform;
+                              if (showPicker && kitchenTeamId) {
+                                loadAccountsForPlatform(kitchenTeamId, targetPlatform);
                               }
 
                               const targetWfs = handoffWorkflows[targetTeamId] || [];
                               const mappingEntries = Object.entries(variableMapping);
-                              const igOptions = kitchenTeamId ? (handoffIgAccounts[kitchenTeamId] || []) : [];
-                              const igLoading = kitchenTeamId ? !!handoffIgLoading[kitchenTeamId] : false;
+                              const accountsKeyForTeam = kitchenTeamId && targetPlatform ? accountsKey(kitchenTeamId, targetPlatform) : '';
+                              const accountOptions = accountsKeyForTeam ? (handoffAccounts[accountsKeyForTeam] || []) : [];
+                              const accountsLoading = accountsKeyForTeam ? !!handoffAccountsLoading[accountsKeyForTeam] : false;
 
                               // Current selection: integrationId (single) or integrationIds (multi, comma-separated)
                               const currentIds = String(variableMapping.integrationIds ?? variableMapping.integrationId ?? '').split(',').map((s: string) => s.trim()).filter(Boolean);
@@ -2628,28 +2660,33 @@ export default function WorkflowsEditorClient({
                                     </label>
                                   ) : null}
 
-                                  {showIgPicker ? (
+                                  {showPicker && targetPlatform ? (
                                     <div>
                                       <div className="flex items-center justify-between">
-                                        <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">instagram accounts</div>
+                                        <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">{targetPlatform} accounts</div>
                                         <button
                                           type="button"
-                                          onClick={() => { setHandoffIgAccounts((prev) => { const next = { ...prev }; delete next[kitchenTeamId]; return next; }); loadInstagramAccounts(kitchenTeamId); }}
+                                          onClick={() => {
+                                            const key = accountsKey(kitchenTeamId, targetPlatform);
+                                            setHandoffAccounts((prev) => { const next = { ...prev }; delete next[key]; return next; });
+                                            loadAccountsForPlatform(kitchenTeamId, targetPlatform);
+                                          }}
                                           className="rounded-lg border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
                                         >
                                           Refresh
                                         </button>
                                       </div>
-                                      {igLoading ? (
+                                      {accountsLoading ? (
                                         <div className="mt-1 text-[10px] text-[color:var(--ck-text-tertiary)]">Loading accounts…</div>
-                                      ) : igOptions.length === 0 ? (
+                                      ) : accountOptions.length === 0 ? (
                                         <div className="mt-1 text-[10px] text-[color:var(--ck-text-tertiary)]">
-                                          No Instagram accounts found. Open Marketing → Accounts and connect IG in Postiz.
+                                          No {targetPlatform} accounts found. Open Marketing → Accounts and connect {targetPlatform} in Postiz.
                                         </div>
                                       ) : (
                                         <div className="mt-1 space-y-1">
-                                          {igOptions.map((opt) => {
+                                          {accountOptions.map((opt) => {
                                             const checked = currentIds.includes(opt.integrationId);
+                                            const variantSuffix = opt.identifier && opt.identifier !== targetPlatform ? ` (${opt.identifier})` : '';
                                             return (
                                               <label key={opt.integrationId} className="flex items-center gap-2 cursor-pointer rounded-lg border border-white/10 bg-white/5 px-2 py-1 hover:bg-white/10">
                                                 <input
@@ -2672,7 +2709,7 @@ export default function WorkflowsEditorClient({
                                                   className="accent-[var(--ck-accent-red)]"
                                                 />
                                                 <div>
-                                                  <div className="text-xs text-[color:var(--ck-text-primary)]">{opt.displayName}</div>
+                                                  <div className="text-xs text-[color:var(--ck-text-primary)]">{opt.displayName}{variantSuffix}</div>
                                                   {opt.username ? <div className="text-[10px] text-[color:var(--ck-text-tertiary)]">{opt.username}</div> : null}
                                                 </div>
                                               </label>
