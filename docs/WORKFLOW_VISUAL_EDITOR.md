@@ -210,3 +210,34 @@ Automated support ticket processing:
 - Output nodes can trigger external webhooks or APIs
 
 This visual editor makes workflow creation accessible while maintaining the power and flexibility of the underlying ClawRecipes format.
+
+## Handoff nodes and account pickers
+
+Handoff nodes (`type: "handoff"`) hand control off to a different workflow, optionally in a different team. When the target is a **per-platform social post workflow**, the editor renders an account picker so operators can pin which social account(s) the target should publish to.
+
+### How the picker decides what to show
+
+The editor derives the target platform from the `targetWorkflowId` using the naming convention:
+
+```
+social-post-to-<platform>-v<N>
+```
+
+Examples that produce a picker:
+- `social-post-to-instagram-v1` → Instagram accounts
+- `social-post-to-facebook-v1` → Facebook accounts
+- `social-post-to-google-business-v1` → Google Business Profile accounts
+
+Targets that don't match the convention (e.g. `social-execution-from-handoff`) are treated as generic forwarders — no picker is shown.
+
+### Requirements
+
+- The `marketing` plugin must be installed on the team whose workflow you're editing.
+- That team must have Postiz connected via the plugin's **Accounts** tab.
+- Accounts are grouped by canonical platform — Postiz variants (`instagram-standalone`, `facebook-page`, etc.) collapse into the same picker, but the raw identifier is preserved per account and used at publish time.
+
+### Naming guidance
+
+When you add a new per-platform publish workflow, follow the `social-post-to-<platform>-v<N>` convention so the editor picks it up automatically. Deviating from the convention removes the account picker for any handoff that targets your workflow.
+
+See [`kitchen-plugin-marketing/docs/SOCIAL_EXECUTION_SETUP.md`](https://github.com/JIGGAI/kitchen-plugin-marketing/blob/main/docs/SOCIAL_EXECUTION_SETUP.md) for the full two-team setup and demo walkthrough.
