@@ -17,6 +17,20 @@ interface PluginTabsProps {
   teamId: string;
 }
 
+/**
+ * Plugins that expose a settings UI.
+ *
+ * The gear icon + settings panel are currently hardcoded to render a single
+ * "Image compression quality" field, which is only meaningful for plugins
+ * that generate media. Showing the gear for plugins without a matching
+ * config surface (e.g. the YOT CRM plugin) silently writes ghost values
+ * into their plugin_config table that nothing reads.
+ *
+ * Follow-up: replace this allow-list with a manifest-driven settings schema
+ * (see HMX ticket 0091 — Kitchen plugin settings schema).
+ */
+const PLUGINS_WITH_SETTINGS_UI = new Set(['marketing']);
+
 function Section({
   title,
   defaultOpen = true,
@@ -257,7 +271,7 @@ export default function PluginTabs({ teamType, teamId }: PluginTabsProps) {
               >
                 {savingPluginId === plugin.id ? 'Saving…' : plugin.enabled ? 'Disable' : 'Enable'}
               </button>
-              {plugin.enabled && (
+              {plugin.enabled && PLUGINS_WITH_SETTINGS_UI.has(plugin.id) && (
                 <button
                   type="button"
                   onClick={() => handleSettingsToggle(plugin.id)}
@@ -299,7 +313,7 @@ export default function PluginTabs({ teamType, teamId }: PluginTabsProps) {
                 })}
               </div>
 
-              {showSettings[plugin.id] ? (
+              {showSettings[plugin.id] && PLUGINS_WITH_SETTINGS_UI.has(plugin.id) ? (
                 <div className="ck-card mt-2 p-4">
                   <div className="mb-4 flex items-center justify-between">
                     <h3 className="text-base font-semibold text-[color:var(--ck-text-primary)]">Plugin Settings</h3>
