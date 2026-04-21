@@ -87,7 +87,7 @@ describe("/api/cron/worker POST", () => {
 
     // Provenance is stored in the team workspace (not per-agent workspace)
     const mappingRaw = await fs.readFile(path.join(TEAM_DIR, "notes", "cron-jobs.json"), "utf8");
-    const mapping = JSON.parse(mappingRaw) as { version: number; entries: Record<string, { installedCronId: string; updatedAtMs?: number }> };
+    const mapping = JSON.parse(mappingRaw) as { version: number; entries: Record<string, { installedCronId: string; updatedAtMs?: number; payloadSchemaVersion?: number }> };
     expect(mapping.version).toBe(1);
 
     // Key format matches ClawRecipes CronMappingStateV1 convention
@@ -107,8 +107,60 @@ describe("/api/cron/worker POST", () => {
     expect(args).toContain("isolated");
     expect(args).toContain("--timeout-seconds");
     expect(args).toContain("120");
+    // Narrow-scope flags: LLM gets minimal context and can only invoke exec.
+    // Without these, workers occasionally hallucinate wrong CLI paths and
+    // silently drop ticks — we had a workflow stall for 25 minutes on this.
+    expect(args).toContain("--light-context");
+    expect(args).toContain("--tools");
+    expect(args).toContain("exec");
     // No --model flag unless KITCHEN_WORKFLOW_CRON_MODEL is set (see new test).
     expect(args).not.toContain("--model");
+
+    // Provenance records the payload schema version so future reconciles can
+    // detect stale crons and migrate them.
+    expect(mapping.entries[key].payloadSchemaVersion).toBe(2);
+  });
+
+  it("reinstalls a stale (pre-v2) worker cron on install", async () => {
+    // Seed a v1 entry (no payloadSchemaVersion, existing cron id).
+    await fs.mkdir(path.join(TEAM_DIR, "notes"), { recursive: true });
+    await fs.writeFile(
+      path.join(TEAM_DIR, "notes", "cron-jobs.json"),
+      JSON.stringify({
+        version: 1,
+        entries: {
+          "team:claw-marketing-team:recipe:workflow-worker:cron:claw-marketing-team-writer": {
+            installedCronId: "cron-old",
+            updatedAtMs: Date.now() - 60000,
+          },
+        },
+      }, null, 2),
+      "utf8"
+    );
+
+    const { POST } = await import("../worker/route");
+
+    const res = await POST(
+      new Request("http://localhost/api/cron/worker", {
+        method: "POST",
+        body: JSON.stringify({ action: "install", teamId: "claw-marketing-team", agentId: "claw-marketing-team-writer" }),
+      })
+    );
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { installedCronId: string };
+
+    // Old v1 cron was removed, new v2 cron was installed.
+    const rmCall = runOpenClawMock.mock.calls.find((c) => c[0].slice(0, 2).join(" ") === "cron rm");
+    expect(rmCall).toBeDefined();
+    expect(rmCall![0]).toContain("cron-old");
+    expect(json.installedCronId).toBe("cron-123");
+
+    // Mapping was updated to v2.
+    const mappingRaw = await fs.readFile(path.join(TEAM_DIR, "notes", "cron-jobs.json"), "utf8");
+    const mapping = JSON.parse(mappingRaw) as { entries: Record<string, { installedCronId: string; payloadSchemaVersion?: number }> };
+    const key = "team:claw-marketing-team:recipe:workflow-worker:cron:claw-marketing-team-writer";
+    expect(mapping.entries[key].installedCronId).toBe("cron-123");
+    expect(mapping.entries[key].payloadSchemaVersion).toBe(2);
   });
 
   it("reconcile installs missing and disables orphaned in team mapping", async () => {
@@ -150,7 +202,7 @@ describe("/api/cron/worker POST", () => {
 
     // The orphaned entry should be marked orphaned
     const mappingRaw = await fs.readFile(path.join(TEAM_DIR, "notes", "cron-jobs.json"), "utf8");
-    const mapping = JSON.parse(mappingRaw) as { entries: Record<string, { orphaned?: boolean; updatedAtMs?: number }> };
+    const mapping = JSON.parse(mappingRaw) as { entries: Record<string, { installedCronId?: string; orphaned?: boolean; updatedAtMs?: number; payloadSchemaVersion?: number }> };
     const orphanKey = "team:claw-marketing-team:recipe:workflow-worker:cron:claw-marketing-team-old";
     expect(mapping.entries[orphanKey].orphaned).toBe(true);
 

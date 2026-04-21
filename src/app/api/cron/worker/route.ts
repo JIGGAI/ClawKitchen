@@ -19,6 +19,31 @@ async function cronJobExists(id: string): Promise<boolean> {
   }
 }
 
+/**
+ * Schema version for the cron payload shape Kitchen installs.
+ *
+ * v1 = agentTurn message only (broad LLM context, all tools allowed).
+ *      LLM sometimes hallucinated the CLI path or skipped the exec, leaving
+ *      workflow queues to drain unreliably.
+ * v2 = agentTurn + --light-context + --tools exec. The LLM now loads a
+ *      minimal bootstrap context and can only invoke the exec tool, which
+ *      dramatically narrows the failure surface for worker/runner ticks.
+ *
+ * Bump this when the install shape changes so reconcile can detect stale
+ * crons and re-install them.
+ */
+const PAYLOAD_SCHEMA_VERSION = 2;
+
+/**
+ * Extra cron-add flags used for every Kitchen-installed workflow cron.
+ *
+ * - --light-context: skip heavy bootstrap (agent identity, skills, etc.).
+ *   The worker-tick / runner-tick commands do not need that context.
+ * - --tools exec: restrict the LLM session to the exec tool only. It cannot
+ *   wander into Read/Write/Search and cannot invent alternative workflows.
+ */
+const WORKFLOW_CRON_NARROW_SCOPE_ARGS: string[] = ["--light-context", "--tools", "exec"];
+
 // ---------------------------------------------------------------------------
 // Provenance format — matches ClawRecipes CronMappingStateV1 so both systems
 // read/write the same file and never create duplicates.
@@ -30,6 +55,12 @@ type MappingStateV1 = {
     specHash?: string;
     orphaned?: boolean;
     updatedAtMs?: number;
+    /**
+     * Payload schema version the cron was installed with. Missing or older
+     * values mean the cron predates a shape change and should be removed +
+     * re-installed on the next reconcile.
+     */
+    payloadSchemaVersion?: number;
   }>;
 };
 
@@ -150,10 +181,13 @@ async function installWorkerCron(teamId: string, agentId: string): Promise<{
   const existing = mapping.entries[key];
   if (existing && existing.installedCronId && !existing.orphaned) {
     const existingId = String(existing.installedCronId);
-    if (await cronJobExists(existingId)) {
+    const existingSchema = existing.payloadSchemaVersion ?? 1;
+    const isStale = existingSchema < PAYLOAD_SCHEMA_VERSION;
+    if (await cronJobExists(existingId) && !isStale) {
       await runOpenClaw(["cron", "enable", existingId]);
       return { alreadyInstalled: true, installedCronId: existingId, mappingPath: mp, key };
     }
+    if (isStale) await runOpenClaw(["cron", "rm", existingId]);
     delete mapping.entries[key];
     await writeMapping(mp, mapping);
   }
@@ -182,6 +216,7 @@ async function installWorkerCron(teamId: string, agentId: string): Promise<{
     description,
     "--message",
     message,
+    ...WORKFLOW_CRON_NARROW_SCOPE_ARGS,
     ...modelFlagArgs(),
     "--no-deliver",
     "--json",
@@ -192,7 +227,11 @@ async function installWorkerCron(teamId: string, agentId: string): Promise<{
   const installedCronId = String(parsed?.id ?? parsed?.job?.id ?? "").trim();
   if (!installedCronId) throw new Error("Cron add succeeded but did not return id");
 
-  mapping.entries[key] = { installedCronId, updatedAtMs: now };
+  mapping.entries[key] = {
+    installedCronId,
+    updatedAtMs: now,
+    payloadSchemaVersion: PAYLOAD_SCHEMA_VERSION,
+  };
   await writeMapping(mp, mapping);
 
   return { alreadyInstalled: false, installedCronId, mappingPath: mp, key };
@@ -213,9 +252,12 @@ async function installRunnerCron(teamId: string): Promise<{
   const existing = mapping.entries[key];
   if (existing && !existing.orphaned) {
     const existingId = String(existing.installedCronId ?? "").trim();
-    if (await cronJobExists(existingId)) {
+    const existingSchema = existing.payloadSchemaVersion ?? 1;
+    const isStale = existingSchema < PAYLOAD_SCHEMA_VERSION;
+    if (await cronJobExists(existingId) && !isStale) {
       return { alreadyInstalled: true, installedCronId: existingId, mappingPath: mp, key };
     }
+    if (isStale && existingId) await runOpenClaw(["cron", "rm", existingId]);
     delete mapping.entries[key];
     await writeMapping(mp, mapping);
   }
@@ -233,6 +275,7 @@ async function installRunnerCron(teamId: string): Promise<{
     "--tz", "America/New_York",
     "--no-deliver",
     "--message", message,
+    ...WORKFLOW_CRON_NARROW_SCOPE_ARGS,
     ...modelFlagArgs(),
     "--timeout-seconds", "900",
     "--json"
@@ -242,7 +285,11 @@ async function installRunnerCron(teamId: string): Promise<{
   const installedCronId = cronData.id;
   const now = Date.now();
 
-  mapping.entries[key] = { installedCronId, updatedAtMs: now };
+  mapping.entries[key] = {
+    installedCronId,
+    updatedAtMs: now,
+    payloadSchemaVersion: PAYLOAD_SCHEMA_VERSION,
+  };
   await writeMapping(mp, mapping);
 
   return { alreadyInstalled: false, installedCronId, mappingPath: mp, key };
