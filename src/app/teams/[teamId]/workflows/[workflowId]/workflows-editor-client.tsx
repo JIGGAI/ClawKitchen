@@ -431,6 +431,15 @@ export default function WorkflowsEditorClient({
   const [installCronBusy, setInstallCronBusy] = useState(false);
   const [installCronError, setInstallCronError] = useState<string>("");
 
+  // Skip cron check: session-only flag ("skipCronOnce") OR persisted flag on the
+  // workflow JSON at `meta.skipCronCheck` ("skipCronPermanent"). Either unblocks
+  // the Run Now button when worker crons aren't installed (e.g. when workers
+  // are running via launchd or an external scheduler).
+  const [skipCronOnce, setSkipCronOnce] = useState(false);
+  const [skipCronModalOpen, setSkipCronModalOpen] = useState(false);
+  const [skipCronSaving, setSkipCronSaving] = useState(false);
+  const [skipCronError, setSkipCronError] = useState<string>("");
+
   const [newNodeId, setNewNodeId] = useState("");
   const [newNodeName, setNewNodeName] = useState("");
   const [newNodeType, setNewNodeType] = useState<WorkflowFileV1["nodes"][number]["type"]>("llm");
@@ -695,9 +704,22 @@ export default function WorkflowsEditorClient({
 
     const agentIdsMissingCron = requiredAgentIds.filter((id) => !agentHasCron[id]);
 
-    const ok = missingAgentOnNodeIds.length === 0 && agentIdsMissingCron.length === 0;
-    return { missingAgentOnNodeIds, requiredAgentIds, agentIdsMissingCron, ok };
-  }, [parsed.wf, agentHasCron]);
+    // meta.skipCronCheck is the persisted "skip permanently" flag on the workflow itself.
+    const meta = wf.meta && typeof wf.meta === "object" && !Array.isArray(wf.meta)
+      ? (wf.meta as Record<string, unknown>)
+      : {};
+    const skipCronPermanent = meta.skipCronCheck === true;
+
+    const cronSatisfied = agentIdsMissingCron.length === 0 || skipCronOnce || skipCronPermanent;
+    const ok = missingAgentOnNodeIds.length === 0 && cronSatisfied;
+    return {
+      missingAgentOnNodeIds,
+      requiredAgentIds,
+      agentIdsMissingCron,
+      skipCronPermanent,
+      ok,
+    };
+  }, [parsed.wf, agentHasCron, skipCronOnce]);
 
   function setWorkflow(next: WorkflowFileV1) {
     const text = JSON.stringify(next, null, 2) + "\n";
@@ -3069,7 +3091,9 @@ export default function WorkflowsEditorClient({
 
                             // Cron reconciliation: keep the system clean by disabling orphaned worker crons,
                             // and install/enable missing worker crons before enqueue.
-                            if (runPreflight.agentIdsMissingCron.length) {
+                            // Skipped when the user opted to skip the cron check (once or permanently).
+                            const skipCronCheck = skipCronOnce || runPreflight.skipCronPermanent;
+                            if (runPreflight.agentIdsMissingCron.length && !skipCronCheck) {
                               setInstallCronBusy(true);
                               setInstallCronError("");
                               try {
@@ -3149,10 +3173,20 @@ export default function WorkflowsEditorClient({
                       <div className="mt-2 rounded-lg border border-red-400/30 bg-red-500/10 p-2 text-xs text-red-100">
                         All nodes must be assigned to an agent. Missing agentId on: {runPreflight.missingAgentOnNodeIds.join(", ")}
                       </div>
+                    ) : runPreflight.skipCronPermanent ? (
+                      <div className="mt-2 rounded-lg border border-sky-400/30 bg-sky-500/10 p-2 text-xs text-sky-50">
+                        Cron check is skipped permanently for this workflow (<span className="font-mono">meta.skipCronCheck: true</span>).
+                        Run Now will enqueue without installing worker crons.
+                      </div>
+                    ) : skipCronOnce ? (
+                      <div className="mt-2 rounded-lg border border-sky-400/30 bg-sky-500/10 p-2 text-xs text-sky-50">
+                        Cron check is skipped for this session. Run Now will enqueue without installing worker crons.
+                        Reload the page to re-enable the check.
+                      </div>
                     ) : runPreflight.agentIdsMissingCron.length ? (
                       <div className="mt-2 rounded-lg border border-amber-400/30 bg-amber-500/10 p-2 text-xs text-amber-50">
                         <div>Cron not set up for: {runPreflight.agentIdsMissingCron.join(", ")}</div>
-                        <div className="mt-2 flex items-center gap-2">
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
                           <button
                             type="button"
                             onClick={() => {
@@ -3170,9 +3204,92 @@ export default function WorkflowsEditorClient({
                           >
                             Re-check
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSkipCronError("");
+                              setSkipCronModalOpen(true);
+                            }}
+                            className="rounded-lg border border-sky-400/30 bg-sky-500/10 px-2 py-1 text-[10px] font-medium text-sky-50 hover:bg-sky-500/15"
+                            title="Skip the cron-install check and enable Run Now (useful when workers run via launchd or an external scheduler)"
+                          >
+                            Skip
+                          </button>
                         </div>
                       </div>
                     ) : null}
+
+                    <ConfirmationModal
+                      open={skipCronModalOpen}
+                      title="Skip cron check?"
+                      busy={skipCronSaving}
+                      error={skipCronError || undefined}
+                      confirmLabel="Skip this run only"
+                      confirmBusyLabel="Saving…"
+                      onClose={() => {
+                        if (skipCronSaving) return;
+                        setSkipCronModalOpen(false);
+                      }}
+                      onConfirm={() => {
+                        setSkipCronOnce(true);
+                        setSkipCronModalOpen(false);
+                      }}
+                    >
+                      <div className="text-sm text-[color:var(--ck-text-secondary)] space-y-3">
+                        <p>
+                          Choose how long to bypass the worker-cron check for this workflow. The actual worker
+                          process must still be running somewhere (OpenClaw cron, macOS launchd, systemd, etc.)
+                          — skipping the check only stops Kitchen from blocking Run Now.
+                        </p>
+                        <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                          <div className="text-xs font-semibold text-[color:var(--ck-text-primary)]">Skip this run only</div>
+                          <div className="mt-1 text-xs text-[color:var(--ck-text-tertiary)]">
+                            Click the primary button below. Skip resets on page reload.
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={skipCronSaving}
+                          onClick={async () => {
+                            setSkipCronSaving(true);
+                            setSkipCronError("");
+                            try {
+                              if (status.kind !== "ready") throw new Error("Workflow not loaded");
+                              const current = JSON.parse(status.jsonText) as WorkflowFileV1;
+                              const nextMeta: Record<string, unknown> = {
+                                ...(current.meta && typeof current.meta === "object" && !Array.isArray(current.meta)
+                                  ? (current.meta as Record<string, unknown>)
+                                  : {}),
+                                skipCronCheck: true,
+                              };
+                              const nextWf: WorkflowFileV1 = { ...current, meta: nextMeta };
+                              const res = await fetch("/api/teams/workflows", {
+                                method: "POST",
+                                headers: { "content-type": "application/json" },
+                                body: JSON.stringify({ teamId, workflow: nextWf }),
+                              });
+                              const json = (await res.json()) as { ok?: boolean; error?: string };
+                              if (!res.ok || json.ok === false) {
+                                throw new Error(json.error || "Failed to save workflow");
+                              }
+                              setStatus({ kind: "ready", jsonText: JSON.stringify(nextWf, null, 2) + "\n" });
+                              setSkipCronModalOpen(false);
+                            } catch (e: unknown) {
+                              setSkipCronError(e instanceof Error ? e.message : String(e));
+                            } finally {
+                              setSkipCronSaving(false);
+                            }
+                          }}
+                          className="w-full rounded-lg border border-sky-400/30 bg-sky-500/10 p-3 text-left hover:bg-sky-500/15 disabled:opacity-60"
+                        >
+                          <div className="text-xs font-semibold text-sky-50">Skip permanently</div>
+                          <div className="mt-1 text-xs text-sky-100/80">
+                            Writes <span className="font-mono">meta.skipCronCheck: true</span> into the workflow JSON.
+                            Applies forever unless the flag is removed.
+                          </div>
+                        </button>
+                      </div>
+                    </ConfirmationModal>
 
                     <ConfirmationModal
                       open={installCronOpen}

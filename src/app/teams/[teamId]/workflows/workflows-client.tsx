@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { fetchJson } from "@/lib/fetch-json";
 import { errorMessage } from "@/lib/errors";
+import { ConfirmationModal } from "@/components/ConfirmationModal";
 
 type RunDetail = {
   id: string;
@@ -37,6 +38,105 @@ export default function WorkflowsClient({ teamId, llmTaskEnabled }: { teamId: st
   const [runError, setRunError] = useState<string>("");
   const [approvalNote, setApprovalNote] = useState<string>("");
   const [approvalBusy, setApprovalBusy] = useState<boolean>(false);
+
+  // Run-from-list state: when the user clicks Run on a list row, we need to
+  // (a) load the workflow to inspect meta.skipCronCheck, (b) check cron state,
+  // (c) either enqueue the run or show a block modal advising to edit/skip.
+  const [runBusyFor, setRunBusyFor] = useState<string>("");
+  const [runBlockWorkflowId, setRunBlockWorkflowId] = useState<string>("");
+  const [runBlockMissing, setRunBlockMissing] = useState<string[]>([]);
+  const [runBlockError, setRunBlockError] = useState<string>("");
+
+  const runWorkflow = useCallback(
+    async (workflowId: string) => {
+      setRunBusyFor(workflowId);
+      setRunBlockError("");
+      try {
+        // 1. Load workflow to check meta.skipCronCheck + collect required agentIds
+        const wfRes = await fetchJson<{ ok?: boolean; error?: string; workflow?: unknown }>(
+          `/api/teams/workflows?teamId=${encodeURIComponent(teamId)}&id=${encodeURIComponent(workflowId)}`,
+          { cache: "no-store" }
+        );
+        if (!wfRes.ok || !wfRes.workflow) throw new Error(wfRes.error || "Failed to load workflow");
+        const wf = wfRes.workflow as {
+          meta?: unknown;
+          nodes?: Array<{ type?: string; config?: unknown }>;
+        };
+        const meta = isRecord(wf.meta) ? wf.meta : {};
+        const skipCronCheck = meta.skipCronCheck === true;
+
+        if (!skipCronCheck) {
+          const nodes = Array.isArray(wf.nodes) ? wf.nodes : [];
+          const requiredAgents = Array.from(
+            new Set(
+              nodes
+                .filter((n) => n.type && !["start", "end", "human_approval"].includes(String(n.type)))
+                .map((n) => {
+                  const cfg = isRecord(n.config) ? n.config : {};
+                  return String(cfg.agentId ?? "").trim();
+                })
+                .filter(Boolean)
+            )
+          );
+
+          // 2. Fetch cron jobs and compute which required agents lack a worker-tick cron.
+          const cronRes = await fetchJson<{ ok?: boolean; error?: string; jobs?: unknown[] }>(
+            `/api/cron/jobs`,
+            { cache: "no-store" }
+          );
+          if (!cronRes.ok) throw new Error(cronRes.error || "Failed to load cron jobs");
+          const jobs = Array.isArray(cronRes.jobs) ? cronRes.jobs : [];
+          const agentHasCron: Record<string, boolean> = {};
+          for (const j of jobs) {
+            const job = j as { enabled?: unknown; name?: unknown; payload?: { message?: unknown } };
+            if (!job || !Boolean(job.enabled)) continue;
+            const jobName = String(job.name ?? "");
+            const payloadMsg = String(job.payload?.message ?? "");
+            const isWorkerTick = jobName.startsWith("workflow-worker:") || payloadMsg.includes("worker-tick");
+            if (!isWorkerTick) continue;
+            const m = jobName.match(/^workflow-worker:[^:]+:(.+)$/);
+            if (m?.[1]) {
+              agentHasCron[m[1]] = true;
+              continue;
+            }
+            const msgMatch = payloadMsg.match(/--agent-id\s+(\S+)/);
+            if (msgMatch?.[1]) agentHasCron[msgMatch[1]] = true;
+          }
+          const missing = requiredAgents.filter((id) => !agentHasCron[id]);
+          if (missing.length) {
+            setRunBlockMissing(missing);
+            setRunBlockWorkflowId(workflowId);
+            return;
+          }
+        }
+
+        // 3. Enqueue the run.
+        const runRes = await fetchJson<{ ok?: boolean; error?: string; runId?: string }>(
+          `/api/teams/workflow-runs`,
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ teamId, workflowId, mode: "run_now" }),
+          }
+        );
+        if (!runRes.ok) throw new Error(runRes.error || "Failed to create run");
+        const newRunId = String(runRes.runId ?? "").trim();
+        if (newRunId) {
+          router.push(`/teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(workflowId)}/${encodeURIComponent(newRunId)}`);
+        } else {
+          // Fall back to showing runs for the workflow inline.
+          setExpandedWorkflowId(workflowId);
+        }
+      } catch (e: unknown) {
+        setRunBlockMissing([]);
+        setRunBlockWorkflowId("");
+        setRunBlockError(errorMessage(e));
+      } finally {
+        setRunBusyFor("");
+      }
+    },
+    [teamId, router]
+  );
 
   const load = useCallback(
     async (opts?: { quiet?: boolean }) => {
@@ -260,6 +360,41 @@ export default function WorkflowsClient({ teamId, llmTaskEnabled }: { teamId: st
         </div>
       ) : null}
 
+      {runBlockError ? (
+        <div className="mt-4 rounded-lg border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-100">
+          {runBlockError}
+        </div>
+      ) : null}
+
+      <ConfirmationModal
+        open={Boolean(runBlockWorkflowId)}
+        title="Worker crons not set up"
+        confirmLabel="Edit workflow"
+        onClose={() => {
+          setRunBlockWorkflowId("");
+          setRunBlockMissing([]);
+        }}
+        onConfirm={() => {
+          const wfId = runBlockWorkflowId;
+          setRunBlockWorkflowId("");
+          setRunBlockMissing([]);
+          if (wfId) router.push(`/teams/${encodeURIComponent(teamId)}/workflows/${encodeURIComponent(wfId)}`);
+        }}
+      >
+        <div className="space-y-2 text-sm text-[color:var(--ck-text-secondary)]">
+          <p>
+            This workflow can’t run because worker cron jobs aren’t installed for the required agents. Open the
+            workflow editor to install them, or choose to skip the cron check (once or permanently) from the same
+            screen.
+          </p>
+          {runBlockMissing.length ? (
+            <div className="rounded-lg border border-white/10 bg-white/5 p-2 font-mono text-[11px] text-[color:var(--ck-text-primary)]">
+              Missing for: {runBlockMissing.join(", ")}
+            </div>
+          ) : null}
+        </div>
+      </ConfirmationModal>
+
       {workflows.length === 0 ? (
         <p className="mt-4 text-sm text-[color:var(--ck-text-secondary)]">No workflows yet.</p>
       ) : (
@@ -292,6 +427,15 @@ export default function WorkflowsClient({ teamId, llmTaskEnabled }: { teamId: st
                   </button>
 
                   <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={runBusyFor === w.id}
+                      onClick={() => void runWorkflow(w.id)}
+                      className="rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-3 py-1.5 text-sm font-medium text-emerald-50 transition-colors hover:bg-emerald-500/15 disabled:opacity-60"
+                      title="Enqueue a run for this workflow"
+                    >
+                      {runBusyFor === w.id ? "Starting…" : "Run"}
+                    </button>
                     <Link
                       href={`/teams/${encodeURIComponent(teamId)}/workflows/${encodeURIComponent(w.id)}`}
                       className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-medium text-[color:var(--ck-text-primary)] hover:bg-white/10"
