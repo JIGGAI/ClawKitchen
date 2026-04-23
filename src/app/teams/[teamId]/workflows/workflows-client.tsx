@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { fetchJson } from "@/lib/fetch-json";
 import { errorMessage } from "@/lib/errors";
 import { ConfirmationModal } from "@/components/ConfirmationModal";
+import { RunLoadingOverlay } from "@/components/RunLoadingOverlay";
 
 type RunDetail = {
   id: string;
@@ -42,7 +43,14 @@ export default function WorkflowsClient({ teamId, llmTaskEnabled }: { teamId: st
   // Run-from-list state: when the user clicks Run on a list row, we need to
   // (a) load the workflow to inspect meta.skipCronCheck, (b) check cron state,
   // (c) either enqueue the run or show a block modal advising to edit/skip.
+  //
+  // `runBusyFor` disables the row's button.
+  // `runOverlayOpen` shows the full-screen "Gathering your ingredients" overlay
+  // from the moment the user clicks Run through navigation to the run page. It
+  // stays open on successful enqueue (the page unmount clears it naturally);
+  // it closes on block-modal or error.
   const [runBusyFor, setRunBusyFor] = useState<string>("");
+  const [runOverlayOpen, setRunOverlayOpen] = useState(false);
   const [runBlockWorkflowId, setRunBlockWorkflowId] = useState<string>("");
   const [runBlockMissing, setRunBlockMissing] = useState<string[]>([]);
   const [runBlockError, setRunBlockError] = useState<string>("");
@@ -50,6 +58,7 @@ export default function WorkflowsClient({ teamId, llmTaskEnabled }: { teamId: st
   const runWorkflow = useCallback(
     async (workflowId: string) => {
       setRunBusyFor(workflowId);
+      setRunOverlayOpen(true);
       setRunBlockError("");
       try {
         // 1. Load workflow to check meta.skipCronCheck + collect required agentIds
@@ -104,6 +113,8 @@ export default function WorkflowsClient({ teamId, llmTaskEnabled }: { teamId: st
           }
           const missing = requiredAgents.filter((id) => !agentHasCron[id]);
           if (missing.length) {
+            setRunOverlayOpen(false);
+            setRunBusyFor("");
             setRunBlockMissing(missing);
             setRunBlockWorkflowId(workflowId);
             return;
@@ -122,17 +133,21 @@ export default function WorkflowsClient({ teamId, llmTaskEnabled }: { teamId: st
         if (!runRes.ok) throw new Error(runRes.error || "Failed to create run");
         const newRunId = String(runRes.runId ?? "").trim();
         if (newRunId) {
+          // Leave overlay open — page unmount on navigation will clear it,
+          // avoiding a flash between fade-out and the run page render.
           router.push(`/teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(workflowId)}/${encodeURIComponent(newRunId)}`);
-        } else {
-          // Fall back to showing runs for the workflow inline.
-          setExpandedWorkflowId(workflowId);
+          return;
         }
+        // No runId returned — fall back to showing runs for the workflow inline.
+        setExpandedWorkflowId(workflowId);
+        setRunOverlayOpen(false);
+        setRunBusyFor("");
       } catch (e: unknown) {
+        setRunOverlayOpen(false);
+        setRunBusyFor("");
         setRunBlockMissing([]);
         setRunBlockWorkflowId("");
         setRunBlockError(errorMessage(e));
-      } finally {
-        setRunBusyFor("");
       }
     },
     [teamId, router]
@@ -657,6 +672,8 @@ export default function WorkflowsClient({ teamId, llmTaskEnabled }: { teamId: st
           })}
         </ul>
       )}
+
+      <RunLoadingOverlay open={runOverlayOpen} />
     </div>
   );
 }
