@@ -3175,8 +3175,48 @@ export default function WorkflowsEditorClient({
                       </div>
                     ) : runPreflight.skipCronPermanent ? (
                       <div className="mt-2 rounded-lg border border-sky-400/30 bg-sky-500/10 p-2 text-xs text-sky-50">
-                        Cron check is skipped permanently for this workflow (<span className="font-mono">meta.skipCronCheck: true</span>).
-                        Run Now will enqueue without installing worker crons.
+                        <div>Cron check is skipped permanently for this workflow. Run Now will enqueue without installing worker crons.</div>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={skipCronSaving}
+                            onClick={async () => {
+                              setSkipCronSaving(true);
+                              setSkipCronError("");
+                              try {
+                                if (status.kind !== "ready") throw new Error("Workflow not loaded");
+                                const current = JSON.parse(status.jsonText) as WorkflowFileV1;
+                                const curMeta =
+                                  current.meta && typeof current.meta === "object" && !Array.isArray(current.meta)
+                                    ? { ...(current.meta as Record<string, unknown>) }
+                                    : {};
+                                delete curMeta.skipCronCheck;
+                                const nextWf: WorkflowFileV1 = { ...current, meta: curMeta };
+                                const res = await fetch("/api/teams/workflows", {
+                                  method: "POST",
+                                  headers: { "content-type": "application/json" },
+                                  body: JSON.stringify({ teamId, workflow: nextWf }),
+                                });
+                                const json = (await res.json()) as { ok?: boolean; error?: string };
+                                if (!res.ok || json.ok === false) {
+                                  throw new Error(json.error || "Failed to save workflow");
+                                }
+                                setStatus({ kind: "ready", jsonText: JSON.stringify(nextWf, null, 2) + "\n" });
+                                await refreshCronMap();
+                              } catch (e: unknown) {
+                                setSkipCronError(e instanceof Error ? e.message : String(e));
+                              } finally {
+                                setSkipCronSaving(false);
+                              }
+                            }}
+                            className="rounded-lg border border-sky-300/30 bg-sky-500/10 px-2 py-1 text-[10px] font-medium text-sky-50 hover:bg-sky-500/15 disabled:opacity-60"
+                          >
+                            {skipCronSaving ? "Unskipping…" : "Unskip"}
+                          </button>
+                          {skipCronError ? (
+                            <span className="text-[10px] text-red-200">{skipCronError}</span>
+                          ) : null}
+                        </div>
                       </div>
                     ) : skipCronOnce ? (
                       <div className="mt-2 rounded-lg border border-sky-400/30 bg-sky-500/10 p-2 text-xs text-sky-50">
