@@ -3,6 +3,7 @@ import path from "node:path";
 import { NextResponse } from "next/server";
 import { runOpenClaw } from "@/lib/openclaw";
 import { invalidateOpenClawCache } from "@/lib/openclaw-cache";
+import { refreshAllTeamCronCaches } from "@/lib/team-cron-cache";
 import { getTeamWorkspaceDir } from "@/lib/paths";
 import { errorMessage } from "@/lib/errors";
 
@@ -310,6 +311,7 @@ export async function POST(req: Request) {
       const res = await installWorkerCron(teamId, agentId);
       // Mutation may have added/replaced/enabled crons — clear list cache.
       invalidateOpenClawCache(["cron", "list"]);
+      refreshAllTeamCronCaches().catch(() => {});
       return NextResponse.json({ ok: true, action, teamId, agentId, ...res });
     }
 
@@ -357,6 +359,7 @@ export async function POST(req: Request) {
 
       // Reconcile may have added/disabled multiple crons — clear list cache.
       invalidateOpenClawCache(["cron", "list"]);
+      refreshAllTeamCronCaches().catch(() => {});
       return NextResponse.json({
         ok: true,
         action,

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { runOpenClaw } from "@/lib/openclaw";
 import { invalidateOpenClawCache } from "@/lib/openclaw-cache";
+import { refreshAllTeamCronCaches } from "@/lib/team-cron-cache";
 
 export async function POST(req: Request) {
   const body = (await req.json()) as { id?: string; action?: string };
@@ -16,11 +17,13 @@ export async function POST(req: Request) {
     const result = await runOpenClaw(["cron", "run", id, "--json"]);
     if (!result.ok) return NextResponse.json({ ok: false, error: result.stderr || result.stdout }, { status: 500 });
     invalidateOpenClawCache(["cron", "list"]);
+    refreshAllTeamCronCaches().catch(() => {});
     return NextResponse.json({ ok: true, action, id, result });
   }
 
   const result = await runOpenClaw(["cron", action, id]);
   if (!result.ok) return NextResponse.json({ ok: false, error: result.stderr || result.stdout }, { status: 500 });
   invalidateOpenClawCache(["cron", "list"]);
+  refreshAllTeamCronCaches().catch(() => {});
   return NextResponse.json({ ok: true, action, id, result });
 }
