@@ -48,9 +48,40 @@ export function forceFrontmatterId(md: string, id: string): string {
   return `---\n${nextLines.join("\n")}\n---\n${body}`;
 }
 
+// `openclaw recipes list` spawns a subprocess and takes ~20s on this machine.
+// `getTeamDisplayName` is called from server components on every render —
+// including each 3s `router.refresh()` poll on the run detail page — and the
+// page render blocks behind it, so updates appear stuck. Cache the recipe list
+// for a short window so polls return fast. Other callers of `listRecipes` (recipe
+// editor, agent list page) remain uncached so they see fresh data on navigation.
+const TEAM_NAME_LIST_TTL_MS = 30_000;
+let cachedRecipeList: { items: RecipeListItem[]; expires: number } | null = null;
+let cachedRecipeListInflight: Promise<RecipeListItem[]> | null = null;
+
+async function getCachedRecipeListForDisplay(): Promise<RecipeListItem[]> {
+  if (cachedRecipeList && Date.now() < cachedRecipeList.expires) return cachedRecipeList.items;
+  if (cachedRecipeListInflight) return cachedRecipeListInflight;
+  cachedRecipeListInflight = (async () => {
+    try {
+      const items = await listRecipes();
+      cachedRecipeList = { items, expires: Date.now() + TEAM_NAME_LIST_TTL_MS };
+      return items;
+    } finally {
+      cachedRecipeListInflight = null;
+    }
+  })();
+  return cachedRecipeListInflight;
+}
+
+/** Test-only: clear the recipe-list cache used by getTeamDisplayName. */
+export function _resetRecipeDisplayCache() {
+  cachedRecipeList = null;
+  cachedRecipeListInflight = null;
+}
+
 /** Returns display name for a team from recipe list, or null if not found. */
 export async function getTeamDisplayName(teamId: string): Promise<string | null> {
-  const recipes = await listRecipes();
+  const recipes = await getCachedRecipeListForDisplay();
   const match = recipes.find((r) => r.kind === "team" && r.id === teamId);
   return match?.name ?? null;
 }
