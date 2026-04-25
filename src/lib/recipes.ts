@@ -103,7 +103,10 @@ export async function listRecipes(): Promise<RecipeListItem[]> {
 
 /** Fetches recipe list and returns the item with the given id, or null. */
 export async function findRecipeById(id: string): Promise<RecipeListItem | null> {
-  const recipes = await listRecipes();
+  // Use the cached list — `recipes list` is a ~20s subprocess and findRecipeById
+  // is called on every /api/recipes/[id] hit (which is the recipe markdown
+  // load that fires when any team page mounts). Mutations bust the cache.
+  const recipes = await listRecipesCached();
   return recipes.find((r) => r.id === id) ?? null;
 }
 
