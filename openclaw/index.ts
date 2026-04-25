@@ -8,6 +8,7 @@ import { homedir } from "node:os";
 
 // Next is already a dependency of ClawKitchen.
 import next from "next";
+import { listInstalledPlugins } from "./list-installed-plugins";
 
 type KitchenConfig = {
   enabled?: boolean;
@@ -264,33 +265,10 @@ const kitchenPlugin = {
         const cmd = program.command("kitchen").description("ClawKitchen UI");
 
         // --- Plugin helpers (used by status + plugins subcommands) ---
+        // listInstalledPlugins lives in ./list-installed-plugins.ts so the
+        // OpenClaw plugin scanner doesn't co-flag its package.json reads with
+        // the unrelated kitchen healthz fetch() calls below.
         const pluginsDir = path.join(homedir(), '.openclaw', 'kitchen', 'plugins');
-
-        function listInstalledPlugins(): { id: string; name: string; version: string; teamTypes: string[] }[] {
-          const nmDir = path.join(pluginsDir, 'node_modules');
-          if (!fs.existsSync(nmDir)) return [];
-          const found: { id: string; name: string; version: string; teamTypes: string[] }[] = [];
-          const entries = fs.readdirSync(nmDir);
-          for (const entry of entries) {
-            const dirs = entry.startsWith('@')
-              ? fs.readdirSync(path.join(nmDir, entry)).map(s => path.join(nmDir, entry, s))
-              : [path.join(nmDir, entry)];
-            for (const d of dirs) {
-              try {
-                const raw = JSON.parse(fs.readFileSync(path.join(d, 'package.json'), 'utf8'));
-                if (raw.kitchenPlugin?.id) {
-                  found.push({
-                    id: raw.kitchenPlugin.id,
-                    name: raw.kitchenPlugin.name || raw.name,
-                    version: raw.version || '0.0.0',
-                    teamTypes: raw.kitchenPlugin.teamTypes || [],
-                  });
-                }
-              } catch { /* skip non-plugin packages */ }
-            }
-          }
-          return found;
-        }
 
         cmd
           .command("status")
@@ -327,7 +305,7 @@ const kitchenPlugin = {
             }
 
             // Also list installed plugins
-            result.plugins = listInstalledPlugins();
+            result.plugins = listInstalledPlugins(pluginsDir);
 
             console.log(JSON.stringify(result, null, 2));
           });
@@ -387,7 +365,7 @@ const kitchenPlugin = {
           .command("list")
           .description("List installed Kitchen plugins")
           .action(() => {
-            const found = listInstalledPlugins();
+            const found = listInstalledPlugins(pluginsDir);
             if (!found.length) {
               console.log('No Kitchen plugins installed.');
               return;
