@@ -1,4 +1,5 @@
 import { runOpenClaw, type OpenClawExecResult } from "@/lib/openclaw";
+import { invalidateOpenClawCache } from "@/lib/openclaw-cache";
 
 export interface CronJobData {
   name?: string;
@@ -140,7 +141,9 @@ export async function createCronJob(data: CronJobData): Promise<OpenClawExecResu
   }
 
   const args = ["cron", "add", ...buildCronJobArgs(data)];
-  return await runOpenClaw(args);
+  const result = await runOpenClaw(args);
+  if (result.ok) invalidateOpenClawCache(["cron", "list"]);
+  return result;
 }
 
 export async function updateCronJob(id: string, data: CronJobData): Promise<OpenClawExecResult> {
@@ -154,5 +157,7 @@ export async function updateCronJob(id: string, data: CronJobData): Promise<Open
   // The `cron update` subcommand does not accept our `--payload-*` flag set,
   // so edits like `payload.model` would silently fail to persist.
   const args = ["cron", "edit", id, ...buildCronJobArgs(data)];
-  return await runOpenClaw(args);
+  const result = await runOpenClaw(args);
+  if (result.ok) invalidateOpenClawCache(["cron", "list"]);
+  return result;
 }

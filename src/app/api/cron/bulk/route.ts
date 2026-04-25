@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { toolsInvoke } from "@/lib/gateway";
 import { runOpenClaw } from "@/lib/openclaw";
+import { invalidateOpenClawCache } from "@/lib/openclaw-cache";
 import { getBaseWorkspaceFromGateway, markOrphanedInTeamWorkspaces } from "../helpers";
 
 type BulkAction = "enable" | "disable" | "delete";
@@ -54,6 +55,10 @@ export async function POST(req: Request) {
       results.push({ id, ok: false, error: String(e) });
     }
   }
+
+  // Any successful mutation invalidates the cron list cache so the next
+  // /api/cron/jobs read returns fresh state.
+  if (results.some((r) => r.ok)) invalidateOpenClawCache(["cron", "list"]);
 
   const errors = results.filter((r) => !r.ok);
   return NextResponse.json({

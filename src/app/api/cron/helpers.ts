@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { runOpenClaw } from "@/lib/openclaw";
+import { cachedRunOpenClaw } from "@/lib/openclaw-cache";
 
 export type CronScope = { kind: "team" | "agent"; id: string; label: string; href: string };
 
@@ -45,7 +45,12 @@ function addEntriesToScopeMap(
 
 async function collectAgentScopes(idToScope: Map<string, CronScope>): Promise<void> {
   try {
-    const cfgText = await runOpenClaw(["config", "get", "agents.list", "--no-color"]);
+    // 60s TTL: `config get agents.list` takes ~5s and the agent list changes
+    // very rarely (only when the user adds/removes an agent via the agents UI,
+    // which has its own paths to the openclaw subprocess).
+    const cfgText = await cachedRunOpenClaw(["config", "get", "agents.list", "--no-color"], {
+      ttlMs: 60_000,
+    });
     if (!cfgText.ok) return;
     const list = JSON.parse(String(cfgText.stdout ?? "[]")) as Array<{ id?: unknown; workspace?: unknown }>;
     for (const a of list) {

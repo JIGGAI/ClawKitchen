@@ -41,6 +41,26 @@ export async function cachedRunOpenClaw(
   return promise;
 }
 
+/**
+ * Invalidate one or more cached entries by argv. Mutation routes (e.g.
+ * `cron rm`, `cron enable`) call this after a successful write so the next
+ * read returns fresh data instead of waiting for the TTL to expire.
+ *
+ * Each argv is matched as a prefix: `invalidateOpenClawCache(["cron"])` clears
+ * every cached `openclaw cron *` call. Pass an exact argv to scope tightly.
+ */
+export function invalidateOpenClawCache(...argvs: string[][]): void {
+  for (const argv of argvs) {
+    const prefix = JSON.stringify(argv).replace(/\]$/, "");
+    for (const key of cache.keys()) {
+      if (key === JSON.stringify(argv) || key.startsWith(prefix)) cache.delete(key);
+    }
+    for (const key of inflight.keys()) {
+      if (key === JSON.stringify(argv) || key.startsWith(prefix)) inflight.delete(key);
+    }
+  }
+}
+
 /** Test-only: clear all cached subprocess results. */
 export function _resetOpenClawCache() {
   cache.clear();

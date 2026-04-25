@@ -3,7 +3,7 @@ import path from "node:path";
 import YAML from "yaml";
 import { runOpenClaw } from "./openclaw";
 import { cachedRunOpenClaw } from "./openclaw-cache";
-import { getBuiltinRecipesDir, getWorkspaceRecipesDir } from "./paths";
+import { getBuiltinRecipesDir, getTeamWorkspaceDir, getWorkspaceRecipesDir } from "./paths";
 
 export type RecipeListItem = {
   id: string;
@@ -49,13 +49,33 @@ export function forceFrontmatterId(md: string, id: string): string {
   return `---\n${nextLines.join("\n")}\n---\n${body}`;
 }
 
-/** Returns display name for a team from recipe list, or null if not found. */
+/**
+ * Returns display name for an installed team, or null if not found.
+ *
+ * Reads `~/.openclaw/workspace-<teamId>/team.json` directly — that's the
+ * source of truth written when a team is scaffolded. Always fresh, ~1ms file
+ * read. Falls back to the (cached) recipe list for unusual cases where a team
+ * id maps to a recipe that hasn't been scaffolded into a workspace dir yet.
+ */
 export async function getTeamDisplayName(teamId: string): Promise<string | null> {
-  // Use the shared cache: `openclaw recipes list` takes ~20s and is called on
-  // every server render of the run detail / workflows / deliverables pages.
-  // See @/lib/openclaw-cache for the rationale.
+  const id = String(teamId ?? "").trim();
+  if (!id) return null;
+  try {
+    const dir = await getTeamWorkspaceDir(id);
+    const raw = await fs.readFile(path.join(dir, "team.json"), "utf8");
+    const parsed = JSON.parse(raw) as { recipeName?: unknown; displayName?: unknown };
+    const name =
+      typeof parsed.recipeName === "string" && parsed.recipeName.trim()
+        ? parsed.recipeName.trim()
+        : typeof parsed.displayName === "string" && parsed.displayName.trim()
+          ? parsed.displayName.trim()
+          : null;
+    if (name) return name;
+  } catch {
+    // team.json missing or unreadable — fall through to recipe-list lookup
+  }
   const recipes = await listRecipesCached();
-  const match = recipes.find((r) => r.kind === "team" && r.id === teamId);
+  const match = recipes.find((r) => r.kind === "team" && r.id === id);
   return match?.name ?? null;
 }
 

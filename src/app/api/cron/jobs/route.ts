@@ -1,6 +1,6 @@
 import path from "node:path";
 import { NextResponse } from "next/server";
-import { runOpenClaw } from "@/lib/openclaw";
+import { cachedRunOpenClaw } from "@/lib/openclaw-cache";
 import { readOpenClawConfig, getTeamWorkspaceDir } from "@/lib/paths";
 import { errorMessage } from "@/lib/errors";
 import { buildIdToScopeMap, getInstalledIdsForTeam, enrichJobsWithScope } from "../helpers";
@@ -10,7 +10,10 @@ export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const teamId = String(url.searchParams.get("teamId") ?? "").trim();
-    const res = await runOpenClaw(["cron", "list", "--all", "--json"]);
+    // 15s TTL: `cron list --all --json` takes ~6s. Mutation routes
+    // (cron rm/enable/disable/run) call invalidateOpenClawCache(["cron"])
+    // after success so users see their changes immediately.
+    const res = await cachedRunOpenClaw(["cron", "list", "--all", "--json"], { ttlMs: 15_000 });
     if (!res.ok) {
       return NextResponse.json({ ok: false, error: res.stderr || res.stdout }, { status: 500 });
     }

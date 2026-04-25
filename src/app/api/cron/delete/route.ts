@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { toolsInvoke } from "@/lib/gateway";
 import { runOpenClaw } from "@/lib/openclaw";
+import { invalidateOpenClawCache } from "@/lib/openclaw-cache";
 import { getBaseWorkspaceFromGateway, markOrphanedInTeamWorkspaces } from "../helpers";
 
 export async function POST(req: Request) {
@@ -13,6 +14,9 @@ export async function POST(req: Request) {
   if (!result.ok) {
     return NextResponse.json({ ok: false, error: result.stderr || result.stdout }, { status: 500 });
   }
+
+  // Cron list cache must be busted so the user sees the deletion immediately.
+  invalidateOpenClawCache(["cron", "list"]);
 
   let orphanedIn: Array<{ teamId: string; mappingPath: string; keys: string[] }> = [];
   try {
