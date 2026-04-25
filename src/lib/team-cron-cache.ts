@@ -60,23 +60,39 @@ export async function refreshTeamCronCache(teamId: string): Promise<TeamCronCach
       const installedIds = await getInstalledIdsForTeam(provenancePath);
 
       const res = await cachedRunOpenClaw(["cron", "list", "--all", "--json"], { ttlMs: 15_000 });
-      let jobs: unknown[] = [];
-      if (res.ok) {
-        const parsed = JSON.parse(String(res.stdout || "{}")) as { jobs?: unknown[] };
-        const allJobs = Array.isArray(parsed.jobs) ? parsed.jobs : [];
-        const filtered = allJobs.filter((j) =>
-          installedIds.includes(String((j as { id?: unknown }).id ?? ""))
-        );
-        const baseWorkspace = String(
-          (await readOpenClawConfig()).agents?.defaults?.workspace ?? ""
-        ).trim();
-        if (baseWorkspace && filtered.length) {
-          const idToScope = await buildIdToScopeMap(baseWorkspace);
-          jobs = enrichJobsWithScope(filtered, idToScope);
-        } else {
-          jobs = filtered;
-        }
+      // If the subprocess failed, refuse to overwrite the cache. Old data is
+      // better than serving an empty list. Caller falls back to whatever's
+      // already on disk; first-call cold path just propagates the failure.
+      if (!res.ok) {
+        const existing = await readTeamCronCache(teamId);
+        if (existing) return existing;
+        throw new Error(`cron list failed: ${res.stderr || res.stdout}`);
       }
+
+      const parsed = JSON.parse(String(res.stdout || "{}")) as { jobs?: unknown[] };
+      const allJobs = Array.isArray(parsed.jobs) ? parsed.jobs : [];
+      const filtered = allJobs.filter((j) =>
+        installedIds.includes(String((j as { id?: unknown }).id ?? ""))
+      );
+
+      // Subprocess succeeded but returned 0 matches despite this team having
+      // installed crons in its provenance. That's almost always a transient
+      // failure (e.g. cron daemon mid-restart) — preserve previous cache so
+      // users don't see a phantom-empty list.
+      if (installedIds.length > 0 && filtered.length === 0) {
+        const existing = await readTeamCronCache(teamId);
+        if (existing) return existing;
+        // No prior cache and no matches — could be a real "fresh install with
+        // stale provenance" case. Continue and write [].
+      }
+
+      const baseWorkspace = String(
+        (await readOpenClawConfig()).agents?.defaults?.workspace ?? ""
+      ).trim();
+      const jobs: unknown[] =
+        baseWorkspace && filtered.length
+          ? enrichJobsWithScope(filtered, await buildIdToScopeMap(baseWorkspace))
+          : filtered;
 
       const payload: TeamCronCachePayload = {
         version: 1,
