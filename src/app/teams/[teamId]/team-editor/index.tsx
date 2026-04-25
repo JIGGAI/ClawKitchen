@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { parse as parseYaml } from "yaml";
 import { useRouter } from "next/navigation";
 import { DeleteTeamModal } from "@/components/delete-modals";
@@ -10,6 +10,10 @@ import { errorMessage } from "@/lib/errors";
 import { fetchJson } from "@/lib/fetch-json";
 import {
   loadTeamEditorInitial,
+  loadTeamFilesTab,
+  loadTeamCronTab,
+  loadTeamAgentsTab,
+  loadTeamSkillsTab,
   handleAddAgentToTeam,
 } from "./team-editor-data";
 import { forceFrontmatterId, forceFrontmatterTeamTeamId } from "./team-editor-utils";
@@ -216,6 +220,34 @@ export default function TeamEditor({ teamId, teamName, initialTab }: { teamId: s
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- Initial load only; flashMessage and setters are stable.
   }, [teamId]);
+
+  // Lazy per-tab data load. Each tab fetches its own endpoint the first time
+  // it's activated; switching back doesn't re-fetch. The eager-load before this
+  // gated the whole team editor on the slowest endpoint (~30s) even when the
+  // user just wanted the recipe tab.
+  const tabsLoadedRef = useRef<Set<TabId>>(new Set());
+  useEffect(() => {
+    tabsLoadedRef.current = new Set();
+  }, [teamId]);
+  useEffect(() => {
+    if (tabsLoadedRef.current.has(activeTab)) return;
+    tabsLoadedRef.current.add(activeTab);
+    if (activeTab === "files") {
+      void loadTeamFilesTab(teamId, { setTeamFiles, setTeamFilesLoading });
+    } else if (activeTab === "cron") {
+      void loadTeamCronTab(teamId, { setCronJobs, setCronLoading });
+    } else if (activeTab === "agents") {
+      void loadTeamAgentsTab(teamId, { setTeamAgents, setTeamAgentsLoading });
+    } else if (activeTab === "skills") {
+      void loadTeamSkillsTab(teamId, {
+        setSkillsList,
+        setAvailableSkills,
+        setSelectedSkill,
+        setSkillsLoading,
+      });
+    }
+   
+  }, [activeTab, teamId]);
 
   async function onLoadTeamRecipeMarkdown() {
     const id = toId.trim();
