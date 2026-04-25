@@ -2,7 +2,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import YAML from "yaml";
 import { runOpenClaw } from "./openclaw";
-import { getBuiltinRecipesDir, getWorkspaceRecipesDir } from "./paths";
+import { cachedRunOpenClaw } from "./openclaw-cache";
+import { getBuiltinRecipesDir, getTeamWorkspaceDir, getWorkspaceRecipesDir } from "./paths";
 
 export type RecipeListItem = {
   id: string;
@@ -48,11 +49,45 @@ export function forceFrontmatterId(md: string, id: string): string {
   return `---\n${nextLines.join("\n")}\n---\n${body}`;
 }
 
-/** Returns display name for a team from recipe list, or null if not found. */
+/**
+ * Returns display name for an installed team, or null if not found.
+ *
+ * Reads `~/.openclaw/workspace-<teamId>/team.json` directly — that's the
+ * source of truth written when a team is scaffolded. Always fresh, ~1ms file
+ * read. Falls back to the (cached) recipe list for unusual cases where a team
+ * id maps to a recipe that hasn't been scaffolded into a workspace dir yet.
+ */
 export async function getTeamDisplayName(teamId: string): Promise<string | null> {
-  const recipes = await listRecipes();
-  const match = recipes.find((r) => r.kind === "team" && r.id === teamId);
+  const id = String(teamId ?? "").trim();
+  if (!id) return null;
+  try {
+    const dir = await getTeamWorkspaceDir(id);
+    const raw = await fs.readFile(path.join(dir, "team.json"), "utf8");
+    const parsed = JSON.parse(raw) as { recipeName?: unknown; displayName?: unknown };
+    const name =
+      typeof parsed.recipeName === "string" && parsed.recipeName.trim()
+        ? parsed.recipeName.trim()
+        : typeof parsed.displayName === "string" && parsed.displayName.trim()
+          ? parsed.displayName.trim()
+          : null;
+    if (name) return name;
+  } catch {
+    // team.json missing or unreadable — fall through to recipe-list lookup
+  }
+  const recipes = await listRecipesCached();
+  const match = recipes.find((r) => r.kind === "team" && r.id === id);
   return match?.name ?? null;
+}
+
+/** Cached variant of listRecipes for hot render paths (server components). */
+export async function listRecipesCached(): Promise<RecipeListItem[]> {
+  const list = await cachedRunOpenClaw(["recipes", "list"]);
+  if (!list.ok) return [];
+  try {
+    return JSON.parse(list.stdout) as RecipeListItem[];
+  } catch {
+    return [];
+  }
 }
 
 /** Fetches recipe list from openclaw. Returns empty array on failure. */

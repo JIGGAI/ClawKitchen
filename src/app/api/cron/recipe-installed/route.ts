@@ -3,7 +3,7 @@ import path from "node:path";
 import { NextResponse } from "next/server";
 import { cronJobId, type CronJobShape } from "@/lib/cron";
 import { getContentText, toolsInvoke } from "@/lib/gateway";
-import { runOpenClaw } from "@/lib/openclaw";
+import { cachedRunOpenClaw } from "@/lib/openclaw-cache";
 import { teamDirFromBaseWorkspace } from "@/lib/paths";
 
 type MappingStateV1 = {
@@ -56,7 +56,7 @@ export async function GET(req: Request) {
       .map((e) => e.installedCronId)
   );
 
-  const res = await runOpenClaw(["cron", "list", "--all", "--json"]);
+  const res = await cachedRunOpenClaw(["cron", "list", "--all", "--json"], { ttlMs: 15_000 });
   if (!res.ok) {
     return NextResponse.json({ ok: false, error: res.stderr || res.stdout }, { status: 500 });
   }

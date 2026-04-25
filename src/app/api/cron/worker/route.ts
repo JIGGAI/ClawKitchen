@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
 import { runOpenClaw } from "@/lib/openclaw";
+import { invalidateOpenClawCache } from "@/lib/openclaw-cache";
 import { getTeamWorkspaceDir } from "@/lib/paths";
 import { errorMessage } from "@/lib/errors";
 
@@ -307,6 +308,8 @@ export async function POST(req: Request) {
     if (action === "install") {
       if (!agentId) return NextResponse.json({ ok: false, error: "agentId is required" }, { status: 400 });
       const res = await installWorkerCron(teamId, agentId);
+      // Mutation may have added/replaced/enabled crons — clear list cache.
+      invalidateOpenClawCache(["cron", "list"]);
       return NextResponse.json({ ok: true, action, teamId, agentId, ...res });
     }
 
@@ -352,14 +355,16 @@ export async function POST(req: Request) {
       }
       if (changed) await writeMapping(mp, mapping);
 
-      return NextResponse.json({ 
-        ok: true, 
-        action, 
-        teamId, 
-        requiredAgentIds, 
-        installed, 
+      // Reconcile may have added/disabled multiple crons — clear list cache.
+      invalidateOpenClawCache(["cron", "list"]);
+      return NextResponse.json({
+        ok: true,
+        action,
+        teamId,
+        requiredAgentIds,
+        installed,
         runnerInstalled,
-        disabled 
+        disabled,
       });
     }
 

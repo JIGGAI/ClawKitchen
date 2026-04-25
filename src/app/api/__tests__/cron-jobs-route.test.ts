@@ -24,6 +24,7 @@ vi.mock("node:fs/promises", () => ({
 
 import { toolsInvoke } from "@/lib/gateway";
 import { runOpenClaw } from "@/lib/openclaw";
+import { _resetOpenClawCache } from "@/lib/openclaw-cache";
 import { getTeamWorkspaceDir } from "@/lib/paths";
 import fs from "node:fs/promises";
 
@@ -35,6 +36,9 @@ describe("api cron jobs route", () => {
     vi.mocked(fs.readFile).mockReset();
     vi.mocked(fs.readdir).mockReset();
     vi.mocked(fs.readdir).mockResolvedValue([]);
+    // The route now uses cachedRunOpenClaw (module-level cache); reset between
+    // tests so each test's mock setup is what the route sees.
+    _resetOpenClawCache();
   });
 
   it("returns empty jobs when cron list returns empty jobs", async () => {

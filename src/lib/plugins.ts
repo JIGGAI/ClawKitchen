@@ -1,4 +1,4 @@
-import { runOpenClaw } from "@/lib/openclaw";
+import { cachedRunOpenClaw } from "@/lib/openclaw-cache";
 
 export type PluginListEntry = {
   id?: unknown;
@@ -23,7 +23,10 @@ export function parseEnabledPluginIds(stdout: string): string[] {
 }
 
 export async function getEnabledPluginIds(): Promise<{ ok: true; ids: string[] } | { ok: false; error: string }> {
-  const res = await runOpenClaw(["plugins", "list", "--json", "--verbose"]);
+  // `openclaw plugins list` takes ~15s on this machine. Cache for 30s — workflow
+  // editor pages render this on every poll. Plugin enable/disable changes are
+  // rare and 30s lag to pick them up is acceptable.
+  const res = await cachedRunOpenClaw(["plugins", "list", "--json", "--verbose"]);
   if (!res.ok) {
     const err = res.stderr.trim() || `openclaw plugins list failed (exit=${res.exitCode})`;
     return { ok: false, error: err };
