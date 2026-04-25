@@ -10,11 +10,11 @@ export type AgentListItem = {
 
 // `openclaw agents list --json` is a subprocess that takes ~15s on this
 // machine and is called from many read-only paths (orchestrator route, recipe
-// editor, scaffold, ids check). Cache for 60s — agents change rarely; agent
+// editor, scaffold, ids check). Uses the default cache TTL (5 min); agent
 // mutation routes (create/delete via openclaw CLI) call
 // invalidateOpenClawCache(["agents", "list"]) after success.
 export async function listAgentsCached(): Promise<AgentListItem[]> {
-  const res = await cachedRunOpenClaw(["agents", "list", "--json"], { ttlMs: 60_000 });
+  const res = await cachedRunOpenClaw(["agents", "list", "--json"]);
   if (!res.ok) return [];
   try {
     return JSON.parse(res.stdout) as AgentListItem[];

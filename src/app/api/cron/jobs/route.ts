@@ -38,7 +38,7 @@ export async function GET(req: Request) {
       aggregate.jobs.map((j) => String((j as { id?: unknown }).id ?? "")).filter(Boolean)
     );
 
-    const res = await cachedRunOpenClaw(["cron", "list", "--all", "--json"], { ttlMs: 15_000 });
+    const res = await cachedRunOpenClaw(["cron", "list", "--all", "--json"]);
     if (!res.ok) {
       // If the global list call fails but we have any cached team data, return it.
       if (aggregate.jobs.length) return NextResponse.json({ ok: true, jobs: aggregate.jobs });

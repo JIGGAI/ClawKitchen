@@ -45,12 +45,9 @@ function addEntriesToScopeMap(
 
 async function collectAgentScopes(idToScope: Map<string, CronScope>): Promise<void> {
   try {
-    // 60s TTL: `config get agents.list` takes ~5s and the agent list changes
-    // very rarely (only when the user adds/removes an agent via the agents UI,
-    // which has its own paths to the openclaw subprocess).
-    const cfgText = await cachedRunOpenClaw(["config", "get", "agents.list", "--no-color"], {
-      ttlMs: 60_000,
-    });
+    // `config get agents.list` is ~5s; agents change rarely. Uses default
+    // 5 min TTL; agent add/delete routes invalidate explicitly.
+    const cfgText = await cachedRunOpenClaw(["config", "get", "agents.list", "--no-color"]);
     if (!cfgText.ok) return;
     const list = JSON.parse(String(cfgText.stdout ?? "[]")) as Array<{ id?: unknown; workspace?: unknown }>;
     for (const a of list) {

@@ -56,7 +56,7 @@ export async function GET(req: Request) {
       .map((e) => e.installedCronId)
   );
 
-  const res = await cachedRunOpenClaw(["cron", "list", "--all", "--json"], { ttlMs: 15_000 });
+  const res = await cachedRunOpenClaw(["cron", "list", "--all", "--json"]);
   if (!res.ok) {
     return NextResponse.json({ ok: false, error: res.stderr || res.stdout }, { status: 500 });
   }

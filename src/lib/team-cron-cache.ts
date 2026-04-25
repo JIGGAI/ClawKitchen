@@ -59,7 +59,7 @@ export async function refreshTeamCronCache(teamId: string): Promise<TeamCronCach
       const provenancePath = path.join(teamDir, "notes", "cron-jobs.json");
       const installedIds = await getInstalledIdsForTeam(provenancePath);
 
-      const res = await cachedRunOpenClaw(["cron", "list", "--all", "--json"], { ttlMs: 15_000 });
+      const res = await cachedRunOpenClaw(["cron", "list", "--all", "--json"]);
       // If the subprocess failed, refuse to overwrite the cache. Old data is
       // better than serving an empty list. Caller falls back to whatever's
       // already on disk; first-call cold path just propagates the failure.
