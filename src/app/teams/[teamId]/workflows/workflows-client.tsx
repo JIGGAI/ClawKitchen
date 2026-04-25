@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { fetchJson } from "@/lib/fetch-json";
 import { errorMessage } from "@/lib/errors";
 import { ConfirmationModal } from "@/components/ConfirmationModal";
+import { RunLoadingOverlay } from "@/components/RunLoadingOverlay";
 
 type RunDetail = {
   id: string;
@@ -46,10 +47,16 @@ export default function WorkflowsClient({ teamId, llmTaskEnabled }: { teamId: st
   const [runBlockWorkflowId, setRunBlockWorkflowId] = useState<string>("");
   const [runBlockMissing, setRunBlockMissing] = useState<string[]>([]);
   const [runBlockError, setRunBlockError] = useState<string>("");
+  // Same "Gathering your ingredients..." overlay the workflow editor shows
+  // while a run is being enqueued. Stays open through the preflight + POST,
+  // then either the router.push to the run detail page takes over (success)
+  // or we close it so the block/error modal becomes visible.
+  const [runOverlayOpen, setRunOverlayOpen] = useState(false);
 
   const runWorkflow = useCallback(
     async (workflowId: string) => {
       setRunBusyFor(workflowId);
+      setRunOverlayOpen(true);
       setRunBlockError("");
       try {
         // 1. Load workflow to check meta.skipCronCheck + collect required agentIds
@@ -133,6 +140,7 @@ export default function WorkflowsClient({ teamId, llmTaskEnabled }: { teamId: st
         setRunBlockError(errorMessage(e));
       } finally {
         setRunBusyFor("");
+        setRunOverlayOpen(false);
       }
     },
     [teamId, router]
@@ -314,6 +322,7 @@ export default function WorkflowsClient({ teamId, llmTaskEnabled }: { teamId: st
 
   return (
     <div className="ck-card p-6">
+      <RunLoadingOverlay open={runOverlayOpen} />
       <div>
         <h2 className="text-lg font-semibold">Workflows (file-first)</h2>
         <p className="mt-1 text-sm text-[color:var(--ck-text-secondary)]">
