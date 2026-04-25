@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import YAML from "yaml";
 import { runOpenClaw } from "./openclaw";
+import { cachedRunOpenClaw } from "./openclaw-cache";
 import { getBuiltinRecipesDir, getWorkspaceRecipesDir } from "./paths";
 
 export type RecipeListItem = {
@@ -48,42 +49,25 @@ export function forceFrontmatterId(md: string, id: string): string {
   return `---\n${nextLines.join("\n")}\n---\n${body}`;
 }
 
-// `openclaw recipes list` spawns a subprocess and takes ~20s on this machine.
-// `getTeamDisplayName` is called from server components on every render —
-// including each 3s `router.refresh()` poll on the run detail page — and the
-// page render blocks behind it, so updates appear stuck. Cache the recipe list
-// for a short window so polls return fast. Other callers of `listRecipes` (recipe
-// editor, agent list page) remain uncached so they see fresh data on navigation.
-const TEAM_NAME_LIST_TTL_MS = 30_000;
-let cachedRecipeList: { items: RecipeListItem[]; expires: number } | null = null;
-let cachedRecipeListInflight: Promise<RecipeListItem[]> | null = null;
-
-async function getCachedRecipeListForDisplay(): Promise<RecipeListItem[]> {
-  if (cachedRecipeList && Date.now() < cachedRecipeList.expires) return cachedRecipeList.items;
-  if (cachedRecipeListInflight) return cachedRecipeListInflight;
-  cachedRecipeListInflight = (async () => {
-    try {
-      const items = await listRecipes();
-      cachedRecipeList = { items, expires: Date.now() + TEAM_NAME_LIST_TTL_MS };
-      return items;
-    } finally {
-      cachedRecipeListInflight = null;
-    }
-  })();
-  return cachedRecipeListInflight;
-}
-
-/** Test-only: clear the recipe-list cache used by getTeamDisplayName. */
-export function _resetRecipeDisplayCache() {
-  cachedRecipeList = null;
-  cachedRecipeListInflight = null;
-}
-
 /** Returns display name for a team from recipe list, or null if not found. */
 export async function getTeamDisplayName(teamId: string): Promise<string | null> {
-  const recipes = await getCachedRecipeListForDisplay();
+  // Use the shared cache: `openclaw recipes list` takes ~20s and is called on
+  // every server render of the run detail / workflows / deliverables pages.
+  // See @/lib/openclaw-cache for the rationale.
+  const recipes = await listRecipesCached();
   const match = recipes.find((r) => r.kind === "team" && r.id === teamId);
   return match?.name ?? null;
+}
+
+/** Cached variant of listRecipes for hot render paths (server components). */
+export async function listRecipesCached(): Promise<RecipeListItem[]> {
+  const list = await cachedRunOpenClaw(["recipes", "list"]);
+  if (!list.ok) return [];
+  try {
+    return JSON.parse(list.stdout) as RecipeListItem[];
+  } catch {
+    return [];
+  }
 }
 
 /** Fetches recipe list from openclaw. Returns empty array on failure. */
