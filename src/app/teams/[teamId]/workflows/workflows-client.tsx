@@ -58,6 +58,12 @@ export default function WorkflowsClient({ teamId, llmTaskEnabled }: { teamId: st
       setRunBusyFor(workflowId);
       setRunOverlayOpen(true);
       setRunBlockError("");
+      // Track whether we successfully kicked off a navigation. If we did, the
+      // overlay is left open so it spans the page transition; this component
+      // unmounts when the run detail page renders, taking the portal with it.
+      // If we DIDN'T navigate (block path, fallback path, error), we close the
+      // overlay explicitly so the block modal / error banner becomes visible.
+      let navigated = false;
       try {
         // 1. Load workflow to check meta.skipCronCheck + collect required agentIds
         const wfRes = await fetchJson<{ ok?: boolean; error?: string; workflow?: unknown }>(
@@ -130,6 +136,7 @@ export default function WorkflowsClient({ teamId, llmTaskEnabled }: { teamId: st
         const newRunId = String(runRes.runId ?? "").trim();
         if (newRunId) {
           router.push(`/teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(workflowId)}/${encodeURIComponent(newRunId)}`);
+          navigated = true;
         } else {
           // Fall back to showing runs for the workflow inline.
           setExpandedWorkflowId(workflowId);
@@ -140,7 +147,12 @@ export default function WorkflowsClient({ teamId, llmTaskEnabled }: { teamId: st
         setRunBlockError(errorMessage(e));
       } finally {
         setRunBusyFor("");
-        setRunOverlayOpen(false);
+        // Keep the overlay open if a navigation was kicked off so the user
+        // sees a continuous loading state until the run detail page renders.
+        // The component unmounts on navigation completion, so the portal
+        // disappears with it. On any non-nav path, close so the user sees
+        // the block modal / error banner.
+        if (!navigated) setRunOverlayOpen(false);
       }
     },
     [teamId, router]
