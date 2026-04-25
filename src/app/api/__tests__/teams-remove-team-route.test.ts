@@ -4,10 +4,14 @@ import { POST } from "../teams/remove-team/route";
 vi.mock("@/lib/openclaw", () => ({ runOpenClaw: vi.fn() }));
 
 import { runOpenClaw } from "@/lib/openclaw";
+import { _resetOpenClawCache } from "@/lib/openclaw-cache";
 
 describe("api teams remove-team route", () => {
   beforeEach(() => {
     vi.mocked(runOpenClaw).mockReset();
+    // findRecipeById now reads through the shared subprocess cache; reset
+    // between tests so each test's mock setup is what the route sees.
+    _resetOpenClawCache();
   });
 
   it("returns 400 when teamId missing", async () => {

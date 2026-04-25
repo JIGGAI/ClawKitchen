@@ -3,6 +3,7 @@ import path from "node:path";
 import { NextResponse } from "next/server";
 import { getWorkspaceRecipesDir } from "@/lib/paths";
 import { runOpenClaw } from "@/lib/openclaw";
+import { invalidateOpenClawCache } from "@/lib/openclaw-cache";
 import { suggestIds, scaffoldCmdForKind, patchFrontmatter } from "@/lib/recipe-clone";
 
 export async function POST(req: Request) {
@@ -67,6 +68,8 @@ export async function POST(req: Request) {
 
   await fs.mkdir(path.dirname(filePath), { recursive: true });
   await fs.writeFile(filePath, next, "utf8");
+  // The new recipe needs to appear in cached recipe lookups.
+  invalidateOpenClawCache(["recipes", "list"]);
 
   // Optional: scaffold workspace files immediately so "clone" yields a functional team/agent.
   // IMPORTANT: scaffold failures should not delete/undo the cloned recipe markdown.

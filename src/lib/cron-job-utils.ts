@@ -1,5 +1,6 @@
 import { runOpenClaw, type OpenClawExecResult } from "@/lib/openclaw";
 import { invalidateOpenClawCache } from "@/lib/openclaw-cache";
+import { refreshAllTeamCronCaches } from "@/lib/team-cron-cache";
 
 export interface CronJobData {
   name?: string;
@@ -142,7 +143,10 @@ export async function createCronJob(data: CronJobData): Promise<OpenClawExecResu
 
   const args = ["cron", "add", ...buildCronJobArgs(data)];
   const result = await runOpenClaw(args);
-  if (result.ok) invalidateOpenClawCache(["cron", "list"]);
+  if (result.ok) {
+    invalidateOpenClawCache(["cron", "list"]);
+    refreshAllTeamCronCaches().catch(() => {});
+  }
   return result;
 }
 
@@ -158,6 +162,9 @@ export async function updateCronJob(id: string, data: CronJobData): Promise<Open
   // so edits like `payload.model` would silently fail to persist.
   const args = ["cron", "edit", id, ...buildCronJobArgs(data)];
   const result = await runOpenClaw(args);
-  if (result.ok) invalidateOpenClawCache(["cron", "list"]);
+  if (result.ok) {
+    invalidateOpenClawCache(["cron", "list"]);
+    refreshAllTeamCronCaches().catch(() => {});
+  }
   return result;
 }

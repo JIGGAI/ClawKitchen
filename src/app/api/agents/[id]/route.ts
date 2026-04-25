@@ -3,12 +3,13 @@ import path from "node:path";
 import { NextResponse } from "next/server";
 
 import { runOpenClaw } from "@/lib/openclaw";
+import { invalidateOpenClawCache } from "@/lib/openclaw-cache";
+import { listAgentsCached } from "@/lib/agents";
 import { parseTeamRoleWorkspace } from "@/lib/agent-workspace";
 
 async function resolveAgentWorkspace(agentId: string): Promise<string | null> {
   try {
-    const { stdout } = await runOpenClaw(["agents", "list", "--json"]);
-    const list = JSON.parse(stdout) as Array<{ id: string; workspace?: string }>;
+    const list = await listAgentsCached();
     const agent = list.find((a) => a.id === agentId);
     return agent?.workspace ? String(agent.workspace) : null;
   } catch {
@@ -68,6 +69,9 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
       const info = parseTeamRoleWorkspace(workspace);
       if (info.kind === "teamRole") await moveTeamRoleToTrashOrRemove(info);
     }
+
+    // Bust the agents-list cache so the next read reflects the deletion.
+    invalidateOpenClawCache(["agents", "list"]);
 
     return NextResponse.json({ ok: true, result: parsed ?? result.stdout });
   } catch (err: unknown) {

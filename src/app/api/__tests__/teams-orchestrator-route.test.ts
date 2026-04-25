@@ -13,10 +13,13 @@ vi.mock("@/lib/kitchen-api", () => ({
 }));
 
 import { runOpenClaw } from "@/lib/openclaw";
+import { _resetOpenClawCache } from "@/lib/openclaw-cache";
 
 describe("api teams orchestrator route", () => {
   beforeEach(() => {
     vi.mocked(runOpenClaw).mockReset();
+    // Route uses cachedRunOpenClaw via listAgentsCached; reset between tests.
+    _resetOpenClawCache();
   });
 
   it("returns 400 when teamId missing", async () => {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import path from "node:path";
 import { runOpenClaw } from "@/lib/openclaw";
+import { invalidateOpenClawCache } from "@/lib/openclaw-cache";
 import { findRecipeById, resolveRecipePath } from "@/lib/recipes";
 import fs from "node:fs/promises";
 import { getAttachedTeams, getAttachedAgents } from "./helpers";
@@ -69,5 +70,7 @@ export async function POST(req: Request) {
   }
 
   await fs.rm(resolved, { force: true });
+  // The deleted recipe must drop out of cached recipe lookups.
+  invalidateOpenClawCache(["recipes", "list"], ["recipes", "show", id]);
   return NextResponse.json({ ok: true, deleted: resolved });
 }

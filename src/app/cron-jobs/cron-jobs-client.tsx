@@ -295,9 +295,11 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
             <div>
               <h2 className="text-lg font-semibold">All Cron Jobs</h2>
               <p className="mt-1 text-sm text-[color:var(--ck-text-secondary)]">
-                {statusFilter !== "all"
-                  ? `${filtered.length} of ${jobs.length} job${jobs.length !== 1 ? "s" : ""} (${statusFilter})`
-                  : `${jobs.length} job${jobs.length !== 1 ? "s" : ""} total · ${jobs.filter((j) => isEnabled(j)).length} enabled`}
+                {loading && jobs.length === 0
+                  ? "Loading…"
+                  : statusFilter !== "all"
+                    ? `${filtered.length} of ${jobs.length} job${jobs.length !== 1 ? "s" : ""} (${statusFilter})`
+                    : `${jobs.length} job${jobs.length !== 1 ? "s" : ""} total · ${jobs.filter((j) => isEnabled(j)).length} enabled`}
               </p>
             </div>
           </div>
@@ -333,6 +335,17 @@ export default function CronJobsClient({ teamId }: { teamId: string | null }) {
       {msg ? (
         <div className="mt-4 rounded-lg border border-white/10 bg-white/5 p-3 text-sm">
           {msg}
+        </div>
+      ) : null}
+
+      {loading && jobs.length === 0 ? (
+        <div className="mt-6 ck-card flex items-center gap-3 px-4 py-6 text-sm text-[color:var(--ck-text-secondary)]">
+          <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-[color:var(--ck-text-tertiary)]" />
+          Loading cron jobs…
+        </div>
+      ) : !loading && jobs.length === 0 ? (
+        <div className="mt-6 ck-card px-4 py-6 text-sm text-[color:var(--ck-text-secondary)]">
+          No cron jobs{teamFilter ? ` installed by ${teamFilter}` : ""}.
         </div>
       ) : null}
 

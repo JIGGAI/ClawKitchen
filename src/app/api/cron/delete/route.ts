@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { toolsInvoke } from "@/lib/gateway";
 import { runOpenClaw } from "@/lib/openclaw";
 import { invalidateOpenClawCache } from "@/lib/openclaw-cache";
+import { refreshAllTeamCronCaches } from "@/lib/team-cron-cache";
 import { getBaseWorkspaceFromGateway, markOrphanedInTeamWorkspaces } from "../helpers";
 
 export async function POST(req: Request) {
@@ -17,6 +18,8 @@ export async function POST(req: Request) {
 
   // Cron list cache must be busted so the user sees the deletion immediately.
   invalidateOpenClawCache(["cron", "list"]);
+  // Pre-warm per-team file caches so the next page load is instant.
+  refreshAllTeamCronCaches().catch(() => {});
 
   let orphanedIn: Array<{ teamId: string; mappingPath: string; keys: string[] }> = [];
   try {

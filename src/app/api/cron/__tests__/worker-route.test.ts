@@ -41,6 +41,14 @@ vi.mock("@/lib/paths", async () => {
   };
 });
 
+// The route fires off `refreshAllTeamCronCaches()` (fire-and-forget) after a
+// successful mutation, which would race with this test's afterEach cleanup.
+// The cache helper is unrelated to the reconcile/install logic under test, so
+// mock it as a no-op.
+vi.mock("@/lib/team-cron-cache", () => ({
+  refreshAllTeamCronCaches: async () => {},
+}));
+
 describe("/api/cron/worker POST", () => {
   // Env vars the route reads — snapshot and clear before each test so
   // behavior is deterministic regardless of the host environment. Any test

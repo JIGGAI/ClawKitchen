@@ -4,13 +4,7 @@ import { NextResponse } from "next/server";
 
 import { errorMessage } from "@/lib/errors";
 import { getKitchenApi } from "@/lib/kitchen-api";
-import { runOpenClaw } from "@/lib/openclaw";
-
-type AgentListItem = {
-  id: string;
-  identityName?: string;
-  workspace?: string;
-};
+import { listAgentsCached, type AgentListItem } from "@/lib/agents";
 
 type TmuxSession = {
   name: string;
@@ -24,12 +18,6 @@ type GitWorktree = {
   branch?: string;
   sha?: string;
 };
-
-async function listAgents(): Promise<AgentListItem[]> {
-  const res = await runOpenClaw(["agents", "list", "--json"]);
-  if (!res.ok) throw new Error(res.stderr || "Failed to list agents");
-  return JSON.parse(res.stdout) as AgentListItem[];
-}
 
 function pickOrchestratorAgentId(teamId: string, agents: AgentListItem[]) {
   const candidates = [
@@ -120,7 +108,7 @@ export async function GET(req: Request) {
   if (!teamId) return NextResponse.json({ ok: false, error: "teamId is required" }, { status: 400 });
 
   try {
-    const agents = await listAgents();
+    const agents = await listAgentsCached();
     const match = pickOrchestratorAgentId(teamId, agents);
 
     if (!match || !match.workspace) {

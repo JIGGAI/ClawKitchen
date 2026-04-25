@@ -11,34 +11,23 @@ async function fetchRecipesAndMeta(teamId: string) {
   return { recipesData, metaRes };
 }
 
-const TEAM_TAB_URLS = (teamId: string) => [
-  `/api/teams/files?teamId=${encodeURIComponent(teamId)}`,
-  `/api/cron/jobs?teamId=${encodeURIComponent(teamId)}`,
-  "/api/agents",
-  `/api/teams/skills?teamId=${encodeURIComponent(teamId)}`,
-  "/api/skills/available",
-];
+// Per-tab loaders. Called lazily from index.tsx when a tab is first activated
+// so the team editor mounts instantly on the default (recipe) tab. Switching
+// to a tab kicks off only that tab's fetch; subsequent activations of the
+// same tab don't re-fetch (tracked in index.tsx).
 
-async function fetchTeamTabResponses(teamId: string) {
-  const responses = await fetchAll(TEAM_TAB_URLS(teamId));
-  const texts = await Promise.all(responses.map((r) => r.text()));
-  return { responses, texts };
-}
-
-export async function loadTeamTabData(teamId: string, setters: TeamTabSetters): Promise<void> {
+export async function loadTeamFilesTab(
+  teamId: string,
+  setters: Pick<TeamTabSetters, "setTeamFiles" | "setTeamFilesLoading">,
+): Promise<void> {
   setters.setTeamFilesLoading(true);
-  setters.setCronLoading(true);
-  setters.setTeamAgentsLoading(true);
-  setters.setSkillsLoading(true);
   try {
-    const { responses, texts } = await fetchTeamTabResponses(teamId);
-    const [filesRes, cronRes, agentsRes, skillsRes, availableSkillsRes] = responses;
-    const [filesText, cronText, agentsText, skillsText, availableText] = texts;
-
-    const filesJson = safeParseJson<{ ok?: boolean; files?: unknown[] }>(filesText, {});
-    if (filesRes.ok && filesJson.ok && Array.isArray(filesJson.files)) {
+    const res = await fetch(`/api/teams/files?teamId=${encodeURIComponent(teamId)}`, { cache: "no-store" });
+    const text = await res.text();
+    const json = safeParseJson<{ ok?: boolean; files?: unknown[] }>(text, {});
+    if (res.ok && json.ok && Array.isArray(json.files)) {
       setters.setTeamFiles(
-        filesJson.files.map((f) => {
+        json.files.map((f) => {
           const entry = f as { name?: unknown; missing?: unknown; required?: unknown; rationale?: unknown };
           return {
             name: String(entry.name ?? ""),
@@ -49,26 +38,74 @@ export async function loadTeamTabData(teamId: string, setters: TeamTabSetters): 
         }),
       );
     }
+  } finally {
+    setters.setTeamFilesLoading(false);
+  }
+}
 
-    const cronJson = safeParseJson<{ ok?: boolean; jobs?: unknown[] }>(cronText, {});
-    if (cronRes.ok && cronJson.ok && Array.isArray(cronJson.jobs)) setters.setCronJobs(cronJson.jobs);
+export async function loadTeamCronTab(
+  teamId: string,
+  setters: Pick<TeamTabSetters, "setCronJobs" | "setCronLoading">,
+): Promise<void> {
+  setters.setCronLoading(true);
+  try {
+    const res = await fetch(`/api/cron/jobs?teamId=${encodeURIComponent(teamId)}`, { cache: "no-store" });
+    const text = await res.text();
+    const json = safeParseJson<{ ok?: boolean; jobs?: unknown[] }>(text, {});
+    if (res.ok && json.ok && Array.isArray(json.jobs)) setters.setCronJobs(json.jobs);
+  } finally {
+    setters.setCronLoading(false);
+  }
+}
 
-    const agentsJson = safeParseJson<{ agents?: unknown[] }>(agentsText, {});
-    if (agentsRes.ok && Array.isArray(agentsJson.agents)) {
-      const filtered = agentsJson.agents.filter((a) => String((a as { id?: unknown }).id ?? "").startsWith(`${teamId}-`));
+export async function loadTeamAgentsTab(
+  teamId: string,
+  setters: Pick<TeamTabSetters, "setTeamAgents" | "setTeamAgentsLoading">,
+): Promise<void> {
+  setters.setTeamAgentsLoading(true);
+  try {
+    const res = await fetch("/api/agents", { cache: "no-store" });
+    const text = await res.text();
+    const json = safeParseJson<{ agents?: unknown[] }>(text, {});
+    if (res.ok && Array.isArray(json.agents)) {
+      const filtered = json.agents.filter((a) => String((a as { id?: unknown }).id ?? "").startsWith(`${teamId}-`));
       setters.setTeamAgents(
         filtered.map((a) => {
           const agent = a as { id?: unknown; identityName?: unknown };
-          return { id: String(agent.id ?? ""), identityName: typeof agent.identityName === "string" ? agent.identityName : undefined };
+          return {
+            id: String(agent.id ?? ""),
+            identityName: typeof agent.identityName === "string" ? agent.identityName : undefined,
+          };
         }),
       );
     }
+  } finally {
+    setters.setTeamAgentsLoading(false);
+  }
+}
+
+export async function loadTeamSkillsTab(
+  teamId: string,
+  setters: Pick<
+    TeamTabSetters,
+    "setSkillsList" | "setAvailableSkills" | "setSelectedSkill" | "setSkillsLoading"
+  >,
+): Promise<void> {
+  setters.setSkillsLoading(true);
+  try {
+    const [skillsRes, availableRes] = await fetchAll([
+      `/api/teams/skills?teamId=${encodeURIComponent(teamId)}`,
+      "/api/skills/available",
+    ]);
+    const [skillsText, availableText] = await Promise.all([skillsRes.text(), availableRes.text()]);
 
     const skillsJson = safeParseJson<{ ok?: boolean; skills?: unknown[] }>(skillsText, {});
-    if (skillsRes.ok && skillsJson.ok && Array.isArray(skillsJson.skills)) setters.setSkillsList(skillsJson.skills as string[]);
+    if (skillsRes.ok && skillsJson.ok && Array.isArray(skillsJson.skills)) {
+      setters.setSkillsList(skillsJson.skills as string[]);
+    }
 
     const availableJson = safeParseJson<{ ok?: boolean; skills?: unknown[] }>(availableText, {});
-    if (availableSkillsRes.ok && availableJson.ok && Array.isArray(availableJson.skills)) {
+    if (availableRes.ok && availableJson.ok && Array.isArray(availableJson.skills)) {
       const list = availableJson.skills as string[];
       setters.setAvailableSkills(list);
       setters.setSelectedSkill((prev) => {
@@ -78,9 +115,6 @@ export async function loadTeamTabData(teamId: string, setters: TeamTabSetters): 
       });
     }
   } finally {
-    setters.setTeamFilesLoading(false);
-    setters.setCronLoading(false);
-    setters.setTeamAgentsLoading(false);
     setters.setSkillsLoading(false);
   }
 }
@@ -131,18 +165,10 @@ export async function loadTeamEditorInitial(teamId: string, setters: LoadTeamEdi
     if (pick) setters.setFromId(pick.id);
   }
 
-  await loadTeamTabData(teamId, {
-    setTeamFiles: setters.setTeamFiles,
-    setCronJobs: setters.setCronJobs,
-    setTeamAgents: setters.setTeamAgents,
-    setSkillsList: setters.setSkillsList,
-    setAvailableSkills: setters.setAvailableSkills,
-    setSelectedSkill: setters.setSelectedSkill,
-    setTeamFilesLoading: setters.setTeamFilesLoading,
-    setCronLoading: setters.setCronLoading,
-    setTeamAgentsLoading: setters.setTeamAgentsLoading,
-    setSkillsLoading: setters.setSkillsLoading,
-  });
+  // Tab data (files / cron / agents / skills) is loaded lazily per-tab from
+  // index.tsx — see the activeTab effect there. Loading them eagerly on mount
+  // forces the user to wait for the slowest endpoint before they can see the
+  // recipe tab they actually opened the editor for.
 }
 
 export async function fetchTeamAgentsOnce(teamId: string): Promise<{ ok: boolean; agents: TeamAgentEntry[] }> {
