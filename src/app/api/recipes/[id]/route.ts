@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { NextResponse } from "next/server";
 import { findRecipeById, parseFrontmatterId, resolveRecipePath, writeRecipeFile } from "@/lib/recipes";
+import { invalidateOpenClawCache } from "@/lib/openclaw-cache";
 
 function sha256(text: string) {
   return crypto.createHash("sha256").update(text, "utf8").digest("hex");
@@ -58,6 +59,8 @@ export async function PUT(
 
   const filePath = await resolveRecipePath(item);
   await writeRecipeFile(filePath, body.content);
+  // Bust caches that depended on this recipe's contents.
+  invalidateOpenClawCache(["recipes", "show", id], ["recipes", "list"]);
 
   return NextResponse.json({ ok: true, filePath });
 }

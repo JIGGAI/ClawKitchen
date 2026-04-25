@@ -1,4 +1,4 @@
-import { runOpenClaw } from "./openclaw";
+import { cachedRunOpenClaw } from "./openclaw-cache";
 
 export type AgentListItem = {
   id: string;
@@ -8,9 +8,23 @@ export type AgentListItem = {
   isDefault?: boolean;
 };
 
+// `openclaw agents list --json` is a subprocess that takes ~15s on this
+// machine and is called from many read-only paths (orchestrator route, recipe
+// editor, scaffold, ids check). Cache for 60s — agents change rarely; agent
+// mutation routes (create/delete via openclaw CLI) call
+// invalidateOpenClawCache(["agents", "list"]) after success.
+export async function listAgentsCached(): Promise<AgentListItem[]> {
+  const res = await cachedRunOpenClaw(["agents", "list", "--json"], { ttlMs: 60_000 });
+  if (!res.ok) return [];
+  try {
+    return JSON.parse(res.stdout) as AgentListItem[];
+  } catch {
+    return [];
+  }
+}
+
 export async function resolveAgentWorkspace(agentId: string): Promise<string> {
-  const { stdout } = await runOpenClaw(["agents", "list", "--json"]);
-  const list = JSON.parse(stdout) as AgentListItem[];
+  const list = await listAgentsCached();
   const agent = list.find((a) => a.id === agentId);
   if (!agent?.workspace) throw new Error(`Agent workspace not found for ${agentId}`);
   return agent.workspace;

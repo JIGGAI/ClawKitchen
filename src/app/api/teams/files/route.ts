@@ -25,9 +25,13 @@ export async function GET(req: Request) {
       const recipeId = String(parsed.recipeId ?? "").trim();
       if (!recipeId) return false;
 
-      // Load recipe frontmatter via OpenClaw CLI and check for qaChecklist: true
-      const { runOpenClaw } = await import("@/lib/openclaw");
-      const shown = await runOpenClaw(["recipes", "show", recipeId]);
+      // Load recipe frontmatter via OpenClaw CLI and check for qaChecklist: true.
+      // `recipes show` takes ~18s on this machine and is the dominant cost of
+      // the team-editor mount (5 endpoints fetch in parallel, slowest one
+      // wins). Cache for 5 min — recipes change rarely; PUT /api/recipes/[id]
+      // invalidates after writes.
+      const { cachedRunOpenClaw } = await import("@/lib/openclaw-cache");
+      const shown = await cachedRunOpenClaw(["recipes", "show", recipeId], { ttlMs: 5 * 60_000 });
       if (!shown.ok) return false;
       const md = String(shown.stdout ?? "");
       if (!md.startsWith("---\n")) return false;
