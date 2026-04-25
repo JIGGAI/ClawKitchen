@@ -20,9 +20,22 @@ function statusColor(status?: string) {
   if (status === "success") return "border-emerald-400/30 bg-emerald-500/10 text-emerald-50";
   if (status === "error") return "border-red-400/30 bg-red-500/10 text-red-50";
   if (status === "running") return "border-sky-400/30 bg-sky-500/10 text-sky-50";
-  if (status === "waiting_for_approval") return "border-amber-400/30 bg-amber-500/10 text-amber-50";
+  if (status === "waiting" || status === "waiting_for_approval") return "border-amber-400/30 bg-amber-500/10 text-amber-50";
   if (status === "canceled") return "border-gray-400/30 bg-gray-500/10 text-gray-50";
   return "border-white/10 bg-white/5 text-[color:var(--ck-text-secondary)]";
+}
+
+function nodeRowClass(status?: string, active?: boolean) {
+  // Tinted background per status so the running step is obvious at a glance.
+  // Active (selected) row gets a brighter ring on top of the status tint.
+  const ring = active ? "ring-1 ring-white/20" : "";
+  if (status === "running") return `border border-sky-400/30 bg-sky-500/15 ${ring}`;
+  if (status === "waiting") return `border border-amber-400/30 bg-amber-500/15 ${ring}`;
+  if (status === "error") return `border border-red-400/30 bg-red-500/15 ${ring}`;
+  if (status === "success") return `border border-emerald-400/20 bg-emerald-500/5 ${ring}`;
+  if (status === "skipped") return `border border-white/10 bg-white/5 opacity-60 ${ring}`;
+  if (active) return "border border-white/15 bg-white/10";
+  return "border border-transparent hover:bg-white/5";
 }
 
 export default function RunDetailClient({ 
@@ -40,11 +53,34 @@ export default function RunDetailClient({
   // nodeId is not unique (a workflow can execute the same node multiple times).
   // Use timeline index for stable selection.
   const [selectedIdx, setSelectedIdx] = useState<number>(0);
+  // Track whether the user has manually picked a node. Until they do, we
+  // auto-follow the current running/waiting step so the timeline panel
+  // always shows what's actively happening.
+  const [userSelected, setUserSelected] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showStopModal, setShowStopModal] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
   const [actionError, setActionError] = useState<string>("");
   const [actionDone, setActionDone] = useState<string>("");
+
+  // The "currently working on" node: first running, else first waiting,
+  // else the last one in the list (latest activity).
+  const activeIdx = useMemo(() => {
+    if (!nodes.length) return -1;
+    const running = nodes.findIndex((n) => n.status === "running");
+    if (running >= 0) return running;
+    const waiting = nodes.findIndex((n) => n.status === "waiting");
+    if (waiting >= 0) return waiting;
+    return nodes.length - 1;
+  }, [nodes]);
+  const activeNode = activeIdx >= 0 ? nodes[activeIdx] : undefined;
+
+  // Auto-follow the active node until the user clicks something else.
+  useEffect(() => {
+    if (!userSelected && activeIdx >= 0) {
+      setSelectedIdx(activeIdx);
+    }
+  }, [activeIdx, userSelected]);
 
   const selectedNode: WorkflowRunNodeResultV1 | undefined = useMemo(
     () => (nodes.length ? nodes[Math.min(Math.max(0, selectedIdx), nodes.length - 1)] : undefined),
@@ -55,11 +91,13 @@ export default function RunDetailClient({
   const canStop = ["running", "waiting_for_approval"].includes(run.status);
   const canDelete = true; // Always allow delete
 
-  // Auto-refresh while the run is in an active state
+  // Auto-refresh while the run is in an active state. Polled at 3s while live
+  // so the timeline keeps up with sub-15s node transitions; was 15s before
+  // (PR #379) and felt frozen for users watching a run progress.
   const isActive = ["queued", "running", "waiting_for_approval", "waiting_workers", "waiting_handoff", "awaiting_approval"].includes(run.status);
   useEffect(() => {
     if (!isActive) return;
-    const id = setInterval(() => router.refresh(), 15_000);
+    const id = setInterval(() => router.refresh(), 3_000);
     return () => clearInterval(id);
   }, [isActive, router]);
 
@@ -168,8 +206,32 @@ export default function RunDetailClient({
           </div>
         </div>
 
+        {isActive && activeNode ? (
+          <div className="mt-4 flex items-center gap-3 rounded-lg border border-sky-400/30 bg-sky-500/10 px-3 py-2">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sky-400 opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-sky-400" />
+            </span>
+            <div className="text-xs">
+              <span className="text-sky-100/70">Currently working on:</span>{" "}
+              <span className="font-mono font-medium text-sky-50">{activeNode.nodeId}</span>
+              <span className="ml-2 rounded-md border border-sky-400/30 bg-sky-500/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-sky-100">
+                {activeNode.status}
+              </span>
+            </div>
+          </div>
+        ) : null}
+
         <div className="mt-4">
-          <div className="text-xs uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">timeline</div>
+          <div className="flex items-center justify-between">
+            <div className="text-xs uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">timeline</div>
+            {isActive ? (
+              <div className="flex items-center gap-1.5 text-[10px] text-[color:var(--ck-text-tertiary)]">
+                <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+                live · refreshing
+              </div>
+            ) : null}
+          </div>
           <div className="mt-2 space-y-1">
             {nodes.length ? (
               nodes.map((n, idx) => {
@@ -178,16 +240,23 @@ export default function RunDetailClient({
                   <button
                     key={`${idx}:${n.nodeId}`}
                     type="button"
-                    onClick={() => setSelectedIdx(idx)}
-                    className={
-                      active
-                        ? "w-full rounded-lg border border-white/10 bg-white/10 px-2 py-2 text-left"
-                        : "w-full rounded-lg px-2 py-2 text-left hover:bg-white/5"
-                    }
+                    onClick={() => {
+                      setUserSelected(true);
+                      setSelectedIdx(idx);
+                    }}
+                    className={`w-full rounded-lg px-2 py-2 text-left transition ${nodeRowClass(n.status, active)}`}
                   >
                     <div className="flex items-center justify-between gap-3">
-                      <div className="font-mono text-xs text-[color:var(--ck-text-primary)]">{n.nodeId}</div>
-                      <div className="text-[10px] text-[color:var(--ck-text-tertiary)]">{n.status}</div>
+                      <div className="flex items-center gap-2">
+                        {n.status === "running" ? (
+                          <span className="relative flex h-2 w-2 shrink-0">
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sky-400 opacity-75" />
+                            <span className="relative inline-flex h-2 w-2 rounded-full bg-sky-400" />
+                          </span>
+                        ) : null}
+                        <div className="font-mono text-xs text-[color:var(--ck-text-primary)]">{n.nodeId}</div>
+                      </div>
+                      <div className="text-[10px] uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">{n.status}</div>
                     </div>
                     {(n.startedAt || n.endedAt) ? (
                       <div className="mt-1 text-[10px] text-[color:var(--ck-text-tertiary)]">
