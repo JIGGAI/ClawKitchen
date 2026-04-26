@@ -38,11 +38,18 @@ export function teamWorkspace(teamId: string) {
  */
 export function getTeamWorkspaceDir(teamId?: string): string {
   if (teamId) return teamWorkspace(teamId);
-  const envTeam = process.env.CK_TEAM_ID;
-  if (!envTeam && !process.env.CK_TEAM_WORKSPACE_DIR) {
+
+  // Prefer explicit env vars when running outside a team-scoped UI context.
+  // CK_TEAM_WORKSPACE_DIR wins (it fully specifies the workspace path).
+  const envDir = process.env.CK_TEAM_WORKSPACE_DIR?.trim();
+  if (envDir) return envDir;
+
+  const envTeam = process.env.CK_TEAM_ID?.trim();
+  if (!envTeam) {
     throw new Error("No team specified. Pass a teamId or set CK_TEAM_ID / CK_TEAM_WORKSPACE_DIR.");
   }
-  return process.env.CK_TEAM_WORKSPACE_DIR ?? teamWorkspace(envTeam!);
+
+  return teamWorkspace(envTeam);
 }
 
 export function stageDir(stage: TicketStage, teamIdOrDir: string) {

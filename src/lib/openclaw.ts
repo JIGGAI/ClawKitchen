@@ -178,7 +178,15 @@ export async function runOpenClaw(args: string[]): Promise<OpenClawExecResult> {
     return runOpenClawLocal(args);
   }
 
-  const api = getKitchenApi();
+  let api: ReturnType<typeof getKitchenApi>;
+  try {
+    api = getKitchenApi();
+  } catch {
+    // When Kitchen is started outside the gateway runtime (e.g. standalone Next.js server),
+    // the plugin API isn't injected. Fall back to local `openclaw` exec so pages can render.
+    return runOpenClawLocal(args);
+  }
+
   try {
     const res = (await api.runtime.system.runCommandWithTimeout(["openclaw", ...args], { timeoutMs: 120000 })) as {
       stdout?: unknown;
