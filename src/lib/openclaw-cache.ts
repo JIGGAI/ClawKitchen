@@ -20,20 +20,25 @@ import { runOpenClaw, type OpenClawExecResult } from "@/lib/openclaw";
 // Disk persistence: cache entries also write to
 // ~/.openclaw/.kitchen-subprocess-cache/<sha1>.json so the first request
 // after a gateway restart can read a still-fresh entry from disk instead of
-// paying the full subprocess cost again. Each entry includes its expiry time;
-// expired entries are ignored on read.
+// paying the full subprocess cost again. Each entry records its expiry; an
+// expired-but-readable entry is served stale-while-revalidate (returned
+// immediately while a background subprocess refreshes it).
 
 // 30 min default. Mutations invalidate explicitly via invalidateOpenClawCache,
 // and the disk cache survives gateway restarts, so a long TTL is safe and
 // keeps hot-render paths (recipes list, agents list, plugins list) off the
 // ~20s subprocess cost most of the time. Caller can override via { ttlMs }.
 const DEFAULT_TTL_MS = 30 * 60_000;
-const DISK_CACHE_DIR = path.join(os.homedir(), ".openclaw", ".kitchen-subprocess-cache");
+
+// Mutable so __setDiskCacheConfigForTests can redirect tests to a tmpdir
+// without polluting the real ~/.openclaw cache. Production code never
+// reassigns these.
+let DISK_CACHE_DIR = path.join(os.homedir(), ".openclaw", ".kitchen-subprocess-cache");
 
 // Skip disk persistence during tests so module-level cache state is the only
-// thing tests need to reason about. Tests already reset memory caches; mocking
-// disk reads on top of that would be noise.
-const DISK_CACHE_ENABLED =
+// thing tests need to reason about by default. The SWR test suite opts in
+// via __setDiskCacheConfigForTests with an isolated tmpdir.
+let DISK_CACHE_ENABLED =
   process.env.NODE_ENV !== "test" && !process.env.VITEST && !process.env.VITEST_WORKER_ID;
 
 const cache = new Map<string, { value: OpenClawExecResult; expires: number }>();
@@ -48,12 +53,13 @@ function diskPathForKey(key: string): string {
 
 type DiskEntry = { args: string[]; expires: number; value: OpenClawExecResult };
 
+// Returns the entry as recorded on disk, including expired ones. Caller
+// inspects `expires` to decide whether to serve fresh or stale-while-revalidate.
 function readDiskEntry(key: string): { value: OpenClawExecResult; expires: number } | null {
   if (!DISK_CACHE_ENABLED) return null;
   try {
     const raw = readFileSync(diskPathForKey(key), "utf8");
     const parsed = JSON.parse(raw) as DiskEntry;
-    if (parsed.expires <= Date.now()) return null;
     if (JSON.stringify(parsed.args) !== key) return null;
     return { value: parsed.value, expires: parsed.expires };
   } catch {
@@ -83,6 +89,31 @@ function deleteDiskEntry(key: string): void {
   }
 }
 
+// Fire-and-forget background refresh. Coalesced via the existing inflight
+// Map so concurrent stale reads only spawn one subprocess. On success, writes
+// the fresh value to memory + disk; on failure, the existing stale entry stays
+// in place and the next read will try again.
+function refreshInBackground(args: string[], ttl: number, key: string): void {
+  if (inflight.has(key)) return;
+  const promise = (async () => {
+    try {
+      const value = await runOpenClaw(args);
+      if (value.ok) {
+        const expires = Date.now() + ttl;
+        cache.set(key, { value, expires });
+        writeDiskEntry(args, value, expires);
+      }
+      return value;
+    } finally {
+      inflight.delete(key);
+    }
+  })();
+  inflight.set(key, promise);
+  // Swallow rejections; the stale value already returned to the caller is
+  // acceptable, and an unhandled rejection here would crash the process.
+  promise.catch(() => {});
+}
+
 export async function cachedRunOpenClaw(
   args: string[],
   options: { ttlMs?: number } = {}
@@ -93,17 +124,25 @@ export async function cachedRunOpenClaw(
   const memHit = cache.get(key);
   if (memHit && Date.now() < memHit.expires) return memHit.value;
 
-  const existing = inflight.get(key);
-  if (existing) return existing;
-
-  // Disk fallback for the first request after gateway restart. If the disk
-  // entry is still valid, serve it AND populate the in-memory cache so further
-  // requests skip the disk read.
+  // Disk read happens before the inflight check so concurrent requests during
+  // a background refresh can each serve stale immediately, instead of all
+  // queueing on the refresh promise.
   const diskHit = readDiskEntry(key);
   if (diskHit) {
-    cache.set(key, diskHit);
+    if (Date.now() < diskHit.expires) {
+      cache.set(key, diskHit);
+      return diskHit.value;
+    }
+    // Stale: serve immediately, refresh in background. Don't write to memory
+    // — leaving memory empty means subsequent calls within the refresh window
+    // re-read disk and continue serving stale until the background subprocess
+    // writes the fresh value.
+    refreshInBackground(args, ttl, key);
     return diskHit.value;
   }
+
+  const existing = inflight.get(key);
+  if (existing) return existing;
 
   const promise = (async () => {
     try {
@@ -171,6 +210,26 @@ export function invalidateOpenClawCache(...argvs: string[][]): void {
     }
   }
   for (const key of diskKeysMatching(argvs)) deleteDiskEntry(key);
+}
+
+/**
+ * Test-only: redirect the disk cache to a tmpdir and/or override the
+ * disk-enabled flag. Pass `{ reset: true }` to restore production defaults
+ * (used in afterEach hooks). Production code never calls this.
+ */
+export function __setDiskCacheConfigForTests(opts: {
+  enabled?: boolean;
+  dir?: string;
+  reset?: boolean;
+}): void {
+  if (opts.reset) {
+    DISK_CACHE_ENABLED =
+      process.env.NODE_ENV !== "test" && !process.env.VITEST && !process.env.VITEST_WORKER_ID;
+    DISK_CACHE_DIR = path.join(os.homedir(), ".openclaw", ".kitchen-subprocess-cache");
+    return;
+  }
+  if (opts.enabled !== undefined) DISK_CACHE_ENABLED = opts.enabled;
+  if (opts.dir !== undefined) DISK_CACHE_DIR = opts.dir;
 }
 
 /** Test-only: clear all cached subprocess results (memory + disk). */
