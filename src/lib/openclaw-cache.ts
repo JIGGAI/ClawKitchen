@@ -23,11 +23,11 @@ import { runOpenClaw, type OpenClawExecResult } from "@/lib/openclaw";
 // paying the full subprocess cost again. Each entry includes its expiry time;
 // expired entries are ignored on read.
 
-// 5 min default. Was 30s for in-memory; now that we persist to disk and
-// mutations invalidate explicitly, longer TTLs are safe and protect against
-// gateway restarts where the previous TTL would have expired before the user
-// finished navigating back. Caller can override via { ttlMs }.
-const DEFAULT_TTL_MS = 5 * 60_000;
+// 30 min default. Mutations invalidate explicitly via invalidateOpenClawCache,
+// and the disk cache survives gateway restarts, so a long TTL is safe and
+// keeps hot-render paths (recipes list, agents list, plugins list) off the
+// ~20s subprocess cost most of the time. Caller can override via { ttlMs }.
+const DEFAULT_TTL_MS = 30 * 60_000;
 const DISK_CACHE_DIR = path.join(os.homedir(), ".openclaw", ".kitchen-subprocess-cache");
 
 // Skip disk persistence during tests so module-level cache state is the only
