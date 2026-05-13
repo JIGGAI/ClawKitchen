@@ -74,5 +74,8 @@
       "help": "on: require Basic auth; local: allow localhost unauthenticated; off: disable auth (not recommended)."
     }
   },
+  "activation": {
+    "onStartup": true
+  },
   "main": "dist/openclaw/index.mjs"
 }
