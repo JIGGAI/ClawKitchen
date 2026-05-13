@@ -90,6 +90,22 @@ function parseCookies(req: http.IncomingMessage): Record<string, string> {
 let server: http.Server | null = null;
 let startedAt: string | null = null;
 
+function resolveKitchenRoot() {
+  const moduleDir = path.dirname(fileURLToPath(import.meta.url));
+  const candidates = [moduleDir, path.resolve(moduleDir, ".."), path.resolve(moduleDir, "../..")];
+  for (const candidate of candidates) {
+    const packageJsonPath = path.join(candidate, "package.json");
+    if (!fs.existsSync(packageJsonPath)) continue;
+    try {
+      const pkg = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
+      if (pkg?.name === "@jiggai/kitchen") return candidate;
+    } catch {
+      // Keep looking; a malformed package.json should not hide a valid root candidate.
+    }
+  }
+  return path.resolve(moduleDir, "..");
+}
+
 async function startKitchen(api: OpenClawPluginApi, cfg: KitchenConfig) {
   if (server) return;
 
@@ -108,7 +124,7 @@ async function startKitchen(api: OpenClawPluginApi, cfg: KitchenConfig) {
     );
   }
 
-  const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const rootDir = resolveKitchenRoot();
 
   // Ensure better-sqlite3 native binary is compiled for this platform.
   // openclaw installs plugins with --ignore-scripts, so node-gyp never runs.
