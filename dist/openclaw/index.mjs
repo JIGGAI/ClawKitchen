@@ -344,22 +344,19 @@ var kitchenPlugin = {
       },
       { commands: ["kitchen"] }
     );
-    api.registerService({
-      id: "kitchen",
-      start: async () => {
-        if (cfg.enabled === false) return;
-        try {
-          await startKitchen(api, cfg);
-        } catch (e) {
-          api.logger.error(`[kitchen] failed to start: ${e instanceof Error ? e.message : String(e)}`);
-        }
-      },
-      stop: async () => {
-        try {
-          await stopKitchen(api);
-        } catch (e) {
-          api.logger.error(`[kitchen] failed to stop: ${e instanceof Error ? e.message : String(e)}`);
-        }
+    api.on("gateway_start", async () => {
+      if (cfg.enabled === false) return;
+      try {
+        await startKitchen(api, cfg);
+      } catch (e) {
+        api.logger.error(`[kitchen] failed to start: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    });
+    api.on("gateway_stop", async () => {
+      try {
+        await stopKitchen(api);
+      } catch (e) {
+        api.logger.error(`[kitchen] failed to stop: ${e instanceof Error ? e.message : String(e)}`);
       }
     });
   }
