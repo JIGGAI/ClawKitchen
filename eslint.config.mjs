@@ -26,9 +26,9 @@ const eslintConfig = defineConfig([
     files: ["**/__tests__/**", "**/*.test.{ts,tsx}"],
     rules: { "sonarjs/no-duplicate-string": "off" },
   },
-  // Dev scripts that intentionally invoke CLI tools (rg) from PATH
+  // Dev/CI scripts that intentionally invoke CLI tools from PATH.
   {
-    files: ["scripts/refactor-report.mjs"],
+    files: ["scripts/refactor-report.mjs", "scripts/verify-runtime-package.mjs"],
     rules: { "sonarjs/no-os-command-from-path": "off" },
   },
   // Team editor: large form with multiple tabs; complexity distributed across handlers
@@ -64,6 +64,7 @@ const eslintConfig = defineConfig([
     ".next/**",
     "out/**",
     "build/**",
+    "dist/**",
     "next-env.d.ts",
     "coverage/**",
     "report/**",

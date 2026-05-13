@@ -31,6 +31,9 @@ jobs:
 
       - run: npm run lint && npm run coverage
 
+      - name: Build and verify OpenClaw runtime package
+        run: npm run build:plugin && npm run verify:runtime-package
+
       - name: Build (Next.js)
         run: npm run build
 
