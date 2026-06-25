@@ -5,6 +5,7 @@ import {
   parseNumberFromFilename,
   listTickets,
   getTicketMarkdown,
+  discoverTeamIds,
 } from "../tickets";
 import fs from "node:fs/promises";
 
@@ -118,6 +119,25 @@ describe("tickets", () => {
       const result = await listTickets("dev");
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("0033-a");
+    });
+  });
+
+  describe("discoverTeamIds", () => {
+    beforeEach(() => {
+      vi.mocked(fs.readdir).mockReset();
+    });
+
+    it("hides runtime attestation workspace from discovered teams", async () => {
+      vi.mocked(fs.readdir).mockResolvedValue([
+        "workspace-dev",
+        "workspace-attestations",
+        "workspace-claw-marketing-team",
+        "random",
+      ] as unknown as Awaited<ReturnType<typeof fs.readdir>>);
+
+      const result = await discoverTeamIds();
+
+      expect(result).toEqual(["claw-marketing-team", "dev", "main"]);
     });
   });
 

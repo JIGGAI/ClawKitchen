@@ -54,6 +54,28 @@ describe("manifest reader", () => {
     expect(vi.mocked(fs.readFile)).toHaveBeenCalledWith(MANIFEST_PATH, "utf8");
   });
 
+  it("hides runtime attestation entries from the team list", async () => {
+    const manifest = makeManifest({
+      teams: {
+        "test-team": makeManifest().teams["test-team"],
+        attestations: {
+          teamId: "attestations",
+          displayName: null,
+          roles: [],
+          ticketCounts: { backlog: 0, "in-progress": 0, testing: 0, done: 0, total: 0 },
+          activeRunCount: 0,
+        },
+      },
+    });
+    vi.mocked(fs.readFile).mockResolvedValue(JSON.stringify(manifest));
+
+    const result = await readManifest();
+
+    expect(result).not.toBeNull();
+    expect(result!.teams["test-team"]).toBeDefined();
+    expect(result!.teams.attestations).toBeUndefined();
+  });
+
   it("returns null when file is missing", async () => {
     vi.mocked(fs.readFile).mockRejectedValue(new Error("ENOENT"));
 

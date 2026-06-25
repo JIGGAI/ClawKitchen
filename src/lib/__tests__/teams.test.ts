@@ -19,6 +19,7 @@ describe("lib/teams", () => {
     vi.mocked(fs.readdir).mockResolvedValue([
       { name: "workspace-dev", isDirectory: () => true },
       { name: "workspace-claw-marketing-team", isDirectory: () => true },
+      { name: "workspace-attestations", isDirectory: () => true },
       { name: "workspace-not-a-dir", isDirectory: () => false },
       { name: "random", isDirectory: () => true },
     ] as unknown as Awaited<ReturnType<typeof fs.readdir>>);
