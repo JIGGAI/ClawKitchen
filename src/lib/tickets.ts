@@ -4,6 +4,8 @@ import path from "node:path";
 
 export type TicketStage = "backlog" | "in-progress" | "testing" | "done";
 
+const HIDDEN_TEAM_IDS = new Set(["attestations"]);
+
 export interface TicketSummary {
   teamId: string;
   number: number;
@@ -128,7 +130,7 @@ export async function discoverTeamIds(): Promise<string[]> {
   const teamIds = entries
     .filter((e) => e.startsWith("workspace-"))
     .map((e) => e.slice("workspace-".length))
-    .filter((id) => Boolean(id) && id !== "workspace");
+    .filter((id) => Boolean(id) && id !== "workspace" && !HIDDEN_TEAM_IDS.has(id));
 
   // Also include personal workspace scope.
   teamIds.push("main");

@@ -48,6 +48,16 @@ const MANIFEST_PATH = path.join(os.homedir(), ".openclaw", "kitchen-manifest.jso
 /** Max age in ms before we consider the manifest stale and trigger background regen. */
 const STALE_THRESHOLD_MS = 10_000;
 
+const HIDDEN_TEAM_IDS = new Set(["attestations"]);
+
+function sanitizeManifest(manifest: KitchenManifest): KitchenManifest {
+  const teams = Object.fromEntries(
+    Object.entries(manifest.teams ?? {}).filter(([teamId]) => !HIDDEN_TEAM_IDS.has(teamId))
+  );
+
+  return { ...manifest, teams };
+}
+
 /**
  * Read the kitchen manifest. Returns null if the file is missing or unparseable.
  */
@@ -56,7 +66,7 @@ export async function readManifest(): Promise<KitchenManifest | null> {
     const raw = await fs.readFile(MANIFEST_PATH, "utf8");
     const parsed = JSON.parse(raw) as KitchenManifest;
     if (!parsed || parsed.version !== 1 || !parsed.generatedAt) return null;
-    return parsed;
+    return sanitizeManifest(parsed);
   } catch {
     return null;
   }
