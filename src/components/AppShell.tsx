@@ -203,6 +203,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const globalNav = [
     {
+      href: navHref(`/overview`),
+      label: "Kitchen Sink",
+      icon: (
+        <Icon>
+          <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 12h16" />
+            <path d="M6 12v7h12v-7" />
+            <path d="M8 7h8" />
+            <path d="M10 7V5a2 2 0 0 1 4 0v2" />
+            <path d="M16 12v2" />
+          </svg>
+        </Icon>
+      ),
+    },
+    {
       href: `/`,
       label: "Agents",
       icon: (

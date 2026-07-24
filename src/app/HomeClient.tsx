@@ -88,7 +88,47 @@ export default function HomeClient({
             Installed agents grouped by team workspace
           </p>
         </div>
-        <span className="text-xs text-[color:var(--ck-text-tertiary)]">{appVersion}-beta</span>
+        <div className="flex flex-col items-start gap-2 sm:items-end">
+          <Link
+            href="/recipes?createCustomTeam=1"
+            className="rounded-[var(--ck-radius-sm)] border border-[color:var(--ck-border-subtle)] bg-[color:var(--ck-bg-glass)] px-3 py-1.5 text-sm font-medium text-[color:var(--ck-text-primary)] shadow-[var(--ck-shadow-1)] transition-colors hover:bg-[color:var(--ck-bg-glass-strong)]"
+          >
+            Create team
+          </Link>
+          <Link
+            href="/recipes"
+            className="text-sm font-medium text-[color:var(--ck-text-secondary)] transition-colors hover:text-[color:var(--ck-text-primary)]"
+          >
+            Recipes
+          </Link>
+          <Link
+            href="/tickets"
+            className="text-sm font-medium text-[color:var(--ck-text-secondary)] transition-colors hover:text-[color:var(--ck-text-primary)]"
+          >
+            Tickets
+          </Link>
+
+          <Link
+            href="/overview"
+            className="text-sm font-medium text-[color:var(--ck-text-secondary)] transition-colors hover:text-[color:var(--ck-text-primary)]"
+          >
+            Kitchen Sink
+          </Link>
+          <Link
+            href="/channels"
+            className="text-sm font-medium text-[color:var(--ck-text-secondary)] transition-colors hover:text-[color:var(--ck-text-primary)]"
+          >
+            Channels / Bindings
+          </Link>
+          <Link
+            href="/settings"
+            className="text-sm font-medium text-[color:var(--ck-text-secondary)] transition-colors hover:text-[color:var(--ck-text-primary)]"
+          >
+            Settings
+          </Link>
+
+          <span className="text-xs text-[color:var(--ck-text-tertiary)]">{appVersion}-beta</span>
+        </div>
       </div>
 
       <div className="mt-6 space-y-8">
