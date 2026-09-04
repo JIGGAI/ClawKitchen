@@ -3,7 +3,7 @@
   "version": "0.5.18",
   "main": "dist/openclaw/index.mjs",
   "description": "ClawKitchen - Web-based dashboard for OpenClaw agent teams, workflows, and automation",
-  "author": "@rjdjohnston · rjdjohnston",
+  "author": "@rjdjohnston \u00b7 rjdjohnston",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -78,7 +78,7 @@
     ".next/package.json"
   ],
   "dependencies": {
-    "better-sqlite3": "^12.8.0",
+    "better-sqlite3": "github:JIGGAI/kitchen-sqlite-compat#v11.0.5",
     "drizzle-kit": "^0.31.10",
     "drizzle-orm": "^0.45.2",
     "next": "16.1.6",

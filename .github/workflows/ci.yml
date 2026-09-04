@@ -11,11 +11,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # checkout otherwise writes an http.<github>.extraheader auth line
+          # into .git/config using GITHUB_TOKEN, scoped to THIS repo. That
+          # header overrides credentials in the dependency URL, so npm fetches
+          # the private shim as the wrong identity and gets 404.
+          persist-credentials: false
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
+
+      # better-sqlite3 is aliased to the private JIGGAI/kitchen-sqlite-compat.
+      - name: Authorize npm to fetch the private shim
+        run: |
+          git config --global url."https://x-access-token:${PAT}@github.com/".insteadOf "ssh://git@github.com/"
+        env:
+          PAT: ${{ secrets.RELEASE_PAT }}
 
       - run: npm ci
 
