@@ -1047,6 +1047,7 @@ export default function RunGraphSvg({
           const to = byId.get(edge.to);
           if (!from || !to) return null;
           const isError = edge.on === "error";
+          const arrowId = isError ? `${markerId}-error` : markerId;
           return (
             <path
               key={`${edge.from}->${edge.to}:${edge.on}`}
@@ -1055,7 +1056,7 @@ export default function RunGraphSvg({
               stroke={isError ? "rgba(239,68,68,0.5)" : "rgba(255,255,255,0.25)"}
               strokeWidth={1.5}
               strokeDasharray={isError ? "5 4" : undefined}
-              markerEnd={`url(#${isError ? `${markerId}-error` : markerId})`}
+              markerEnd={`url(#${arrowId})`}
             />
           );
         })}
@@ -1481,7 +1482,7 @@ with
 ```ts
     if (!TEAM_SCOPED_ROUTES.includes(pathname)) return;
 ```
-In `globalNav`, insert before the `navHref(\`/runs\`)` entry:
+(Implemented at module scope, as the fallback allows.) In `globalNav`, insert before the `navHref(\`/runs\`)` entry:
 ```tsx
     {
       href: navHref(`/workflows`),
