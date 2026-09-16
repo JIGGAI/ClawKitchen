@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import {
   NODE_H,
   NODE_W,
@@ -58,6 +59,7 @@ function short(text: string, max = 22): string {
 
 function subtitle(node: PlacedNode): string {
   if (node.type === "human_approval") return "approval";
+  if (node.type === "removed") return "no longer in workflow";
   return node.agent ?? node.type;
 }
 
@@ -82,8 +84,21 @@ export default function RunGraphSvg({
   // Many graphs share the page; marker ids must not collide.
   const markerId = `wf-arrow-${run.teamId}-${run.runId}`;
 
+  // The node worth looking at (running, waiting) is usually near the end of a
+  // wide graph — bring it into view rather than leaving it off to the right.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const selectedX = selected ? byId.get(selected)?.x : undefined;
+  useEffect(() => {
+    const box = scrollRef.current;
+    if (!box || !scrollable || selectedX === undefined) return;
+    const left = selectedX - box.scrollLeft;
+    if (left < 0 || left + NODE_W > box.clientWidth) {
+      box.scrollTo({ left: Math.max(0, selectedX - box.clientWidth / 2 + NODE_W / 2), behavior: "smooth" });
+    }
+  }, [scrollable, selectedX]);
+
   return (
-    <div className={scrollable ? "overflow-x-auto" : ""}>
+    <div ref={scrollRef} className={scrollable ? "overflow-x-auto" : ""}>
       <svg
         viewBox={`0 0 ${width} ${height}`}
         width={scrollable ? width : undefined}
@@ -114,7 +129,9 @@ export default function RunGraphSvg({
               fill="none"
               stroke={isError ? "rgba(239,68,68,0.5)" : "rgba(255,255,255,0.25)"}
               strokeWidth={1.5}
-              strokeDasharray={isError ? "5 4" : undefined}
+              // Dashed = not a normal success route: an error path, or an edge
+              // inferred for a node since removed from the workflow file.
+              strokeDasharray={isError || edge.on === "inferred" ? "5 4" : undefined}
               markerEnd={`url(#${arrowId})`}
             />
           );
@@ -146,6 +163,7 @@ export default function RunGraphSvg({
                 fill={STATUS_FILL[node.status]}
                 stroke={isSelected ? "rgba(255,255,255,0.9)" : STATUS_STROKE[node.status]}
                 strokeWidth={isSelected ? 2 : 1.25}
+                strokeDasharray={node.type === "removed" ? "5 4" : undefined}
               />
               {node.status === "running" ? (
                 <rect x={node.x} y={node.y} width={NODE_W} height={NODE_H} rx={10} fill="none" stroke="rgba(56,189,248,0.9)" strokeWidth={2}>

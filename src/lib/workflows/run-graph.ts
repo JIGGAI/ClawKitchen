@@ -167,8 +167,14 @@ export function buildRunGraph(input: BuildRunGraphInput): RunGraph {
     shape.nodes = stateIds.map(bareNode);
     shape.edges = stateIds.slice(1).map((id, i) => ({ from: stateIds[i], to: id, on: "success" }));
   } else {
+    // The file was edited after this run. nodeStates is in execution order, so
+    // hang each vanished node off whatever ran just before it.
     const known = new Set(shape.nodes.map((n) => n.id));
-    for (const id of stateIds) if (!known.has(id)) shape.nodes.push(bareNode(id));
+    stateIds.forEach((id, i) => {
+      if (known.has(id)) return;
+      shape.nodes.push({ ...bareNode(id), type: "removed" });
+      if (i > 0) shape.edges.push({ from: stateIds[i - 1], to: id, on: "inferred" });
+    });
   }
 
   const nodes: GraphNode[] = shape.nodes.map((n) => {

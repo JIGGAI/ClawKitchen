@@ -151,9 +151,16 @@ describe("buildRunGraph", () => {
     ]);
   });
 
-  it("appends executed nodes that are no longer in the workflow file", () => {
+  it("appends executed nodes that are no longer in the workflow file after the node that ran before them", () => {
     const g = build(runLog("completed", { start: { status: "success" }, old_step: { status: "success" } }));
-    expect(g.nodes.at(-1)).toMatchObject({ id: "old_step", type: "node", status: "success" });
+    expect(g.nodes.at(-1)).toMatchObject({ id: "old_step", type: "removed", status: "success", depth: 1 });
+    expect(g.edges.at(-1)).toEqual({ from: "start", to: "old_step", on: "inferred" });
+  });
+
+  it("leaves a removed node unconnected when it ran first", () => {
+    const g = build(runLog("completed", { old_first: { status: "success" }, start: { status: "success" } }));
+    expect(g.nodes.at(-1)).toMatchObject({ id: "old_first", type: "removed", depth: 0 });
+    expect(g.edges.some((e) => e.to === "old_first")).toBe(false);
   });
 
   it("drops edges that point at unknown nodes", () => {

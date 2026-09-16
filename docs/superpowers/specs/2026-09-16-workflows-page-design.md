@@ -50,9 +50,13 @@ type RunGraph = { teamId: string; runId: string; workflowId: string; workflowNam
     If the workflow file is missing/unreadable, nodes come from `nodeStates` keys in
     insertion order with an implicit chain of edges.
   - Nodes that appear in `nodeStates` but not in the file are appended (the file changed
-    after the run) so no executed node is hidden.
+    after the run) so no executed node is hidden: type `removed`, joined by an
+    `on: "inferred"` edge from the node that ran before them (nodeStates is in execution
+    order), drawn dashed. Both waiting runs on HMX hit this — their approval nodes were
+    later removed from the workflow files.
+  - A scrollable graph scrolls its selected node into view.
   - Status per node from `nodeStates`; absent → `pending`. When the run is active
-    (`queued|running|waiting_workers`), a pending node whose predecessors all succeeded is
+    (`running|waiting_workers`; `queued` is unclaimed), a pending node whose predecessors all succeeded is
     shown `running`. Only when the run is `awaiting_approval`: the approval node is
     `approval.json`'s `nodeId` while its status is pending (none if already decided —
     the resume just hasn't landed), else the first node in `waiting`; it is shown `waiting`.
