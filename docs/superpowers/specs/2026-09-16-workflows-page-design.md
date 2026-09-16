@@ -53,21 +53,24 @@ type RunGraph = { teamId: string; runId: string; workflowId: string; workflowNam
     after the run) so no executed node is hidden.
   - Status per node from `nodeStates`; absent → `pending`. When the run is active
     (`queued|running|waiting_workers`), a pending node whose predecessors all succeeded is
-    shown `running`. The approval node (from `approval.json` when pending, else a node
-    in `waiting`) is `waiting`.
+    shown `running`. Only when the run is `awaiting_approval`: the approval node is
+    `approval.json`'s `nodeId` while its status is pending (none if already decided —
+    the resume just hasn't landed), else the first node in `waiting`; it is shown `waiting`.
   - `depth` = longest path from roots, cycle-safe (back edges ignored).
 - `layoutGraph(nodes)` → placed nodes (column = depth, row = order within column) and
   canvas size; exported for tests.
 
-### `GET /api/workflows/runs?team=&limit=20&before=<runId>`
+### `GET /api/workflows/runs?team=&limit=20`
 
-`src/app/api/workflows/runs/route.ts`. Team ids from the manifest (fallback
-`listLocalTeamIds`), or the one `team`. For each team, `readdir` the runs dir and take
-directory names; merge across teams, sort by run id descending (timestamp prefix), apply
-`before` + `limit` (max 50). Read only those `run.json` + `approval.json` files; read each
-distinct workflow file once per request. Response
-`{ ok: true, runs: RunGraph[], nextBefore: string | null }`; a run that fails to parse is
-skipped, not fatal.
+`src/app/api/workflows/runs/route.ts` → `listRunGraphs` in `src/lib/workflows/overview.ts`.
+Team ids from the manifest (fallback `listLocalTeamIds`), or the one `team`. Reads every
+runner-layout `run.json` (measured: 258 runs / 6.2 MB in 12–17 ms), orders runs
+**awaiting approval first** (two on HMX today are months old and would otherwise never be
+seen), then by run id descending (timestamp prefix), and takes `limit` (1–200). Only the
+returned runs get their `approval.json` and workflow file read; each distinct workflow
+file once per request. Response `{ ok: true, runs: RunGraph[], total: number }`; a run
+that fails to parse is skipped, not fatal. "Load more" raises `limit` by 20, so polling
+keeps every visible run live (no cursor).
 
 ### `/workflows` page
 
@@ -75,7 +78,7 @@ skipped, not fatal.
   cards for every workflow file across teams (or the selected team): name, id, team, cron
   trigger summary; link `/teams/<team>/workflows/<id>`. Then `<WorkflowRunsClient team>`.
 - `src/app/workflows/workflow-runs-client.tsx` (client): polls the API every 5s (skipped
-  while an approval is in flight), "Load more" uses `nextBefore`. Each run card: workflow
+  while an approval is in flight), "Load more" raises `limit` by 20 while `runs < total`. Each run card: workflow
   name, team, status pill, created → updated time, "open run →" link to
   `/teams/<team>/runs/<workflowId>/<runId>`, the graph, and a node detail panel.
   Auto-selects the running node, else the waiting node.
@@ -96,8 +99,9 @@ routes (`navHref`, `syncTeamToCurrentUrl`).
 
 - Vitest: `src/lib/workflows/__tests__/run-graph.test.ts` (merge, kind/type shapes, missing
   workflow, extra nodes, active-run inference, approval, depth with cycles, layout) and
-  `src/app/api/__tests__/workflows-runs-route.test.ts` (ordering across teams, limit/before,
-  bad run files skipped).
+  `src/lib/workflows/__tests__/overview.test.ts` (real temp dirs: ordering across teams,
+  approval pinning, limit/total, bad run files skipped, workflow file lookup, installed
+  list) and `src/app/api/__tests__/workflows-runs-route.test.ts` (param parsing, 400).
 - `npm run lint`, `npm run test:run`, `npm run build` in the worktree.
 - Run the built app on a spare port against the real HMX workspaces; Playwright
   screenshots next to JIGGA's page; exercise node selection. Approve/Request changes are
