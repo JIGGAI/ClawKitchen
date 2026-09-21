@@ -32,6 +32,18 @@ export function useSelectedTeamId(): string {
   return useSyncExternalStore(subscribe, readSelectedTeamId, () => "");
 }
 
+/** Make `teamId` the selected team everywhere: persist it and tell every subscriber. */
+export function selectTeam(teamId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    if (teamId) localStorage.setItem("ck-selected-team", teamId);
+    else localStorage.removeItem("ck-selected-team");
+  } catch {
+    // ignore
+  }
+  dispatchSelectedTeamChanged();
+}
+
 export function dispatchSelectedTeamChanged() {
   if (typeof window === "undefined") return;
   try {
