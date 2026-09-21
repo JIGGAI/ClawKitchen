@@ -180,8 +180,8 @@ export default function ChatClient({
   return (
     <div className="mt-4 flex min-h-0 flex-1 overflow-hidden rounded-xl border border-[color:var(--ck-border-subtle)]">
       <aside className="w-60 shrink-0 overflow-y-auto border-r border-[color:var(--ck-border-subtle)] p-2">
-        <AgentRail agents={agents} selected={agentId} query={query} onQuery={setQuery} onSelect={selectAgent} />
         <ThreadList threads={threads} selected={threadKey} onSelect={setThreadKey} />
+        <AgentRail agents={agents} selected={agentId} query={query} onQuery={setQuery} onSelect={selectAgent} />
       </aside>
 
       <section className="flex min-w-0 flex-1 flex-col">

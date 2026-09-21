@@ -15,7 +15,7 @@ export const headerBtn =
 const MARKDOWN =
   "space-y-2 break-words leading-relaxed [&_a]:text-sky-300 [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:border-white/20 " +
   "[&_blockquote]:pl-3 [&_code]:rounded [&_code]:bg-black/40 [&_code]:px-1 [&_code]:text-xs [&_h1]:font-semibold [&_h2]:font-semibold " +
-  "[&_h3]:font-semibold [&_ol]:list-decimal [&_ol]:pl-5 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-black/40 [&_pre]:p-2 " +
+  "[&_h3]:font-semibold [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:whitespace-pre-wrap [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-black/40 [&_pre]:p-2 " +
   "[&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_table]:text-xs [&_td]:border [&_td]:border-white/10 [&_td]:px-2 [&_th]:border " +
   "[&_th]:border-white/10 [&_th]:px-2 [&_ul]:list-disc [&_ul]:pl-5";
 
@@ -133,7 +133,7 @@ export function ThreadList({
   onSelect: (key: string) => void;
 }) {
   return (
-    <div className="mt-3 border-t border-[color:var(--ck-border-subtle)] pt-3">
+    <div className="mb-3 border-b border-[color:var(--ck-border-subtle)] pb-3">
       <div className={sectionLabel}>Threads</div>
       {threads.map((t) => (
         <button
