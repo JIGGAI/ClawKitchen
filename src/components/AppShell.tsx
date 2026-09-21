@@ -8,6 +8,9 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { fetchJson } from "@/lib/fetch-json";
 import { ToastProvider } from "@/components/ToastProvider";
 
+// Pages that read ?team= — the nav carries the selected team to these.
+const TEAM_SCOPED_ROUTES = ["/tickets", "/goals", "/cron-jobs", "/runs", "/workflows"];
+
 function Icon({ children }: { children: React.ReactNode }) {
   return (
     <span
@@ -75,7 +78,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   function navHref(href: string): string {
     if (!selectedTeamId) return href;
     // Only carry team context for pages that currently support it.
-    if (href === "/tickets" || href === "/goals" || href === "/cron-jobs" || href === "/runs") {
+    if (TEAM_SCOPED_ROUTES.includes(href)) {
       return withTeamQuery(href, selectedTeamId);
     }
     return href;
@@ -85,7 +88,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     // Team editor routes already encode team in the path.
     if (pathname.startsWith("/teams/")) return;
     // Only enforce on pages that support it.
-    if (pathname !== "/tickets" && pathname !== "/goals" && pathname !== "/cron-jobs" && pathname !== "/runs") return;
+    if (!TEAM_SCOPED_ROUTES.includes(pathname)) return;
 
     try {
       const url = new URL(window.location.href);
@@ -272,6 +275,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="12" cy="12" r="9" />
             <path d="M12 7v5" />
+          </svg>
+        </Icon>
+      ),
+    },
+    {
+      href: navHref(`/workflows`),
+      label: "Workflows",
+      icon: (
+        <Icon>
+          <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="6" cy="5" r="2" />
+            <circle cx="18" cy="5" r="2" />
+            <circle cx="12" cy="19" r="2" />
+            <path d="M6 7v2a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V7" />
+            <path d="M12 12v5" />
           </svg>
         </Icon>
       ),
