@@ -103,14 +103,85 @@ async function listTeamRuns(teamId: string): Promise<RunEntry[]> {
   return entries.filter((e): e is RunEntry => e !== null);
 }
 
-// A run waiting on a person is the one this page exists for — however old it is.
-function compareRuns(a: RunEntry, b: RunEntry): number {
-  const aWaiting = a.run.status === "awaiting_approval";
-  const bWaiting = b.run.status === "awaiting_approval";
-  if (aWaiting !== bWaiting) return aWaiting ? -1 : 1;
+export type RunSort = "newest" | "oldest" | "updated";
+export const RUN_SORTS: readonly RunSort[] = ["newest", "oldest", "updated"];
+
+export type RunFilters = {
+  workflow?: string | null;
+  status?: string | null;
+  q?: string | null;
+  sort?: RunSort;
+};
+
+export type RunFacets = {
+  workflows: { id: string; name: string | null; count: number }[];
+  statuses: { status: string; count: number }[];
+};
+
+type RunMeta = { workflowId: string; workflowName: string | null; status: string; updatedAt: string };
+
+/** The fields filters and sorting need, read from run.json without building the graph. */
+function runMeta(entry: RunEntry): RunMeta {
+  const ref = isObject(entry.run.workflow) ? entry.run.workflow : {};
+  const fileId = typeof ref.file === "string" ? path.basename(ref.file).replace(/\.workflow\.json$/i, "") : "";
+  const id = typeof ref.id === "string" && ref.id.trim() ? ref.id : fileId;
+  return {
+    workflowId: id || "(unknown)",
+    workflowName: typeof ref.name === "string" && ref.name.trim() ? ref.name : null,
+    status: typeof entry.run.status === "string" ? entry.run.status : "unknown",
+    updatedAt: typeof entry.run.updatedAt === "string" ? entry.run.updatedAt : "",
+  };
+}
+
+function byNameDesc(a: RunEntry, b: RunEntry): number {
   // Runner ids start with an ISO timestamp, so name order is start order.
   if (a.name !== b.name) return a.name < b.name ? 1 : -1;
   return a.teamId.localeCompare(b.teamId);
+}
+
+// A run waiting on a person is the one this page exists for — however old it
+// is, and whatever the sort.
+function compareRuns(sort: RunSort, meta: Map<RunEntry, RunMeta>) {
+  return (a: RunEntry, b: RunEntry): number => {
+    const aWaiting = a.run.status === "awaiting_approval";
+    const bWaiting = b.run.status === "awaiting_approval";
+    if (aWaiting !== bWaiting) return aWaiting ? -1 : 1;
+    if (sort === "oldest") return -byNameDesc(a, b);
+    if (sort === "updated") {
+      const au = meta.get(a)?.updatedAt ?? "";
+      const bu = meta.get(b)?.updatedAt ?? "";
+      if (au !== bu) return au < bu ? 1 : -1;
+    }
+    return byNameDesc(a, b);
+  };
+}
+
+function matches(entry: RunEntry, m: RunMeta, filters: RunFilters): boolean {
+  if (filters.workflow && m.workflowId !== filters.workflow) return false;
+  if (filters.status && m.status !== filters.status) return false;
+  const needle = (filters.q ?? "").trim().toLowerCase();
+  if (!needle) return true;
+  return [entry.teamId, m.workflowId, m.workflowName ?? "", entry.name].some((v) => v.toLowerCase().includes(needle));
+}
+
+function facetsOf(entries: RunEntry[], meta: Map<RunEntry, RunMeta>): RunFacets {
+  const workflows = new Map<string, { id: string; name: string | null; count: number }>();
+  const statuses = new Map<string, number>();
+  for (const e of entries) {
+    const m = meta.get(e);
+    if (!m) continue;
+    const w = workflows.get(m.workflowId) ?? { id: m.workflowId, name: m.workflowName, count: 0 };
+    w.count += 1;
+    w.name = w.name ?? m.workflowName;
+    workflows.set(m.workflowId, w);
+    statuses.set(m.status, (statuses.get(m.status) ?? 0) + 1);
+  }
+  return {
+    workflows: [...workflows.values()].sort((a, b) => (a.name ?? a.id).localeCompare(b.name ?? b.id)),
+    statuses: [...statuses.entries()]
+      .map(([status, count]) => ({ status, count }))
+      .sort((a, b) => b.count - a.count || a.status.localeCompare(b.status)),
+  };
 }
 
 function workflowFileName(run: Record<string, unknown>): string | null {
@@ -120,9 +191,18 @@ function workflowFileName(run: Record<string, unknown>): string | null {
   return base.endsWith(WORKFLOW_SUFFIX) ? base : null;
 }
 
-export async function listRunGraphs(opts: { teamIds: string[]; limit: number }): Promise<{ runs: RunGraph[]; total: number }> {
-  const all = (await Promise.all(opts.teamIds.map(listTeamRuns))).flat().sort(compareRuns);
-  const page = all.slice(0, opts.limit);
+export async function listRunGraphs(opts: {
+  teamIds: string[];
+  limit: number;
+  filters?: RunFilters;
+}): Promise<{ runs: RunGraph[]; total: number; facets: RunFacets }> {
+  const filters = opts.filters ?? {};
+  const all = (await Promise.all(opts.teamIds.map(listTeamRuns))).flat();
+  const meta = new Map(all.map((e) => [e, runMeta(e)]));
+  const matching = all
+    .filter((e) => matches(e, meta.get(e) as RunMeta, filters))
+    .sort(compareRuns(filters.sort ?? "newest", meta));
+  const page = matching.slice(0, opts.limit);
 
   const workflows = new Map<string, Promise<unknown>>();
   const loadWorkflow = (entry: RunEntry): Promise<unknown> => {
@@ -146,5 +226,5 @@ export async function listRunGraphs(opts: { teamIds: string[]; limit: number }):
       return buildRunGraph({ teamId: entry.teamId, runDirName: entry.name, run: entry.run, workflow, approval });
     }),
   );
-  return { runs, total: all.length };
+  return { runs, total: matching.length, facets: facetsOf(all, meta) };
 }

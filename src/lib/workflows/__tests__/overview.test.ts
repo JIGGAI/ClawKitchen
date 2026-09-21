@@ -111,6 +111,64 @@ describe("listRunGraphs", () => {
   });
 });
 
+describe("listRunGraphs filters and sort", () => {
+  async function writeRunOf(team: string, runId: string, status: string, workflow: string, updatedAt: string) {
+    await write(`workspace-${team}/shared-context/workflow-runs/${runId}/run.json`, {
+      runId,
+      status,
+      updatedAt,
+      workflow: { id: workflow, name: workflow.toUpperCase(), file: `${workflow}.workflow.json` },
+      nodeStates: {},
+    });
+  }
+
+  beforeEach(async () => {
+    await writeRunOf("alpha", "2026-09-01t00-00-00-000z-aaaaaaaa", "completed", "post", "2026-09-10T00:00:00.000Z");
+    await writeRunOf("alpha", "2026-09-03t00-00-00-000z-bbbbbbbb", "error", "post", "2026-09-03T01:00:00.000Z");
+    await writeRunOf("beta", "2026-09-02t00-00-00-000z-cccccccc", "error", "plan", "2026-09-02T01:00:00.000Z");
+    await writeRunOf("beta", "2026-01-01t00-00-00-000z-dddddddd", "awaiting_approval", "plan", "2026-01-01T01:00:00.000Z");
+  });
+
+  const ids = (runs: { runId: string }[]) => runs.map((r) => r.runId.slice(0, 10));
+
+  it("returns options for every workflow and status before filtering", async () => {
+    const out = await listRunGraphs({ teamIds: ["alpha", "beta"], limit: 20, filters: { status: "error" } });
+    expect(out.facets).toEqual({
+      workflows: [
+        { id: "plan", name: "PLAN", count: 2 },
+        { id: "post", name: "POST", count: 2 },
+      ],
+      statuses: [
+        { status: "error", count: 2 },
+        { status: "awaiting_approval", count: 1 },
+        { status: "completed", count: 1 },
+      ],
+    });
+  });
+
+  it("filters by workflow, status and search text, and counts only the matches", async () => {
+    const byWorkflow = await listRunGraphs({ teamIds: ["alpha", "beta"], limit: 20, filters: { workflow: "post" } });
+    expect([ids(byWorkflow.runs), byWorkflow.total]).toEqual([["2026-09-03", "2026-09-01"], 2]);
+
+    const byStatus = await listRunGraphs({ teamIds: ["alpha", "beta"], limit: 1, filters: { status: "error" } });
+    expect([ids(byStatus.runs), byStatus.total]).toEqual([["2026-09-03"], 2]);
+
+    const bySearch = await listRunGraphs({ teamIds: ["alpha", "beta"], limit: 20, filters: { q: "BETA" } });
+    expect(ids(bySearch.runs)).toEqual(["2026-01-01", "2026-09-02"]);
+
+    const byName = await listRunGraphs({ teamIds: ["alpha", "beta"], limit: 20, filters: { q: "pla" } });
+    expect(ids(byName.runs)).toEqual(["2026-01-01", "2026-09-02"]);
+  });
+
+  it("sorts oldest first or by last update, keeping approvals pinned", async () => {
+    const oldest = await listRunGraphs({ teamIds: ["alpha", "beta"], limit: 20, filters: { sort: "oldest" } });
+    expect(ids(oldest.runs)).toEqual(["2026-01-01", "2026-09-01", "2026-09-02", "2026-09-03"]);
+
+    const updated = await listRunGraphs({ teamIds: ["alpha", "beta"], limit: 20, filters: { sort: "updated" } });
+    expect(ids(updated.runs)).toEqual(["2026-01-01", "2026-09-01", "2026-09-03", "2026-09-02"]);
+  });
+});
+
 describe("listInstalledWorkflows", () => {
   it("lists workflow files across teams with enabled cron triggers, sorted by name", async () => {
     await write("workspace-alpha/shared-context/workflows/zed.workflow.json", {
