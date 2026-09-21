@@ -3,6 +3,7 @@ import { ago, type Attention, type LastSeen, type TeamSummary, type WorkItem } f
 import type { DashboardPlugin } from "@/lib/dashboard/overview";
 import type { InstalledWorkflow } from "@/lib/workflows/overview";
 import type { RunGraph } from "@/lib/workflows/run-graph";
+import SelectTeamLink from "./select-team-link";
 
 /** Dashboard panels — server components over data read at request time. */
 
@@ -237,9 +238,9 @@ const LANES: { key: keyof TeamSummary["tickets"]; label: string; lane: string }[
 
 function TeamCard({ team, selected }: { team: TeamSummary; selected: boolean }) {
   return (
-    <Link
-      href={`/dashboard?team=${encodeURIComponent(team.id)}`}
-      aria-current={selected ? "true" : undefined}
+    <SelectTeamLink
+      teamId={team.id}
+      current={selected}
       className={`rounded-xl border p-3 transition-colors ${
         selected ? "border-white/30 bg-white/10" : "border-[color:var(--ck-border-subtle)] bg-white/[0.03] hover:bg-white/[0.07]"
       }`}
@@ -258,7 +259,7 @@ function TeamCard({ team, selected }: { team: TeamSummary; selected: boolean }) 
         ) : null}
         {team.lead ? <span className="truncate text-[color:var(--ck-text-tertiary)]">lead: {team.lead}</span> : null}
       </div>
-    </Link>
+    </SelectTeamLink>
   );
 }
 

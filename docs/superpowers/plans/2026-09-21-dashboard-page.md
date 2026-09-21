@@ -297,6 +297,12 @@ function ms(iso: string | null | undefined): number {
   return iso ? Date.parse(iso) : Number.NaN;
 }
 
+/** True when `iso` is more than `span` ago — or unknown, which is no better. */
+function olderThan(iso: string | null | undefined, span: number, now: number): boolean {
+  const age = now - ms(iso);
+  return Number.isNaN(age) || age > span;
+}
+
 function plural(n: number, word: string): string {
   return `${n} ${word}${n === 1 ? "" : "s"}`;
 }
@@ -320,51 +326,56 @@ export function isClaimLive(claim: QueueClaim, now: number): boolean {
   return now - claimedAt <= lease * 1000;
 }
 
-export function workingNow(queues: AgentQueue[], runs: RunGraph[], now: number): WorkItem[] {
+function claimedWork(queues: AgentQueue[], runs: RunGraph[], now: number): WorkItem[] {
   const runsById = new Map(runs.map((r) => [`${r.teamId}/${r.runId}`, r]));
-  const items: WorkItem[] = [];
+  return queues.flatMap((q) =>
+    q.claims
+      .filter((claim) => isClaimLive(claim, now))
+      .map((claim): WorkItem => {
+        const runId = claim.task?.runId ?? null;
+        const owner = runId ? runsById.get(`${q.teamId}/${runId}`) : undefined;
+        return {
+          agentId: q.agentId,
+          teamId: q.teamId,
+          source: "claim",
+          runId,
+          workflowId: owner?.workflowId ?? null,
+          workflowName: owner?.workflowName ?? null,
+          nodeId: claim.task?.nodeId ?? null,
+          since: claim.claimedAt,
+        };
+      }),
+  );
+}
+
+function runningNodes(runs: RunGraph[]): WorkItem[] {
+  return runs
+    .filter((r) => ACTIVE_RUN_STATUSES.has(r.status))
+    .flatMap((r) =>
+      r.nodes
+        .filter((n) => n.status === "running" && n.agent)
+        .map((n): WorkItem => ({
+          agentId: n.agent ?? "",
+          teamId: r.teamId,
+          source: "run",
+          runId: r.runId,
+          workflowId: r.workflowId,
+          workflowName: r.workflowName,
+          nodeId: n.id,
+          since: n.ts ?? r.updatedAt,
+        })),
+    );
+}
+
+export function workingNow(queues: AgentQueue[], runs: RunGraph[], now: number): WorkItem[] {
+  // A claimed step is usually also a running node; list it once, as the claim.
   const seen = new Set<string>();
-
-  for (const q of queues) {
-    for (const claim of q.claims) {
-      if (!isClaimLive(claim, now)) continue;
-      const runId = claim.task?.runId ?? null;
-      const nodeId = claim.task?.nodeId ?? null;
-      const owner = runId ? runsById.get(`${q.teamId}/${runId}`) : undefined;
-      seen.add(`${q.agentId}|${runId}|${nodeId}`);
-      items.push({
-        agentId: q.agentId,
-        teamId: q.teamId,
-        source: "claim",
-        runId,
-        workflowId: owner?.workflowId ?? null,
-        workflowName: owner?.workflowName ?? null,
-        nodeId,
-        since: claim.claimedAt,
-      });
-    }
-  }
-
-  for (const r of runs) {
-    if (!ACTIVE_RUN_STATUSES.has(r.status)) continue;
-    for (const n of r.nodes) {
-      if (n.status !== "running" || !n.agent) continue;
-      const key = `${n.agent}|${r.runId}|${n.id}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      items.push({
-        agentId: n.agent,
-        teamId: r.teamId,
-        source: "run",
-        runId: r.runId,
-        workflowId: r.workflowId,
-        workflowName: r.workflowName,
-        nodeId: n.id,
-        since: n.ts ?? r.updatedAt,
-      });
-    }
-  }
-
+  const items = [...claimedWork(queues, runs, now), ...runningNodes(runs)].filter((w) => {
+    const key = `${w.agentId}|${w.runId}|${w.nodeId}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
   return items.sort((a, b) => (ms(b.since) || 0) - (ms(a.since) || 0));
 }
 
@@ -392,7 +403,7 @@ export function lastSeenByAgent(runs: RunGraph[]): Map<string, LastSeen> {
 
 function staleApprovals(runs: RunGraph[], now: number): Attention[] {
   return runs
-    .filter((r) => r.status === "awaiting_approval" && !(now - ms(r.updatedAt ?? r.createdAt) <= DAY))
+    .filter((r) => r.status === "awaiting_approval" && olderThan(r.updatedAt ?? r.createdAt, DAY, now))
     .map((r) => ({
       id: `approval:${r.teamId}/${r.runId}`,
       level: "warn" as const,
@@ -465,7 +476,8 @@ export function needsAttention(input: {
     ...manifestProblem(manifestGeneratedAt, now),
   ];
   // Failures first; Array#sort is stable, so each group keeps its order.
-  return items.sort((a, b) => (a.level === b.level ? 0 : a.level === "fail" ? -1 : 1));
+  const rank = (a: Attention) => (a.level === "fail" ? 0 : 1);
+  return items.sort((a, b) => rank(a) - rank(b));
 }
 
 export function teamSummaries(manifest: KitchenManifest): TeamSummary[] {
@@ -736,6 +748,7 @@ import { ago, type Attention, type LastSeen, type TeamSummary, type WorkItem } f
 import type { DashboardPlugin } from "@/lib/dashboard/overview";
 import type { InstalledWorkflow } from "@/lib/workflows/overview";
 import type { RunGraph } from "@/lib/workflows/run-graph";
+import SelectTeamLink from "./select-team-link";
 
 /** Dashboard panels — server components over data read at request time. */
 
@@ -970,9 +983,9 @@ const LANES: { key: keyof TeamSummary["tickets"]; label: string; lane: string }[
 
 function TeamCard({ team, selected }: { team: TeamSummary; selected: boolean }) {
   return (
-    <Link
-      href={`/dashboard?team=${encodeURIComponent(team.id)}`}
-      aria-current={selected ? "true" : undefined}
+    <SelectTeamLink
+      teamId={team.id}
+      current={selected}
       className={`rounded-xl border p-3 transition-colors ${
         selected ? "border-white/30 bg-white/10" : "border-[color:var(--ck-border-subtle)] bg-white/[0.03] hover:bg-white/[0.07]"
       }`}
@@ -991,7 +1004,7 @@ function TeamCard({ team, selected }: { team: TeamSummary; selected: boolean }) 
         ) : null}
         {team.lead ? <span className="truncate text-[color:var(--ck-text-tertiary)]">lead: {team.lead}</span> : null}
       </div>
-    </Link>
+    </SelectTeamLink>
   );
 }
 
@@ -1196,6 +1209,8 @@ export default async function DashboardPage({
 
 - [ ] **Step 4:** `npx eslint src/app/dashboard src/components/AppShell.tsx src/lib/dashboard` and `npx tsc --noEmit -p . | grep -E "dashboard|AppShell"` — clean.
 - [ ] **Step 5:** commit `feat(dashboard): Dashboard page with working-now, workflows, attention, teams and plugins`.
+
+**Added during verification:** team cards and the sidebar switcher disagreed (the sidebar kept a private copy of the selection). `selectTeam()` in `src/lib/selected-team.ts` (+ `src/lib/__tests__/selected-team.test.ts`) writes the store and fires the change event; `AppShell` reads `useSelectedTeamId()`; team cards use `src/app/dashboard/select-team-link.tsx`. AppShell's localStorage effect now only SETS on `/teams/<id>` — clearing on empty wiped the saved team during hydration.
 
 ---
 

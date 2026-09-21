@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { dispatchSelectedTeamChanged } from "@/lib/selected-team";
+import { selectTeam, useSelectedTeamId } from "@/lib/selected-team";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { fetchJson } from "@/lib/fetch-json";
 import { ToastProvider } from "@/components/ToastProvider";
@@ -64,7 +64,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const isTeamEditorRoute = useMemo(() => pathname.startsWith("/teams/"), [pathname]);
 
-  const [storedTeamId, setStoredTeamId] = useState<string>("");
+  // Shared store (localStorage + change event), so a team picked anywhere — this
+  // sidebar or a page like /dashboard — is the selection everywhere. Its server
+  // snapshot is "", so hydration matches.
+  const storedTeamId = useSelectedTeamId();
 
   const selectedTeamId = (teamIdFromPath || storedTeamId).trim();
 
@@ -109,15 +112,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // Load persisted selected team after hydration to avoid SSR/client mismatch.
-  useEffect(() => {
-    try {
-      setStoredTeamId((localStorage.getItem("ck-selected-team") || "").trim());
-    } catch {
-      // ignore
-    }
-  }, []);
-
   // Keep URL in sync with the selected team on pages that support team filtering.
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -125,16 +119,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sync uses window.location
   }, [pathname, selectedTeamId]);
 
-  // Keep localStorage in sync with the effective selected team (when we can compute it).
+  // Opening a team's editor selects that team. Only ever SET here: the store
+  // reads "" during hydration, so clearing on empty would wipe the saved team.
+  // Clearing is an explicit choice made in the switcher.
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      if (selectedTeamId) localStorage.setItem("ck-selected-team", selectedTeamId);
-      else localStorage.removeItem("ck-selected-team");
-    } catch {
-      // ignore
-    }
-  }, [selectedTeamId]);
+    if (teamIdFromPath && teamIdFromPath !== storedTeamId) selectTeam(teamIdFromPath);
+  }, [teamIdFromPath, storedTeamId]);
 
   const [collapsed, setCollapsed] = useState(false);
 
@@ -395,15 +385,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   disabled={isTeamEditorRoute}
                   onChange={(e) => {
                     const id = (e.target.value || "").trim();
-                    setStoredTeamId(id);
-                    try {
-                      if (id) localStorage.setItem("ck-selected-team", id);
-                      else localStorage.removeItem("ck-selected-team");
-                    } catch {
-                      // ignore
-                    }
-
-                    dispatchSelectedTeamChanged();
+                    selectTeam(id);
                     syncTeamToCurrentUrl(id);
                   }}
                   className={
