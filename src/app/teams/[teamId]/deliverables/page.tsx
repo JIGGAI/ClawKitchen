@@ -102,7 +102,7 @@ export default async function TeamDeliverablesPage({
             Workflows →
           </Link>
           <Link
-            href={`/runs?team=${encodeURIComponent(teamId)}`}
+            href={`/workflows?team=${encodeURIComponent(teamId)}`}
             className="text-sm font-medium text-[color:var(--ck-text-secondary)] hover:underline"
           >
             Runs →

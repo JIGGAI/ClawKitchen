@@ -192,7 +192,7 @@ function failedRuns(runs: RunGraph[], now: number): Attention[] {
   if (failed.length === 0) return [];
   const names = Array.from(new Set(failed.map((r) => r.workflowName ?? r.workflowId)));
   const shown = names.slice(0, 3).join(", ") + (names.length > 3 ? "…" : "");
-  return [{ id: "failed-runs", level: "fail", title: `${plural(failed.length, "run")} failed in the last 24h`, detail: shown, href: "/runs" }];
+  return [{ id: "failed-runs", level: "fail", title: `${plural(failed.length, "run")} failed in the last 24h`, detail: shown, href: "/workflows?status=error" }];
 }
 
 function queueProblems(queues: AgentQueue[], now: number): Attention[] {

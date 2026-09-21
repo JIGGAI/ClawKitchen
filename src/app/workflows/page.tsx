@@ -2,11 +2,15 @@ import Link from "next/link";
 import { unstable_noStore as noStore } from "next/cache";
 import { errorMessage } from "@/lib/errors";
 import { readManifest } from "@/lib/manifest";
-import { listInstalledWorkflows, resolveTeamIds } from "@/lib/workflows/overview";
+import { listInstalledWorkflows, resolveTeamIds, RUN_SORTS, type RunSort } from "@/lib/workflows/overview";
 import WorkflowRunsClient from "./workflow-runs-client";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+function first(v: string | string[] | undefined): string {
+  return String((Array.isArray(v) ? v[0] : v) ?? "").trim();
+}
 
 const sectionTitle = "text-xs font-semibold uppercase tracking-wider text-[color:var(--ck-text-tertiary)]";
 
@@ -17,7 +21,14 @@ export default async function WorkflowsPage({
 }) {
   noStore();
   const sp = await searchParams;
-  const team = String((Array.isArray(sp.team) ? sp.team[0] : sp.team) ?? "").trim();
+  const team = first(sp.team);
+  const sort = first(sp.sort);
+  const initialFilters = {
+    workflow: first(sp.workflow),
+    status: first(sp.status),
+    q: first(sp.q),
+    sort: RUN_SORTS.includes(sort as RunSort) ? (sort as RunSort) : ("newest" as RunSort),
+  };
 
   let teamIds: string[] = [];
   let error: string | null = null;
@@ -27,11 +38,17 @@ export default async function WorkflowsPage({
     error = errorMessage(e);
   }
 
-  const [installed, manifest] = await Promise.all([listInstalledWorkflows(teamIds), readManifest()]);
+  const [installed, manifest, allTeamIds] = await Promise.all([
+    listInstalledWorkflows(teamIds),
+    readManifest(),
+    resolveTeamIds(""),
+  ]);
+  const recipeNames = new Map((manifest?.recipes ?? []).filter((r) => r.kind === "team").map((r) => [r.id, r.name]));
   const teamNames: Record<string, string> = {};
-  for (const [id, entry] of Object.entries(manifest?.teams ?? {})) {
-    if (entry.displayName) teamNames[id] = entry.displayName;
+  for (const id of allTeamIds) {
+    teamNames[id] = manifest?.teams[id]?.displayName ?? recipeNames.get(id) ?? id;
   }
+  const teams = allTeamIds.map((id) => ({ id, name: teamNames[id] }));
 
   return (
     <div className="flex flex-col gap-6">
@@ -107,7 +124,14 @@ export default async function WorkflowsPage({
 
       <section>
         <h2 className={sectionTitle}>Runs</h2>
-        <WorkflowRunsClient team={team} teamNames={teamNames} />
+        <WorkflowRunsClient
+          // Remount on team change so filters for one team don't leak into the next.
+          key={team}
+          team={team}
+          teams={teams}
+          teamNames={teamNames}
+          initialFilters={initialFilters}
+        />
       </section>
     </div>
   );

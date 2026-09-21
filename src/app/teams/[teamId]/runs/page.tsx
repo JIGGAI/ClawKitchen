@@ -10,8 +10,6 @@ export default async function TeamRunsPage({
 }) {
   const { teamId } = await params;
 
-  // Canonical route is global + team-aware:
-  //   /runs?team=<teamId>
-  // so the sidebar team dropdown can control the view.
-  redirect(`/runs?team=${encodeURIComponent(teamId)}`);
+  // Runs are listed on /workflows, filtered to the team via ?team= (the sidebar selection).
+  redirect(`/workflows?team=${encodeURIComponent(teamId)}`);
 }

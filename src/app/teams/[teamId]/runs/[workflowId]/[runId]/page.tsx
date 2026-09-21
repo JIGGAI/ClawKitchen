@@ -31,8 +31,8 @@ export default async function TeamRunDetailPage({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="text-xs text-[color:var(--ck-text-tertiary)]">
-            <Link href={`/runs?team=${encodeURIComponent(teamId)}`} className="hover:underline">
-              Runs
+            <Link href={`/workflows?team=${encodeURIComponent(teamId)}`} className="hover:underline">
+              Workflows
             </Link>
             <span className="mx-2">/</span>
             <span className="font-mono">{workflowId}</span>
