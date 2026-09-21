@@ -9,7 +9,7 @@ import { fetchJson } from "@/lib/fetch-json";
 import { ToastProvider } from "@/components/ToastProvider";
 
 // Pages that read ?team= — the nav carries the selected team to these.
-const TEAM_SCOPED_ROUTES = ["/tickets", "/goals", "/cron-jobs", "/runs", "/workflows"];
+const TEAM_SCOPED_ROUTES = ["/dashboard", "/tickets", "/goals", "/cron-jobs", "/runs", "/workflows"];
 
 function Icon({ children }: { children: React.ReactNode }) {
   return (
@@ -205,6 +205,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   const globalNav = [
+    {
+      href: navHref(`/dashboard`),
+      label: "Dashboard",
+      icon: (
+        <Icon>
+          <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="3" y="3" width="7" height="9" rx="1" />
+            <rect x="14" y="3" width="7" height="5" rx="1" />
+            <rect x="14" y="12" width="7" height="9" rx="1" />
+            <rect x="3" y="16" width="7" height="5" rx="1" />
+          </svg>
+        </Icon>
+      ),
+    },
     {
       href: `/`,
       label: "Agents",
