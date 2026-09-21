@@ -151,8 +151,8 @@ export default function RunDetailClient({
         throw new Error(response.error || "Failed to delete run");
       }
 
-      // Navigate back to runs list
-      router.push(`/teams/${encodeURIComponent(teamId)}/runs`);
+      // Navigate back to the runs list (on /workflows, filtered to this team)
+      router.push(`/workflows?team=${encodeURIComponent(teamId)}`);
     } catch (err) {
       setActionError(String(err));
     } finally {
@@ -292,7 +292,7 @@ export default function RunDetailClient({
             ) : null}
             {actionDone ? (
               <div className={`mt-3 rounded-lg px-4 py-2 text-sm font-medium ${actionDone === "approved" ? "border border-emerald-400/30 bg-emerald-500/10 text-emerald-200" : "border border-amber-400/30 bg-amber-500/10 text-amber-200"}`}>
-                {actionDone === "approved" ? "Approved — the runner will resume this workflow shortly." : "Rejected — revision requested."}
+                {actionDone === "approved" ? "Approved — the runner will resume this workflow shortly." : "Declined — sent back for changes."}
               </div>
             ) : (!run.approval || run.approval.state === "pending") && !actionDone ? (
               <div className="mt-3 flex gap-2">
@@ -323,10 +323,12 @@ export default function RunDetailClient({
                   type="button"
                   disabled={actionBusy}
                   onClick={async () => {
+                    // Same as replying `decline <code> <what to change>` on Telegram.
+                    const note = prompt("What should change? (optional)");
+                    if (note === null) return; // Cancel means don't decline
                     setActionBusy(true);
                     setActionError("");
                     try {
-                      const note = prompt("Reason for rejection (optional):");
                       await fetchJson("/api/teams/workflow-runs", {
                         method: "POST",
                         headers: { "content-type": "application/json" },
@@ -341,7 +343,7 @@ export default function RunDetailClient({
                   }}
                   className="rounded-lg border border-amber-400/30 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-200 shadow-[var(--ck-shadow-1)] transition hover:bg-amber-500/20 disabled:opacity-50"
                 >
-                  {actionBusy ? "…" : "Reject"}
+                  {actionBusy ? "…" : "Decline"}
                 </button>
               </div>
             ) : null}

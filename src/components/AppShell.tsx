@@ -9,7 +9,7 @@ import { fetchJson } from "@/lib/fetch-json";
 import { ToastProvider } from "@/components/ToastProvider";
 
 // Pages that read ?team= — the nav carries the selected team to these.
-const TEAM_SCOPED_ROUTES = ["/dashboard", "/tickets", "/goals", "/cron-jobs", "/runs", "/workflows"];
+const TEAM_SCOPED_ROUTES = ["/dashboard", "/tickets", "/goals", "/cron-jobs", "/workflows"];
 
 function Icon({ children }: { children: React.ReactNode }) {
   return (
@@ -112,12 +112,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // The store reads "" until hydration is done, so syncing before then stripped
+  // the ?team= a page was opened with while the sidebar went on to show the
+  // saved team. Wait for hydration, and let a ?team= in the URL win on load so a
+  // shared or bookmarked link shows what it says.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    try {
+      if (TEAM_SCOPED_ROUTES.includes(window.location.pathname)) {
+        const fromUrl = (new URL(window.location.href).searchParams.get("team") ?? "").trim();
+        if (fromUrl) selectTeam(fromUrl);
+      }
+    } catch {
+      // ignore
+    }
+    setHydrated(true);
+  }, []);
+
   // Keep URL in sync with the selected team on pages that support team filtering.
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (!hydrated) return;
     syncTeamToCurrentUrl(selectedTeamId);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sync uses window.location
-  }, [pathname, selectedTeamId]);
+  }, [pathname, selectedTeamId, hydrated]);
 
   // Opening a team's editor selects that team. Only ever SET here: the store
   // reads "" during hydration, so clearing on empty would wipe the saved team.
@@ -296,21 +313,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <circle cx="12" cy="19" r="2" />
             <path d="M6 7v2a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V7" />
             <path d="M12 12v5" />
-          </svg>
-        </Icon>
-      ),
-    },
-    {
-      href: navHref(`/runs`),
-      label: "Runs",
-      icon: (
-        <Icon>
-          <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M4 19h16" />
-            <path d="M6 16l4-4 3 3 5-7" />
-            <circle cx="10" cy="12" r="1" />
-            <circle cx="13" cy="15" r="1" />
-            <circle cx="18" cy="8" r="1" />
           </svg>
         </Icon>
       ),

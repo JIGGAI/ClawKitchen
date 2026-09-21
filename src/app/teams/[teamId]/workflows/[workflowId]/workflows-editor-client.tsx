@@ -3032,7 +3032,7 @@ export default function WorkflowsEditorClient({
                       <div className="flex items-center gap-3">
                         <div className="text-xs font-medium text-[color:var(--ck-text-secondary)]">Runs (history)</div>
                         <Link
-                          href={`/teams/${encodeURIComponent(teamId)}/runs`}
+                          href={`/workflows?team=${encodeURIComponent(teamId)}&workflow=${encodeURIComponent(workflowId)}`}
                           className="text-[10px] font-medium text-[color:var(--ck-text-tertiary)] hover:text-[color:var(--ck-text-secondary)] hover:underline"
                         >
                           View all →
