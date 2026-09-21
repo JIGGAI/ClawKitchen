@@ -39,10 +39,10 @@ export default async function DashboardPage({
         <StatCard
           label="Teams"
           value={teams.length}
-          href="/"
+          href="/agents"
           hint={teams.length ? teams.slice(0, 2).map((t) => t.name).join(", ") : "none yet"}
         />
-        <StatCard label="Agents" value={agents.length} href="/" hint={`${busy} working now`} />
+        <StatCard label="Agents" value={agents.length} href="/agents" hint={`${busy} working now`} />
         <StatCard
           label="Workflows"
           value={installed.length}

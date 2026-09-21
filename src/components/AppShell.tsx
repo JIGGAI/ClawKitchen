@@ -210,13 +210,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       ),
     },
     {
-      href: `/`,
+      href: `/agents`,
       label: "Agents",
       icon: (
         <Icon>
           <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M3 11l9-8 9 8" />
-            <path d="M5 10v10h14V10" />
+            <circle cx="9" cy="8" r="3" />
+            <path d="M3 20a6 6 0 0 1 12 0" />
+            <path d="M16 5a3 3 0 0 1 0 6" />
+            <path d="M18 14a6 6 0 0 1 3 6" />
           </svg>
         </Icon>
       ),

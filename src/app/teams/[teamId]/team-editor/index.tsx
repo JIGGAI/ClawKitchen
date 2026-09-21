@@ -628,7 +628,7 @@ export default function TeamEditor({ teamId, teamName, initialTab }: { teamId: s
             });
             flashMessage("Deleted team successfully", "success");
             setDeleteOpen(false);
-            setTimeout(() => router.push("/"), 250);
+            setTimeout(() => router.push("/agents"), 250);
           } catch (e: unknown) {
             flashMessage(errorMessage(e), "error");
           } finally {
