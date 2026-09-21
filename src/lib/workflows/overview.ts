@@ -22,7 +22,7 @@ export type InstalledWorkflow = {
 
 type RunEntry = { teamId: string; teamDir: string; name: string; run: Record<string, unknown> };
 
-async function readJsonOrNull(p: string): Promise<unknown> {
+export async function readJsonOrNull(p: string): Promise<unknown> {
   try {
     return JSON.parse(await fs.readFile(p, "utf8")) as unknown;
   } catch {
