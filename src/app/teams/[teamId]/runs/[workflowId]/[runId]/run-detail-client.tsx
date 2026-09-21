@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { fetchJson } from "@/lib/fetch-json";
+import { approvalNeedsDecision } from "@/lib/workflows/approval-state";
 import { ConfirmationModal } from "@/components/ConfirmationModal";
 import RunDeliverables from "@/components/RunDeliverables";
 import type { WorkflowRunFileV1, WorkflowRunNodeResultV1 } from "@/lib/workflows/runs-types";
@@ -60,6 +61,8 @@ export default function RunDetailClient({
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showStopModal, setShowStopModal] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
+  // Page-load time is precise enough for the "decision never took effect" check.
+  const [loadedAt] = useState(() => Date.now());
   const [actionError, setActionError] = useState<string>("");
   const [actionDone, setActionDone] = useState<string>("");
 
@@ -292,9 +295,16 @@ export default function RunDetailClient({
             ) : null}
             {actionDone ? (
               <div className={`mt-3 rounded-lg px-4 py-2 text-sm font-medium ${actionDone === "approved" ? "border border-emerald-400/30 bg-emerald-500/10 text-emerald-200" : "border border-amber-400/30 bg-amber-500/10 text-amber-200"}`}>
-                {actionDone === "approved" ? "Approved — the runner will resume this workflow shortly." : "Declined — sent back for changes."}
+                {actionDone === "approved" && "Approved — the runner will resume this workflow shortly."}
+                {actionDone === "rejected" && "Declined — sent back for changes."}
+                {actionDone === "canceled" && "Declined — run canceled."}
               </div>
-            ) : (!run.approval || run.approval.state === "pending") && !actionDone ? (
+            ) : approvalNeedsDecision({
+                runAwaiting: run.status === "waiting_for_approval",
+                decision: run.approval?.state,
+                decidedAt: run.approval?.decidedAt,
+                now: loadedAt,
+              }) && !actionDone ? (
               <div className="mt-3 flex gap-2">
                 <button
                   type="button"
@@ -323,18 +333,25 @@ export default function RunDetailClient({
                   type="button"
                   disabled={actionBusy}
                   onClick={async () => {
-                    // Same as replying `decline <code> <what to change>` on Telegram.
-                    const note = prompt("What should change? (optional)");
-                    if (note === null) return; // Cancel means don't decline
+                    // With a note: same as replying `decline <code> <what to change>` on
+                    // Telegram (revise). Without one: the run is canceled.
+                    const answer = prompt("What should change? Leave empty to cancel the run.");
+                    if (answer === null) return; // the prompt's Cancel means don't decline
+                    const note = answer.trim();
                     setActionBusy(true);
                     setActionError("");
                     try {
                       await fetchJson("/api/teams/workflow-runs", {
                         method: "POST",
                         headers: { "content-type": "application/json" },
-                        body: JSON.stringify({ teamId, workflowId, runId: run.id, action: "request_changes", ...(note ? { note } : {}) }),
+                        body: JSON.stringify({
+                          teamId,
+                          workflowId,
+                          runId: run.id,
+                          ...(note ? { action: "request_changes", note } : { action: "cancel" }),
+                        }),
                       });
-                      setActionDone("rejected");
+                      setActionDone(note ? "rejected" : "canceled");
                     } catch (err) {
                       setActionError(String(err));
                     } finally {

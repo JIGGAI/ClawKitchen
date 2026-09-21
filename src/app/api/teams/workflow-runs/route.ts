@@ -9,7 +9,14 @@ import { errorMessage } from "@/lib/errors";
 import { toolsInvoke } from "@/lib/gateway";
 import { runOpenClaw } from "@/lib/openclaw";
 import { assertSafeRelativeFileName, getTeamWorkspaceDir } from "@/lib/paths";
-import { listWorkflowRuns, readWorkflowRun, writeWorkflowRun, appendWorkflowRunEvent, writeApprovalFile } from "@/lib/workflows/runs-storage";
+import {
+  appendWorkflowRunEvent,
+  cancelRunnerWorkflowRun,
+  listWorkflowRuns,
+  readWorkflowRun,
+  writeApprovalFile,
+  writeWorkflowRun,
+} from "@/lib/workflows/runs-storage";
 import type { WorkflowRunFileV1, WorkflowRunNodeResultV1 } from "@/lib/workflows/runs-types";
 import { readWorkflow } from "@/lib/workflows/storage";
 import type { WorkflowFileV1 } from "@/lib/workflows/types";
@@ -506,7 +513,33 @@ export async function POST(req: Request) {
       // to actually progress the run — mirrors what Telegram auto-approval does.
       if (isRunnerManaged) {
         const decidedAtRunner = nowIso();
-        const nextStateRunner = action === "approve" ? "approved" : action === "request_changes" ? "rejected" : "rejected";
+
+        // Decline without a change request: end the run. The engine's rejection
+        // path always loops back to a revise step, so it is not resumed; the
+        // approval is stamped resumed so the engine's poller leaves it alone.
+        if (action === "cancel") {
+          try {
+            await writeApprovalFile(teamId, workflowId, run.id, approvalNodeId, {
+              state: "rejected",
+              requestedAt: run.approval?.requestedAt,
+              decidedAt: decidedAtRunner,
+              note,
+              decidedBy,
+              resumedAt: decidedAtRunner,
+              resumedStatus: "canceled",
+            });
+            await cancelRunnerWorkflowRun(teamId, workflowId, run.id, {
+              nodeId: approvalNodeId,
+              at: decidedAtRunner,
+              decidedBy: decidedBy || "ClawKitchen UI",
+            });
+          } catch (e) {
+            return NextResponse.json({ ok: false, error: `Failed to cancel run: ${errorMessage(e)}` }, { status: 500 });
+          }
+          return jsonOkRest({ ok: true, runId: run.id, action, state: "canceled", runnerManaged: true });
+        }
+
+        const nextStateRunner = action === "approve" ? "approved" : "rejected";
 
         try {
           await writeApprovalFile(teamId, workflowId, run.id, approvalNodeId, {
@@ -547,6 +580,24 @@ export async function POST(req: Request) {
           }
         } catch (e) {
           resumeError = String(e);
+        }
+
+        // A decision that didn't take effect must stay visible and decidable,
+        // not just come back in this response.
+        if (resumeError) {
+          try {
+            await writeApprovalFile(teamId, workflowId, run.id, approvalNodeId, {
+              state: nextStateRunner,
+              decidedAt: decidedAtRunner,
+              note,
+              decidedBy,
+              resumedAt: nowIso(),
+              resumedStatus: "error",
+              resumeError,
+            });
+          } catch {
+            // best-effort; the error is still returned below
+          }
         }
 
         return jsonOkRest({

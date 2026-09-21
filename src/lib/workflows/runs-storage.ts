@@ -337,6 +337,10 @@ export async function writeApprovalFile(
     decidedAt?: string;
     note?: string;
     decidedBy?: string;
+    /** The engine's poller skips approvals with resumedAt set. */
+    resumedAt?: string;
+    resumedStatus?: string;
+    resumeError?: string;
   }
 ) {
   const wfId = assertSafeWorkflowId(workflowId);
@@ -367,10 +371,48 @@ export async function writeApprovalFile(
     decidedAt: approvalData.decidedAt,
     ...(approvalData.note ? { note: approvalData.note } : {}),
     ...(approvalData.decidedBy ? { decidedBy: approvalData.decidedBy } : {}),
+    ...(approvalData.resumedAt ? { resumedAt: approvalData.resumedAt } : {}),
+    ...(approvalData.resumedStatus ? { resumedStatus: approvalData.resumedStatus } : {}),
+    ...(approvalData.resumeError ? { resumeError: approvalData.resumeError } : {}),
   };
 
   await fs.writeFile(approvalPath, JSON.stringify(approvalFile, null, 2) + "\n", "utf8");
   return { ok: true as const, path: approvalPath };
+}
+
+/**
+ * End an engine-managed run whose approval was declined without a change
+ * request. The engine's own rejection path always loops back to a revise step,
+ * so cancelling is done here: the run becomes canceled (the engine treats it as
+ * finished) and the approval node is marked declined.
+ */
+export async function cancelRunnerWorkflowRun(
+  teamId: string,
+  workflowId: string,
+  runId: string,
+  opts: { nodeId: string; at: string; decidedBy?: string },
+) {
+  const wfId = assertSafeWorkflowId(workflowId);
+  const rId = assertSafeRunId(runId);
+  const runPath = path.join(await getWorkflowRunsDir(teamId, wfId), rId, "run.json");
+  const run = JSON.parse(await fs.readFile(runPath, "utf8")) as {
+    nodeStates?: Record<string, unknown>;
+    events?: unknown[];
+    [k: string]: unknown;
+  };
+  const next = {
+    ...run,
+    status: "canceled",
+    updatedAt: opts.at,
+    nodeStates: { ...(run.nodeStates ?? {}), [opts.nodeId]: { status: "error", ts: opts.at, message: "declined" } },
+    events: [
+      ...(Array.isArray(run.events) ? run.events : []),
+      { type: "approval.declined", nodeId: opts.nodeId, ...(opts.decidedBy ? { decidedBy: opts.decidedBy } : {}), ts: opts.at },
+      { type: "run.canceled", reason: "approval_declined", ts: opts.at },
+    ],
+  };
+  await fs.writeFile(runPath, JSON.stringify(next, null, 2) + "\n", "utf8");
+  return { ok: true as const, path: runPath };
 }
 
 export type WorkflowRunSummary = {

@@ -1,3 +1,5 @@
+import { approvalNeedsDecision } from "@/lib/workflows/approval-state";
+
 /**
  * A workflow run as the graph it is: the workflow file's nodes and edges,
  * coloured by the run's `nodeStates`. The run log has no topology of its own,
@@ -39,6 +41,8 @@ export type BuildRunGraphInput = {
   run: unknown;
   workflow: unknown;
   approval: unknown;
+  /** Defaults to Date.now(); passed in tests. */
+  now?: number;
 };
 
 type Obj = Record<string, unknown>;
@@ -102,14 +106,21 @@ function bareNode(id: string): NodeShape {
   return { id, name: null, type: "node", agent: null };
 }
 
-function findApprovalNode(runStatus: string, approval: unknown, nodes: GraphNode[]): string | null {
+function findApprovalNode(runStatus: string, approval: unknown, nodes: GraphNode[], now: number): string | null {
   if (runStatus !== "awaiting_approval") return null;
   const a = obj(approval);
   const fileNodeId = str(a?.nodeId);
   if (fileNodeId) {
-    const decision = str(a?.status) ?? str(a?.state);
-    // Decided but not yet resumed: offering the buttons again would double-decide.
-    if (decision && decision !== "pending") return null;
+    // Decided and the resume is still expected: offering the buttons again would
+    // double-decide. Decided but it never took effect: offer them again.
+    const open = approvalNeedsDecision({
+      runAwaiting: true,
+      decision: str(a?.status) ?? str(a?.state),
+      decidedAt: str(a?.decidedAt),
+      resumeError: str(a?.resumeError),
+      now,
+    });
+    if (!open) return null;
     if (nodes.some((n) => n.id === fileNodeId)) return fileNodeId;
   }
   return nodes.find((n) => n.status === "waiting")?.id ?? null;
@@ -188,7 +199,7 @@ export function buildRunGraph(input: BuildRunGraphInput): RunGraph {
     };
   });
 
-  const approvalNodeId = findApprovalNode(status, input.approval, nodes);
+  const approvalNodeId = findApprovalNode(status, input.approval, nodes, input.now ?? Date.now());
   const approvalNode = nodes.find((n) => n.id === approvalNodeId);
   if (approvalNode && approvalNode.status === "pending") approvalNode.status = "waiting";
   if (ACTIVE_RUN_STATUSES.has(status)) markReadyNodesRunning(nodes, shape.edges);

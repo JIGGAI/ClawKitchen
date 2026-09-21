@@ -7,6 +7,8 @@ vi.mock("@/lib/workflows/runs-storage", () => ({
   readWorkflowRun: vi.fn(),
   writeWorkflowRun: vi.fn(),
   appendWorkflowRunEvent: vi.fn(),
+  writeApprovalFile: vi.fn(),
+  cancelRunnerWorkflowRun: vi.fn(),
 }));
 vi.mock("@/lib/workflows/storage", () => ({
   readWorkflow: vi.fn(),
@@ -44,7 +46,14 @@ vi.mock("node:path", () => ({
   },
 }));
 
-import { getWorkflowRunsDir, listWorkflowRuns, readWorkflowRun, writeWorkflowRun } from "@/lib/workflows/runs-storage";
+import {
+  cancelRunnerWorkflowRun,
+  getWorkflowRunsDir,
+  listWorkflowRuns,
+  readWorkflowRun,
+  writeApprovalFile,
+  writeWorkflowRun,
+} from "@/lib/workflows/runs-storage";
 import { readWorkflow } from "@/lib/workflows/storage";
 import { runOpenClaw } from "@/lib/openclaw";
 
@@ -56,6 +65,8 @@ describe("api teams workflow-runs route", () => {
     vi.mocked(writeWorkflowRun).mockReset();
     vi.mocked(readWorkflow).mockReset();
     vi.mocked(runOpenClaw).mockReset();
+    vi.mocked(writeApprovalFile).mockReset();
+    vi.mocked(cancelRunnerWorkflowRun).mockReset();
   });
 
   it("GET returns 400 when teamId missing", async () => {
@@ -273,5 +284,64 @@ describe("api teams workflow-runs route", () => {
     expect(json.ok).toBe(true);
     expect(json.deleted).toBe(true);
     expect(json.runId).toBe("test-run-1");
+  });
+
+  describe("engine-run approvals", () => {
+    const waitingRun = {
+      ok: true,
+      path: "/home/test/run.json",
+      isRunnerManaged: true,
+      run: {
+        schema: "clawkitchen.workflow-run.v1",
+        id: "run-1",
+        workflowId: "wf1",
+        startedAt: "2026-09-21T12:00:00Z",
+        status: "waiting_for_approval",
+        approval: { nodeId: "approve", state: "pending", requestedAt: "2026-09-21T12:01:00Z" },
+      },
+    } as const;
+
+    const post = (body: Record<string, unknown>) =>
+      POST(
+        new Request("https://test", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ teamId: "team1", workflowId: "wf1", runId: "run-1", ...body }),
+        }),
+      );
+
+    it("cancel (a decline with no change request) cancels the run instead of resuming it into revision", async () => {
+      vi.mocked(readWorkflowRun).mockResolvedValue(waitingRun as never);
+      const res = await post({ action: "cancel", decidedBy: "RJ" });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({ ok: true, runId: "run-1", action: "cancel", state: "canceled" });
+      expect(writeApprovalFile).toHaveBeenCalledWith(
+        "team1",
+        "wf1",
+        "run-1",
+        "approve",
+        expect.objectContaining({ state: "rejected", resumedAt: expect.any(String), resumedStatus: "canceled", decidedBy: "RJ" }),
+      );
+      expect(cancelRunnerWorkflowRun).toHaveBeenCalledWith("team1", "wf1", "run-1", {
+        nodeId: "approve",
+        at: expect.any(String),
+        decidedBy: "RJ",
+      });
+      expect(runOpenClaw).not.toHaveBeenCalled();
+    });
+
+    it("records a failed resume on the approval so the run can be decided again", async () => {
+      vi.mocked(readWorkflowRun).mockResolvedValue(waitingRun as never);
+      vi.mocked(runOpenClaw).mockResolvedValue({ ok: false, stdout: "", stderr: "Approval node not found in workflow" } as never);
+      const res = await post({ action: "request_changes", note: "tighten the copy" });
+      expect(await res.json()).toMatchObject({ ok: true, state: "rejected", resumeError: "Approval node not found in workflow" });
+      expect(writeApprovalFile).toHaveBeenLastCalledWith(
+        "team1",
+        "wf1",
+        "run-1",
+        "approve",
+        expect.objectContaining({ state: "rejected", note: "tighten the copy", resumedStatus: "error", resumeError: "Approval node not found in workflow" }),
+      );
+    });
   });
 });
