@@ -265,31 +265,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       ),
     },
     {
-      href: navHref(`/tickets`),
-      label: "Tickets",
-      icon: (
-        <Icon>
-          <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M4 7h16v4a2 2 0 0 1 0 4v4H4v-4a2 2 0 0 0 0-4z" />
-          </svg>
-        </Icon>
-      ),
-    },
-    {
-      href: `/channels`,
-      label: "Channels",
-      icon: (
-        <Icon>
-          <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M4 6h16" />
-            <path d="M4 12h16" />
-            <path d="M4 18h16" />
-            <path d="M7 9h0" />
-          </svg>
-        </Icon>
-      ),
-    },
-    {
       href: navHref(`/goals`),
       label: "Goals",
       icon: (
@@ -302,13 +277,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       ),
     },
     {
-      href: navHref(`/cron-jobs`),
-      label: "Cron jobs",
+      href: navHref(`/tickets`),
+      label: "Tickets",
       icon: (
         <Icon>
           <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="9" />
-            <path d="M12 7v5" />
+            <path d="M4 7h16v4a2 2 0 0 1 0 4v4H4v-4a2 2 0 0 0 0-4z" />
           </svg>
         </Icon>
       ),
@@ -324,6 +298,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <circle cx="12" cy="19" r="2" />
             <path d="M6 7v2a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V7" />
             <path d="M12 12v5" />
+          </svg>
+        </Icon>
+      ),
+    },
+    {
+      href: navHref(`/cron-jobs`),
+      label: "Cron jobs",
+      icon: (
+        <Icon>
+          <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 7v5" />
           </svg>
         </Icon>
       ),
