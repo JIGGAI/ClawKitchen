@@ -60,10 +60,17 @@ function runKey(run: RunGraph): string {
   return `${run.teamId}/${run.runId}`;
 }
 
-function decisionNotice(run: RunGraph, node: GraphNode, action: Decision, out: DecideResponse): string {
+function decisionNotice(run: RunGraph, node: GraphNode, action: Decision, note: string | undefined, out: DecideResponse): string {
   if (out.resumeError) return `Recorded, but the run did not resume: ${out.resumeError}`;
-  if (action === "approve") return `Approved ${node.name ?? node.id} — resuming ${run.workflowName ?? run.workflowId}.`;
-  return `Declined ${node.name ?? node.id} — sent back for changes.`;
+  const label = node.name ?? node.id;
+  if (action === "approve") return `Approved ${label} — resuming ${run.workflowName ?? run.workflowId}.`;
+  return note ? `Declined ${label} — sent back for changes.` : `Declined ${label} — run canceled.`;
+}
+
+/** Decline with a change request revises (like the Telegram reply); without one it ends the run. */
+function apiAction(action: Decision, note: string | undefined): "approve" | "request_changes" | "cancel" {
+  if (action === "approve") return "approve";
+  return note ? "request_changes" : "cancel";
 }
 
 function NodeDetail({
@@ -110,7 +117,7 @@ function NodeDetail({
             onChange={(e) => setNote(e.target.value)}
             rows={2}
             autoFocus
-            placeholder="What should change? (optional — sent back with the run)"
+            placeholder="What should change? Leave empty to cancel the run."
             className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-[color:var(--ck-text-primary)]"
           />
           <div className="flex flex-wrap items-center gap-2">
@@ -125,7 +132,9 @@ function NodeDetail({
             <button type="button" className={secondaryBtn} disabled={busy} onClick={() => setDeclining(false)}>
               Cancel
             </button>
-            <span className="text-[10px] text-[color:var(--ck-text-tertiary)]">Sends the run back to its revise step with your note.</span>
+            <span className="text-[10px] text-[color:var(--ck-text-tertiary)]">
+              {note.trim() ? "Sends the run back to its revise step with your note." : "No note: the run is canceled."}
+            </span>
           </div>
         </div>
       ) : null}
@@ -391,11 +400,11 @@ export default function WorkflowRunsClient({
           teamId: run.teamId,
           workflowId: run.workflowId,
           runId: run.runId,
-          action: action === "approve" ? "approve" : "request_changes",
+          action: apiAction(action, note),
           ...(note ? { note } : {}),
         }),
       });
-      setNotice(decisionNotice(run, node, action, out));
+      setNotice(decisionNotice(run, node, action, note, out));
     } catch (e) {
       setError(errorMessage(e));
     } finally {

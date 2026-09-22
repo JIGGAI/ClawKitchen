@@ -100,11 +100,22 @@ describe("buildRunGraph", () => {
     expect(byId(g.nodes).approval.status).toBe("waiting");
   });
 
-  it("has no approval node once the approval is decided", () => {
+  it("has no approval node right after the approval is decided", () => {
     const g = build(runLog("awaiting_approval", { approval: { status: "waiting" } }), {
-      approval: { nodeId: "approval", status: "approved" },
+      approval: { nodeId: "approval", status: "approved", decidedAt: new Date(Date.now() - 60_000).toISOString() },
     });
     expect(g.approvalNodeId).toBeNull();
+  });
+
+  it("offers the approval again when a recorded decision never took effect", () => {
+    const stale = build(runLog("awaiting_approval", { approval: { status: "waiting" } }), {
+      approval: { nodeId: "approval", status: "rejected", decidedAt: "2026-06-24T02:10:00.000Z" },
+    });
+    expect(stale.approvalNodeId).toBe("approval");
+    const failed = build(runLog("awaiting_approval", { approval: { status: "waiting" } }), {
+      approval: { nodeId: "approval", status: "rejected", decidedAt: new Date().toISOString(), resumeError: "Approval node not found" },
+    });
+    expect(failed.approvalNodeId).toBe("approval");
   });
 
   it("falls back to the waiting node when there is no approval file", () => {
