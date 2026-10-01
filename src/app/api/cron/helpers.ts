@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { readAgents, type AgentsConfigMutable } from "@/lib/agents-shape";
 import { cachedRunOpenClaw } from "@/lib/openclaw-cache";
 
 export type CronScope = { kind: "team" | "agent"; id: string; label: string; href: string };
@@ -45,11 +46,16 @@ function addEntriesToScopeMap(
 
 async function collectAgentScopes(idToScope: Map<string, CronScope>): Promise<void> {
   try {
-    // `config get agents.list` is ~5s; agents change rarely. Uses default
+    // `config get agents` is ~5s; agents change rarely. Uses default
     // 5 min TTL; agent add/delete routes invalidate explicitly.
-    const cfgText = await cachedRunOpenClaw(["config", "get", "agents.list", "--no-color"]);
+    //
+    // Fetch the whole `agents` section rather than `agents.list`: current hosts
+    // store agents at `agents.entries` and the legacy array is absent there,
+    // which silently yielded zero agent scopes. agents-shape normalizes both.
+    const cfgText = await cachedRunOpenClaw(["config", "get", "agents", "--no-color"]);
     if (!cfgText.ok) return;
-    const list = JSON.parse(String(cfgText.stdout ?? "[]")) as Array<{ id?: unknown; workspace?: unknown }>;
+    const agentsSection = JSON.parse(String(cfgText.stdout ?? "{}")) as AgentsConfigMutable["agents"];
+    const list = readAgents({ agents: agentsSection });
     for (const a of list) {
       const agentId = String(a.id ?? "");
       const workspace = String(a.workspace ?? "");

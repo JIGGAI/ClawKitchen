@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { NextResponse } from "next/server";
 
+import { readAgents, withAgents, type AgentsConfigMutable } from "@/lib/agents-shape";
 import { getKitchenApi } from "@/lib/kitchen-api";
 import { teamDirFromBaseWorkspace } from "@/lib/paths";
 
@@ -58,8 +59,8 @@ export async function POST(req: Request) {
 
     const configPath = path.join(homeDir, ".openclaw", "openclaw.json");
     const raw = await fs.readFile(configPath, "utf8");
-    const cfg = JSON.parse(raw) as {
-      agents?: { defaults?: { workspace?: string }; list?: Array<Record<string, unknown>> };
+    const cfg = JSON.parse(raw) as AgentsConfigMutable & {
+      agents?: { defaults?: { workspace?: string } };
     };
 
     const baseWorkspace = String(cfg?.agents?.defaults?.workspace ?? "").trim();
@@ -68,7 +69,9 @@ export async function POST(req: Request) {
     }
 
     const newWorkspace = teamDirFromBaseWorkspace(baseWorkspace, newAgentId);
-    const agentsList: Array<Record<string, unknown>> = Array.isArray(cfg?.agents?.list) ? cfg.agents.list : [];
+    // Read/write through agents-shape so this works whether the host stores
+    // agents as `agents.entries` (current) or `agents.list` (legacy).
+    const agentsList = readAgents(cfg);
     const exists = agentsList.some((a) => String(a?.id ?? "").toLowerCase() === newAgentId.toLowerCase());
     if (exists && !overwrite) {
       return NextResponse.json({ ok: false, error: `Agent already exists: ${newAgentId}` }, { status: 409 });
@@ -85,13 +88,7 @@ export async function POST(req: Request) {
   await fs.writeFile(path.join(newWorkspace, "IDENTITY.md"), identityMd, "utf8");
 
   // Persist to ~/.openclaw/openclaw.json
-  const nextCfg = {
-    ...cfg,
-    agents: {
-      ...(cfg.agents ?? {}),
-      list: nextList,
-    },
-  };
+  const nextCfg = withAgents(cfg, nextList);
 
   // Write atomically.
   const tmpPath = `${configPath}.tmp`;

@@ -92,4 +92,55 @@ describe("api agents update route", () => {
     expect(res.status).toBe(200);
     expect(gatewayConfigPatch).toHaveBeenCalled();
   });
+
+  describe("on a host storing agents at agents.entries", () => {
+    const cfgWithEntries = {
+      agents: {
+        defaults: { systemAgent: { agentId: "main" } },
+        entries: {
+          "agent-1": { workspace: "/ws", model: "gpt-4", identity: { name: "Old", emoji: "🧑" } },
+          main: { workspace: "/ws-main" },
+        },
+      },
+    };
+
+    beforeEach(() => {
+      vi.mocked(gatewayConfigGet).mockResolvedValue({ raw: JSON.stringify(cfgWithEntries), hash: "abc" });
+    });
+
+    it("finds the agent and patches the entry, never agents.list", async () => {
+      const res = await POST(
+        new Request("https://test", {
+          method: "POST",
+          body: JSON.stringify({
+            agentId: "agent-1",
+            patch: { workspace: " /new/ws ", model: "gpt-4o", identity: { name: "New Name" } },
+          }),
+        })
+      );
+      expect(res.status).toBe(200);
+
+      const [patch] = vi.mocked(gatewayConfigPatch).mock.calls[0] as [Record<string, never>];
+      const agents = patch.agents as unknown as {
+        list?: unknown;
+        entries: Record<string, { workspace?: string; model?: string; identity?: Record<string, string>; id?: string }>;
+      };
+      // A stale agents.list would be migrated back over entries by OpenClaw.
+      expect(agents.list).toBeUndefined();
+      expect(agents.entries["agent-1"].workspace).toBe("/new/ws");
+      expect(agents.entries["agent-1"].model).toBe("gpt-4o");
+      expect(agents.entries["agent-1"].identity).toMatchObject({ name: "New Name", emoji: "🧑" });
+      // The id is the key in this shape, not a field inside the entry.
+      expect(agents.entries["agent-1"].id).toBeUndefined();
+      // Patching is scoped to the one agent, leaving siblings to the recursive merge.
+      expect(agents.entries.main).toBeUndefined();
+    });
+
+    it("still 404s for an unknown agent", async () => {
+      const res = await POST(
+        new Request("https://test", { method: "POST", body: JSON.stringify({ agentId: "missing" }) })
+      );
+      expect(res.status).toBe(404);
+    });
+  });
 });
