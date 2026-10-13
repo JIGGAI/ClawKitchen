@@ -1,13 +1,13 @@
 "use client";
 
-import { FileListWithOptionalToggle } from "@/components/FileListWithOptionalToggle";
+import { WorkspaceFileTree } from "@/components/WorkspaceFileTree";
 import type { TeamFileEntry } from "./types";
 
 type TeamFilesTabProps = {
+  teamId: string;
+  /** The recipe's scaffold files — badges + "missing" rows in the tree. */
   teamFiles: TeamFileEntry[];
   teamFilesLoading: boolean;
-  showOptionalFiles: boolean;
-  setShowOptionalFiles: (v: boolean) => void;
   fileName: string;
   fileContent: string;
   setFileContent: (v: string) => void;
@@ -19,10 +19,9 @@ type TeamFilesTabProps = {
 
 export function TeamFilesTab(props: TeamFilesTabProps) {
   const {
+    teamId,
     teamFiles,
     teamFilesLoading,
-    showOptionalFiles,
-    setShowOptionalFiles,
     fileName,
     fileContent,
     setFileContent,
@@ -34,13 +33,10 @@ export function TeamFilesTab(props: TeamFilesTabProps) {
 
   return (
     <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
-      <FileListWithOptionalToggle
-        title="Team files"
-        files={teamFiles}
-        loading={teamFilesLoading}
-        showOptionalFiles={showOptionalFiles}
-        onShowOptionalChange={setShowOptionalFiles}
-        selectedFileName={fileName}
+      <WorkspaceFileTree
+        teamId={teamId}
+        scaffold={teamFilesLoading ? undefined : teamFiles}
+        selectedPath={fileName}
         onSelectFile={onLoadTeamFile}
       />
 
