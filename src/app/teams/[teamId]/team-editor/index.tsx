@@ -91,7 +91,6 @@ export default function TeamEditor({ teamId, teamName, initialTab }: { teamId: s
   const [teamFiles, setTeamFiles] = useState<{ name: string; missing: boolean; required?: boolean; rationale?: string }[]>([]);
   const [teamFilesLoading, setTeamFilesLoading] = useState(false);
   const [teamFileError, setTeamFileError] = useState<string>("");
-  const [showOptionalFiles, setShowOptionalFiles] = useState(false);
   const [fileName, setFileName] = useState<string>("SOUL.md");
   const [fileContent, setFileContent] = useState<string>("");
 
@@ -552,10 +551,9 @@ export default function TeamEditor({ teamId, teamName, initialTab }: { teamId: s
 
       {activeTab === "files" && (
         <TeamFilesTab
+          teamId={teamId}
           teamFiles={teamFiles}
           teamFilesLoading={teamFilesLoading}
-          showOptionalFiles={showOptionalFiles}
-          setShowOptionalFiles={setShowOptionalFiles}
           fileName={fileName}
           fileContent={fileContent}
           setFileContent={setFileContent}
