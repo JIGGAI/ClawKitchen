@@ -27,6 +27,19 @@ export type ChatMessage = {
   ts: number | null;
 };
 
+export type BackgroundActivity = {
+  id: string;
+  ts: number | null;
+  outcome: string | null;
+  summary: string;
+  blocks: ChatBlock[];
+};
+
+export type ChatHistory = {
+  messages: ChatMessage[];
+  backgroundActivities: BackgroundActivity[];
+};
+
 export type ChatThread = {
   key: string;
   title: string;
@@ -167,6 +180,92 @@ function messageId(message: Obj, fallback: string): string {
   return firstString(obj(message.__openclaw)?.id, message.id, message.messageId) ?? fallback;
 }
 
+function runId(message: Obj): string | null {
+  return firstString(obj(message.__openclaw)?.runId, message.runId);
+}
+
+function timestamp(message: Obj): number | null {
+  if (typeof message.timestamp === "number") return message.timestamp;
+  const recorded = obj(message.__openclaw)?.recordTimestampMs;
+  return typeof recorded === "number" ? recorded : null;
+}
+
+const FORMAT_EDGE = new Set(["*", "_", "`", "~"]);
+
+function trimEdges(value: string, predicate: (char: string) => boolean): string {
+  let start = 0;
+  let end = value.length;
+  while (start < end && predicate(value[start])) start += 1;
+  while (end > start && predicate(value[end - 1])) end -= 1;
+  return value.slice(start, end);
+}
+
+function formattingEdge(char: string): boolean {
+  return FORMAT_EDGE.has(char) || char.trim() === "";
+}
+
+function ackSeparator(char: string): boolean {
+  return char.trim() === "" || /\p{P}/u.test(char);
+}
+
+function visibleAssistantText(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  const bare = trimEdges(trimmed, formattingEdge);
+  if (bare.split(/\s+/u).every((part) => part.toUpperCase() === "NO_REPLY")) return "";
+  if (!/HEARTBEAT_OK/iu.test(bare)) return value;
+
+  let visible = bare;
+  while (visible.toUpperCase().startsWith("HEARTBEAT_OK")) {
+    visible = trimEdges(visible.slice("HEARTBEAT_OK".length), ackSeparator);
+  }
+  while (visible.toUpperCase().endsWith("HEARTBEAT_OK")) {
+    visible = trimEdges(visible.slice(0, -"HEARTBEAT_OK".length), ackSeparator);
+  }
+  return visible;
+}
+
+function heartbeatPoll(message: Obj): boolean {
+  if (message.role !== "user") return false;
+  const text = textOf(message.content).trim();
+  return /^\[OpenClaw heartbeat poll\]/iu.test(text) || /^Read HEARTBEAT\.md\b/iu.test(text);
+}
+
+type HeartbeatRun = {
+  runId: string;
+  notify: boolean;
+  notificationText: string | null;
+  outcome: string | null;
+  summary: string;
+  firstIndex: number;
+  ts: number | null;
+};
+
+function heartbeatRuns(raw: unknown[]): Map<string, HeartbeatRun> {
+  const runs = new Map<string, HeartbeatRun>();
+  raw.forEach((entry, index) => {
+    const message = obj(entry);
+    if (!message || message.role !== "assistant") return;
+    const id = runId(message);
+    if (!id || !Array.isArray(message.content)) return;
+    for (const rawBlock of message.content) {
+      const block = obj(rawBlock);
+      if (!block || block.name !== "heartbeat_respond") continue;
+      const args = obj(block.arguments ?? block.args ?? block.input);
+      runs.set(id, {
+        runId: id,
+        notify: args?.notify === true,
+        notificationText: firstString(args?.notificationText),
+        outcome: firstString(args?.outcome),
+        summary: firstString(args?.summary) ?? "Heartbeat check",
+        firstIndex: index,
+        ts: timestamp(message),
+      });
+    }
+  });
+  return runs;
+}
+
 function mediaBlock(block: Obj): ChatBlock | null {
   if (block.type === "image" || block.type === "image_url") {
     const source = obj(block.source);
@@ -198,7 +297,8 @@ function contentBlocks(message: Obj, activity: ActivityIndex, id: string): ChatB
     const block = obj(rawBlock);
     if (!block) return [];
     if (block.type === "text" && typeof block.text === "string" && block.text.trim()) {
-      return [{ type: "text", text: block.text }];
+      const text = message.role === "assistant" ? visibleAssistantText(block.text) : block.text;
+      return text ? [{ type: "text", text }] : [];
     }
     const thinking = firstString(block.thinking, block.text);
     if ((block.type === "thinking" || block.type === "reasoning") && thinking) {
@@ -235,7 +335,7 @@ function contentBlocks(message: Obj, activity: ActivityIndex, id: string): ChatB
   });
 }
 
-export function toChatMessages(raw: unknown, rawActivity?: unknown): ChatMessage[] {
+function toVisibleChatMessages(raw: unknown, rawActivity?: unknown): ChatMessage[] {
   if (!Array.isArray(raw)) return [];
   const activity = indexActivity(rawActivity);
   const out: ChatMessage[] = [];
@@ -244,7 +344,7 @@ export function toChatMessages(raw: unknown, rawActivity?: unknown): ChatMessage
     if (!message) return;
     const role = message.role;
     const id = messageId(message, `${String(role ?? "message")}-${index}`);
-    const ts = typeof message.timestamp === "number" ? message.timestamp : null;
+    const ts = timestamp(message);
     if (role === "user" || role === "assistant") {
       const blocks = contentBlocks(message, activity, id);
       if (blocks.length) {
@@ -284,7 +384,75 @@ export function toChatMessages(raw: unknown, rawActivity?: unknown): ChatMessage
       });
     }
   });
-  return out;
+  const grouped: ChatMessage[] = [];
+  for (const message of out) {
+    const operational = message.blocks.length > 0 && message.blocks.every((block) =>
+      block.type === "thinking" || block.type === "tool_call" || block.type === "tool_result",
+    );
+    const previous = grouped.at(-1);
+    const previousOperational = previous?.blocks.length && previous.blocks.every((block) =>
+      block.type === "thinking" || block.type === "tool_call" || block.type === "tool_result",
+    );
+    if (operational && previous && previousOperational) {
+      previous.blocks.push(...message.blocks);
+      previous.text = [previous.text, message.text].filter(Boolean).join("\n\n");
+      continue;
+    }
+    grouped.push(message);
+  }
+  return grouped;
+}
+
+export function toChatHistory(raw: unknown, rawActivity?: unknown): ChatHistory {
+  if (!Array.isArray(raw)) return { messages: [], backgroundActivities: [] };
+  const heartbeats = heartbeatRuns(raw);
+  const emittedAlerts = new Set<string>();
+  const visibleRaw: unknown[] = [];
+
+  raw.forEach((entry) => {
+    const message = obj(entry);
+    if (!message || heartbeatPoll(message)) return;
+    const id = runId(message);
+    const heartbeat = id ? heartbeats.get(id) : undefined;
+    if (!heartbeat) {
+      visibleRaw.push(entry);
+      return;
+    }
+    if (heartbeat.notify && heartbeat.notificationText && !emittedAlerts.has(heartbeat.runId)) {
+      emittedAlerts.add(heartbeat.runId);
+      visibleRaw.push({
+        role: "assistant",
+        content: [{ type: "text", text: heartbeat.notificationText }],
+        timestamp: heartbeat.ts,
+        __openclaw: { id: `heartbeat-alert-${heartbeat.runId}`, runId: heartbeat.runId },
+      });
+    }
+  });
+
+  const backgroundActivities = [...heartbeats.values()]
+    .sort((a, b) => a.firstIndex - b.firstIndex)
+    .map((heartbeat): BackgroundActivity => {
+      const runMessages = raw.filter((entry) => {
+        const message = obj(entry);
+        return message ? runId(message) === heartbeat.runId : false;
+      });
+      return {
+        id: heartbeat.runId,
+        ts: heartbeat.ts,
+        outcome: heartbeat.outcome,
+        summary: heartbeat.summary,
+        blocks: toVisibleChatMessages(runMessages, rawActivity).flatMap((message) => message.blocks),
+      };
+    });
+
+  return {
+    messages: toVisibleChatMessages(visibleRaw, rawActivity),
+    backgroundActivities,
+  };
+}
+
+export function toChatMessages(raw: unknown, rawActivity?: unknown): ChatMessage[] {
+  return toChatHistory(raw, rawActivity).messages;
 }
 
 export function toThreads(agentId: string, rows: unknown): ChatThread[] {

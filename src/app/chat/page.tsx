@@ -35,13 +35,7 @@ export default async function ChatPage({
   });
 
   return (
-    <div className="flex h-[calc(100dvh-6rem)] min-h-[32rem] flex-col">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Chat</h1>
-        <p className="mt-1 text-sm text-[color:var(--ck-text-secondary)]">
-          Talk to any agent in its own OpenClaw sessions — the same threads the Control UI shows.
-        </p>
-      </div>
+    <div className="flex h-full min-h-0 flex-col">
       <ChatClient agents={agents} initialAgent={first(sp.agent)} initialThread={first(sp.thread)} />
     </div>
   );

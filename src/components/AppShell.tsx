@@ -56,6 +56,7 @@ function SideNavLink({
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "/";
+  const isChatRoute = pathname === "/chat" || pathname.startsWith("/chat/");
   const router = useRouter();
   const teamIdFromPath = useMemo(() => {
     const m = pathname.match(/^\/teams\/([^/]+)(?:\/|$)/);
@@ -451,7 +452,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </aside>
 
         <div className="min-w-0 flex-1">
-          <main className="h-full overflow-auto px-6 py-5 lg:px-10">
+          <main className={isChatRoute ? "h-full min-h-0 overflow-hidden" : "h-full overflow-auto px-6 py-5 lg:px-10"}>
             <ErrorBoundary>{children}</ErrorBoundary>
           </main>
         </div>

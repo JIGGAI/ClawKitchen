@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { errorMessage } from "@/lib/errors";
 import { fetchJson } from "@/lib/fetch-json";
-import { mainSessionKey, type ChatMessage, type ChatThread, type LiveActivity, type StreamEvent } from "@/lib/chat/messages";
-import { AgentRail, Bubble, headerBtn, LiveActivityPanel, StreamingBubble, ThreadList } from "./chat-parts";
+import { mainSessionKey, type BackgroundActivity, type ChatMessage, type ChatThread, type LiveActivity, type StreamEvent } from "@/lib/chat/messages";
+import { AgentRail, BackgroundActivityPanel, Bubble, headerBtn, LiveActivityPanel, StreamingBubble, ThreadList } from "./chat-parts";
 
 export type ChatAgent = { id: string; name: string; team: string | null; teamName: string | null; isDefault: boolean };
 
@@ -70,6 +70,7 @@ export default function ChatClient({
   const [threadKey, setThreadKey] = useState(() => threadFor(pickAgent(agents, initialAgent), initialThread));
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [backgroundActivities, setBackgroundActivities] = useState<BackgroundActivity[]>([]);
   const [streamText, setStreamText] = useState<string | null>(null);
   const [thinkingText, setThinkingText] = useState<string | null>(null);
   const [liveActivities, setLiveActivities] = useState<LiveActivity[]>([]);
@@ -80,6 +81,7 @@ export default function ChatClient({
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
+  const [showBackground, setShowBackground] = useState(false);
   const messageListRef = useRef<HTMLDivElement>(null);
   const followLatestRef = useRef(true);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -100,11 +102,12 @@ export default function ChatClient({
 
   const loadHistory = useCallback(async () => {
     try {
-      const out = await fetchJson<{ messages: ChatMessage[]; running: boolean }>(
+      const out = await fetchJson<{ messages: ChatMessage[]; backgroundActivities: BackgroundActivity[]; running: boolean }>(
         `/api/chat/history?session=${encodeURIComponent(threadKey)}`,
         { cache: "no-store" },
       );
       setMessages(out.messages);
+      setBackgroundActivities(out.backgroundActivities);
       setRunning(out.running);
     } catch (e) {
       setError(errorMessage(e));
@@ -119,6 +122,8 @@ export default function ChatClient({
     followLatestRef.current = true;
     setShowJumpToLatest(false);
     setMessages([]);
+    setBackgroundActivities([]);
+    setShowBackground(false);
     setStreamText(null);
     setThinkingText(null);
     setLiveActivities([]);
@@ -313,7 +318,7 @@ export default function ChatClient({
   }
 
   return (
-    <div className="mt-4 flex min-h-0 flex-1 overflow-hidden rounded-xl border border-[color:var(--ck-border-subtle)]">
+    <div className="flex min-h-0 flex-1 overflow-hidden">
       <aside className="w-60 shrink-0 overflow-y-auto border-r border-[color:var(--ck-border-subtle)] p-2">
         <ThreadList threads={threads} selected={threadKey} onSelect={setThreadKey} />
         <AgentRail agents={agents} selected={agentId} query={query} onQuery={setQuery} onSelect={selectAgent} />
@@ -331,6 +336,12 @@ export default function ChatClient({
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            {backgroundActivities.length ? (
+              <button type="button" className={headerBtn} onClick={() => setShowBackground((value) => !value)} aria-expanded={showBackground}>
+                Background activity
+                <span className="ml-1 text-[color:var(--ck-text-tertiary)]">{backgroundActivities.length}</span>
+              </button>
+            ) : null}
             <button type="button" className={headerBtn} onClick={() => void newThread()}>
               + New thread
             </button>
@@ -339,6 +350,8 @@ export default function ChatClient({
             </Link>
           </div>
         </header>
+
+        {showBackground ? <BackgroundActivityPanel activities={backgroundActivities} /> : null}
 
         <div className="relative min-h-0 flex-1">
           <div ref={messageListRef} onScroll={handleMessageScroll} className="absolute inset-0 space-y-3 overflow-y-auto p-4">

@@ -4,6 +4,7 @@ import {
   mainSessionKey,
   textOf,
   toAgentStreamEvent,
+  toChatHistory,
   toChatMessages,
   toStreamEvent,
   toThreads,
@@ -84,6 +85,99 @@ describe("textOf / toChatMessages", () => {
         ts: 3,
       },
     ]);
+  });
+
+  it("removes silent heartbeat runs from chat and retains their grouped audit activity", () => {
+    const run = (id: string) => ({ runId: id, recordTimestampMs: 100 });
+    const history = toChatHistory([
+      { role: "user", content: "[OpenClaw heartbeat poll]\nCheck HEARTBEAT.md" },
+      {
+        role: "assistant",
+        content: [{ type: "toolCall", id: "check", name: "exec", arguments: { command: "test -f HEARTBEAT.md" } }],
+        __openclaw: run("heartbeat-1"),
+      },
+      {
+        role: "toolResult",
+        toolCallId: "check",
+        toolName: "exec",
+        content: [{ type: "text", text: "not found" }],
+        __openclaw: run("heartbeat-1"),
+      },
+      {
+        role: "assistant",
+        content: [{
+          type: "toolCall",
+          id: "respond",
+          name: "heartbeat_respond",
+          arguments: { notify: false, outcome: "no_change", summary: "Nothing needs attention." },
+        }],
+        __openclaw: run("heartbeat-1"),
+      },
+      {
+        role: "toolResult",
+        toolCallId: "respond",
+        toolName: "heartbeat_respond",
+        content: [{ type: "text", text: "{ \"status\": \"accepted\" }" }],
+        __openclaw: run("heartbeat-1"),
+      },
+      { role: "assistant", content: "HEARTBEAT_OK" },
+      { role: "assistant", content: "NO_REPLY" },
+      { role: "user", content: "Keep this message", timestamp: 200, __openclaw: { id: "visible" } },
+    ]);
+
+    expect(history.messages).toEqual([
+      {
+        id: "visible",
+        role: "user",
+        text: "Keep this message",
+        blocks: [{ type: "text", text: "Keep this message" }],
+        ts: 200,
+      },
+    ]);
+    expect(history.backgroundActivities).toHaveLength(1);
+    expect(history.backgroundActivities[0]).toMatchObject({
+      id: "heartbeat-1",
+      ts: 100,
+      outcome: "no_change",
+      summary: "Nothing needs attention.",
+    });
+    expect(history.backgroundActivities[0].blocks.filter((block) => block.type === "tool_call")).toHaveLength(2);
+  });
+
+  it("shows only a heartbeat notification when the run requests attention", () => {
+    const history = toChatHistory([
+      {
+        role: "assistant",
+        content: [{ type: "toolCall", id: "check", name: "exec", arguments: { command: "check" } }],
+        __openclaw: { runId: "heartbeat-alert", recordTimestampMs: 300 },
+      },
+      {
+        role: "assistant",
+        content: [{
+          type: "toolCall",
+          id: "respond",
+          name: "heartbeat_respond",
+          arguments: {
+            notify: true,
+            notificationText: "Your calendar event starts in 30 minutes.",
+            outcome: "needs_attention",
+            summary: "Upcoming calendar event",
+          },
+        }],
+        __openclaw: { runId: "heartbeat-alert", recordTimestampMs: 301 },
+      },
+    ]);
+
+    expect(history.messages).toEqual([
+      {
+        id: "heartbeat-alert-heartbeat-alert",
+        role: "assistant",
+        text: "Your calendar event starts in 30 minutes.",
+        blocks: [{ type: "text", text: "Your calendar event starts in 30 minutes." }],
+        ts: 301,
+      },
+    ]);
+    expect(history.backgroundActivities).toHaveLength(1);
   });
 });
 

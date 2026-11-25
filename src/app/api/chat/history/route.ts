@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { gatewayRequest } from "@/lib/chat/gateway-client";
-import { isChatSessionKey, toChatMessages } from "@/lib/chat/messages";
+import { isChatSessionKey, toChatHistory } from "@/lib/chat/messages";
 import { errorMessage } from "@/lib/errors";
 
 export const dynamic = "force-dynamic";
@@ -17,10 +17,11 @@ export async function GET(req: Request) {
       sessionKey: session,
       limit: 1000,
     });
+    const history = toChatHistory(out?.messages, out?.activity);
     return NextResponse.json({
       ok: true,
       running: out?.sessionInfo?.hasActiveRun === true,
-      messages: toChatMessages(out?.messages, out?.activity),
+      ...history,
     });
   } catch (e) {
     return NextResponse.json({ ok: false, error: errorMessage(e) }, { status: 502 });

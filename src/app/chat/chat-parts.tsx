@@ -3,7 +3,7 @@
 import Image from "next/image";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { ChatBlock, ChatMessage, ChatThread, LiveActivity, ToolStatus } from "@/lib/chat/messages";
+import type { BackgroundActivity, ChatBlock, ChatMessage, ChatThread, LiveActivity, ToolStatus } from "@/lib/chat/messages";
 import type { ChatAgent } from "./chat-client";
 
 export const railItem = "block w-full rounded-lg px-3 py-2 text-left text-sm transition-colors";
@@ -120,8 +120,27 @@ function Block({ block, mine }: { block: ChatBlock; mine: boolean }) {
 }
 
 export function Bubble({ message, agentName }: { message: ChatMessage; agentName: string }) {
-  if (message.role === "tool") {
-    return <div className="mx-auto w-full max-w-3xl space-y-2">{message.blocks.map((block, index) => <Block key={`${message.id}-${index}`} block={block} mine={false} />)}</div>;
+  const operational = message.blocks.length > 0 && message.blocks.every((block) =>
+    block.type === "thinking" || block.type === "tool_call" || block.type === "tool_result",
+  );
+  if (message.role === "tool" || operational) {
+    const operationCount = message.blocks.filter((block) => block.type === "tool_call" || block.type === "tool_result").length;
+    let operationLabel = "reasoning";
+    if (operationCount === 1) operationLabel = "1 operation";
+    if (operationCount > 1) operationLabel = `${operationCount} operations`;
+    return (
+      <details className="mx-auto w-full max-w-3xl rounded-xl border border-white/10 bg-black/10 px-3 py-2">
+        <summary className="cursor-pointer list-none text-xs text-[color:var(--ck-text-secondary)]">
+          <span className="font-medium">Activity</span>
+          <span className="ml-2 text-[color:var(--ck-text-tertiary)]">
+            {operationLabel}
+          </span>
+        </summary>
+        <div className="mt-2 space-y-2">
+          {message.blocks.map((block, index) => <Block key={`${message.id}-${index}`} block={block} mine={false} />)}
+        </div>
+      </details>
+    );
   }
   const mine = message.role === "user";
   return (
@@ -131,6 +150,31 @@ export function Bubble({ message, agentName }: { message: ChatMessage; agentName
         <div className={`mt-1 text-[10px] ${mine ? "text-white/70" : "text-[color:var(--ck-text-tertiary)]"}`}>
           {[mine ? "you" : agentName, clock(message.ts)].filter(Boolean).join(" · ")}
         </div>
+      </div>
+    </div>
+  );
+}
+
+export function BackgroundActivityPanel({ activities }: { activities: BackgroundActivity[] }) {
+  return (
+    <div className="max-h-72 overflow-y-auto border-b border-[color:var(--ck-border-subtle)] bg-black/10 px-4 py-3">
+      <div className="mb-2 text-xs text-[color:var(--ck-text-tertiary)]">
+        Routine heartbeat checks are hidden from the conversation. Expand one here for its audit trail.
+      </div>
+      <div className="space-y-2">
+        {[...activities].reverse().map((activity) => (
+          <details key={activity.id} className="rounded-lg border border-white/10 bg-black/15 px-3 py-2">
+            <summary className="cursor-pointer list-none text-xs">
+              <span className="font-medium">{activity.summary}</span>
+              <span className="ml-2 text-[color:var(--ck-text-tertiary)]">
+                {[activity.outcome?.replaceAll("_", " "), clock(activity.ts)].filter(Boolean).join(" · ")}
+              </span>
+            </summary>
+            <div className="mt-2 space-y-2">
+              {activity.blocks.map((block, index) => <Block key={`${activity.id}-${index}`} block={block} mine={false} />)}
+            </div>
+          </details>
+        ))}
       </div>
     </div>
   );
