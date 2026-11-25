@@ -62,8 +62,15 @@ describe("history", () => {
       sessionInfo: { hasActiveRun: true },
     });
     const res = await history(new Request("https://k/api/chat/history?session=agent:main:main"));
-    expect(gatewayRequest).toHaveBeenCalledWith("chat.history", { sessionKey: "agent:main:main", limit: 200 });
-    expect(await res.json()).toEqual({ ok: true, running: true, messages: [{ id: "m1", role: "user", text: "hi", ts: 1 }] });
+    expect(gatewayRequest).toHaveBeenCalledWith("chat.history", {
+      sessionKey: "agent:main:main",
+      limit: 1000,
+    });
+    expect(await res.json()).toEqual({
+      ok: true,
+      running: true,
+      messages: [{ id: "m1", role: "user", text: "hi", blocks: [{ type: "text", text: "hi" }], ts: 1 }],
+    });
   });
 
   it("refuses sessions that are not chat threads", async () => {
@@ -84,9 +91,44 @@ describe("send / abort", () => {
     expect(await res.json()).toEqual({ ok: true, runId: "r1", status: "started" });
   });
 
-  it("rejects empty messages", async () => {
-    const res = await send(new Request("https://k/api/chat/send", json({ session: "agent:main:main", message: "  " })));
-    expect(res.status).toBe(400);
+  it("accepts a validated image without text", async () => {
+    vi.mocked(gatewayRequest).mockResolvedValue({ runId: "r2", status: "started" });
+    const attachment = {
+      type: "image",
+      mimeType: "image/png",
+      fileName: "screen.png",
+      origin: "paste",
+      content: "aGVsbG8=",
+    };
+    const res = await send(
+      new Request("https://k/api/chat/send", json({ session: "agent:main:main", message: "", attachments: [attachment] })),
+    );
+    expect(res.status).toBe(200);
+    expect(gatewayRequest).toHaveBeenCalledWith(
+      "chat.send",
+      {
+        sessionKey: "agent:main:main",
+        message: "",
+        idempotencyKey: expect.any(String),
+        attachments: [attachment],
+      },
+      60_000,
+    );
+  });
+
+  it("rejects empty sends and invalid images", async () => {
+    const empty = await send(new Request("https://k/api/chat/send", json({ session: "agent:main:main", message: "  " })));
+    expect(empty.status).toBe(400);
+    const invalid = await send(
+      new Request(
+        "https://k/api/chat/send",
+        json({
+          session: "agent:main:main",
+          attachments: [{ type: "image", mimeType: "image/svg+xml", content: "PHN2Zz4=" }],
+        }),
+      ),
+    );
+    expect(invalid.status).toBe(400);
   });
 
   it("aborts the session's run", async () => {
@@ -119,6 +161,18 @@ describe("stream", () => {
     emit({ sessionKey: "agent:main:main", runId: "r", state: "delta", message: { content: [{ type: "text", text: "po" }] } });
     expect(decoder.decode((await reader.read()).value)).toBe(
       `data: ${JSON.stringify({ type: "delta", runId: "r", text: "po" })}\n\n`,
+    );
+
+    gw.listeners.forEach((listener) =>
+      listener("agent", {
+        sessionKey: "agent:main:main",
+        runId: "r",
+        stream: "thinking",
+        data: { itemId: "t1", phase: "delta", text: "Working" },
+      }),
+    );
+    expect(decoder.decode((await reader.read()).value)).toBe(
+      `data: ${JSON.stringify({ type: "thinking", runId: "r", itemId: "t1", text: "Working" })}\n\n`,
     );
 
     ctrl.abort();

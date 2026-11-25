@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { ensureGatewayConnected, onGatewayEvent } from "@/lib/chat/gateway-client";
-import { isChatSessionKey, toStreamEvent } from "@/lib/chat/messages";
+import { isChatSessionKey, toAgentStreamEvent, toStreamEvent } from "@/lib/chat/messages";
 import { errorMessage } from "@/lib/errors";
 
 export const dynamic = "force-dynamic";
@@ -31,8 +31,8 @@ export async function GET(req: Request) {
         }
       };
       const off = onGatewayEvent((event, payload) => {
-        if (event !== "chat" || (payload as { sessionKey?: unknown } | null)?.sessionKey !== session) return;
-        const ev = toStreamEvent(payload);
+        if ((payload as { sessionKey?: unknown } | null)?.sessionKey !== session) return;
+        const ev = event === "chat" ? toStreamEvent(payload) : event === "agent" || event === "session.tool" ? toAgentStreamEvent(payload) : null;
         if (ev) write(`data: ${JSON.stringify(ev)}\n\n`);
       });
       const heartbeat = setInterval(() => write(": keep-alive\n\n"), HEARTBEAT_MS);
