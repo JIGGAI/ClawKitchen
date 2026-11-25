@@ -70,6 +70,7 @@ describe("history", () => {
       ok: true,
       running: true,
       messages: [{ id: "m1", role: "user", text: "hi", blocks: [{ type: "text", text: "hi" }], ts: 1 }],
+      backgroundActivities: [],
     });
   });
 

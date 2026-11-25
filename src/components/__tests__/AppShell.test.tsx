@@ -58,4 +58,17 @@ describe("AppShell", () => {
     const link = screen.getByText("Edit team").closest("a");
     expect(link?.getAttribute("href")).toBe("/teams/claw-marketing-team");
   });
+
+  it("gives chat the full shell body without page padding or document scrolling", () => {
+    mockUsePathname.mockReturnValue("/chat");
+
+    render(
+      <AppShell>
+        <div>chat body</div>
+      </AppShell>
+    );
+
+    const main = screen.getByText("chat body").closest("main");
+    expect(main?.className).toBe("h-full min-h-0 overflow-hidden");
+  });
 });
