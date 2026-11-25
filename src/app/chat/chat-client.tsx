@@ -79,7 +79,9 @@ export default function ChatClient({
   const [input, setInput] = useState("");
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const endRef = useRef<HTMLDivElement>(null);
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
+  const messageListRef = useRef<HTMLDivElement>(null);
+  const followLatestRef = useRef(true);
   const fileRef = useRef<HTMLInputElement>(null);
   const agent = agents.find((a) => a.id === agentId) ?? null;
   const agentName = agent?.name ?? agentId;
@@ -114,6 +116,8 @@ export default function ChatClient({
   }, [loadThreads]);
 
   useEffect(() => {
+    followLatestRef.current = true;
+    setShowJumpToLatest(false);
     setMessages([]);
     setStreamText(null);
     setThinkingText(null);
@@ -180,10 +184,29 @@ export default function ChatClient({
   }, [agentId, threadKey]);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "end" });
+    if (!followLatestRef.current) return;
+    const messageList = messageListRef.current;
+    if (messageList) messageList.scrollTop = messageList.scrollHeight;
   }, [messages.length, streamText, thinkingText, liveActivities]);
 
+  function handleMessageScroll() {
+    const messageList = messageListRef.current;
+    if (!messageList) return;
+    const nearLatest = messageList.scrollHeight - messageList.scrollTop - messageList.clientHeight < 80;
+    followLatestRef.current = nearLatest;
+    setShowJumpToLatest(!nearLatest);
+  }
+
+  function jumpToLatest() {
+    followLatestRef.current = true;
+    setShowJumpToLatest(false);
+    const messageList = messageListRef.current;
+    messageList?.scrollTo({ top: messageList.scrollHeight, behavior: "smooth" });
+  }
+
   function selectAgent(id: string) {
+    followLatestRef.current = true;
+    setShowJumpToLatest(false);
     setAgentId(id);
     setThreadKey(mainSessionKey(id));
     setThreads([]);
@@ -241,6 +264,8 @@ export default function ChatClient({
     setInput("");
     setAttachments([]);
     setError(null);
+    followLatestRef.current = true;
+    setShowJumpToLatest(false);
     setSending(true);
     setRunning(true);
     setMessages((prev) => [...prev, optimistic]);
@@ -315,16 +340,26 @@ export default function ChatClient({
           </div>
         </header>
 
-        <div className="flex-1 space-y-3 overflow-y-auto p-4">
-          {messages.length === 0 && !running ? (
-            <p className="text-sm text-[color:var(--ck-text-tertiary)]">No messages with {agentName} here yet — say hello.</p>
+        <div className="relative min-h-0 flex-1">
+          <div ref={messageListRef} onScroll={handleMessageScroll} className="absolute inset-0 space-y-3 overflow-y-auto p-4">
+            {messages.length === 0 && !running ? (
+              <p className="text-sm text-[color:var(--ck-text-tertiary)]">No messages with {agentName} here yet — say hello.</p>
+            ) : null}
+            {messages.map((m) => (
+              <Bubble key={m.id} message={m} agentName={agentName} />
+            ))}
+            {running ? <LiveActivityPanel thinking={thinkingText} activities={liveActivities} /> : null}
+            {running ? <StreamingBubble text={streamText} agentName={agentName} /> : null}
+          </div>
+          {showJumpToLatest ? (
+            <button
+              type="button"
+              onClick={jumpToLatest}
+              className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-white/15 bg-[color:var(--ck-bg-glass-strong)] px-3 py-1.5 text-xs font-medium shadow-[var(--ck-shadow-2)] hover:border-white/25"
+            >
+              Jump to latest
+            </button>
           ) : null}
-          {messages.map((m) => (
-            <Bubble key={m.id} message={m} agentName={agentName} />
-          ))}
-          {running ? <LiveActivityPanel thinking={thinkingText} activities={liveActivities} /> : null}
-          {running ? <StreamingBubble text={streamText} agentName={agentName} /> : null}
-          <div ref={endRef} />
         </div>
 
         {error ? <div className="border-t border-[color:var(--ck-border-subtle)] px-4 py-2 text-sm text-red-400">{error}</div> : null}
