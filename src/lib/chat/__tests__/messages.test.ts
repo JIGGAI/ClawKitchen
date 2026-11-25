@@ -3,6 +3,7 @@ import {
   isChatSessionKey,
   mainSessionKey,
   textOf,
+  toAgentStreamEvent,
   toChatMessages,
   toStreamEvent,
   toThreads,
@@ -30,17 +31,58 @@ describe("textOf / toChatMessages", () => {
     expect(textOf(undefined)).toBe("");
   });
 
-  it("keeps user and assistant text, drops tool traffic and empty turns", () => {
-    const out = toChatMessages([
-      { role: "user", content: "Reply with just: pong", timestamp: 1, __openclaw: { id: "u1" } },
-      { role: "assistant", content: [{ type: "toolCall", name: "exec" }], timestamp: 2 },
-      { role: "toolResult", content: [{ type: "text", text: "ok" }] },
-      { role: "assistant", content: [{ type: "text", text: "pong" }], timestamp: 3, __openclaw: { id: "a1" } },
-      "junk",
-    ]);
+  it("keeps text, reasoning, tool calls, results, and prepared activity", () => {
+    const out = toChatMessages(
+      [
+        { role: "user", content: "Reply with just: pong", timestamp: 1, __openclaw: { id: "u1" } },
+        {
+          role: "assistant",
+          content: [
+            { type: "thinking", thinking: "I should inspect it." },
+            { type: "toolCall", id: "call-1", name: "exec", arguments: { command: "pwd" } },
+          ],
+          timestamp: 2,
+          __openclaw: { id: "a-tool" },
+        },
+        { role: "toolResult", toolCallId: "call-1", toolName: "exec", content: [{ type: "text", text: "ok" }] },
+        { role: "assistant", content: [{ type: "text", text: "pong" }], timestamp: 3, __openclaw: { id: "a1" } },
+      ],
+      [{ messageId: "a-tool", items: [{ itemId: "i1", toolCallId: "call-1", name: "exec", title: "Run command", status: "completed" }] }],
+    );
     expect(out).toEqual([
-      { id: "u1", role: "user", text: "Reply with just: pong", ts: 1 },
-      { id: "a1", role: "assistant", text: "pong", ts: 3 },
+      {
+        id: "u1",
+        role: "user",
+        text: "Reply with just: pong",
+        blocks: [{ type: "text", text: "Reply with just: pong" }],
+        ts: 1,
+      },
+      {
+        id: "a-tool",
+        role: "assistant",
+        text: "",
+        blocks: [
+          { type: "thinking", text: "I should inspect it." },
+          {
+            type: "tool_call",
+            id: "call-1",
+            name: "exec",
+            title: "Run command",
+            input: '{\n  "command": "pwd"\n}',
+            output: "ok",
+            isError: false,
+            status: "completed",
+          },
+        ],
+        ts: 2,
+      },
+      {
+        id: "a1",
+        role: "assistant",
+        text: "pong",
+        blocks: [{ type: "text", text: "pong" }],
+        ts: 3,
+      },
     ]);
   });
 });
@@ -66,7 +108,7 @@ describe("toThreads", () => {
   });
 });
 
-describe("toStreamEvent", () => {
+describe("stream events", () => {
   it("maps chat event states", () => {
     expect(toStreamEvent({ runId: "r", state: "delta", message: { content: [{ type: "text", text: "po" }] } })).toEqual({
       type: "delta",
@@ -78,5 +120,36 @@ describe("toStreamEvent", () => {
     expect(toStreamEvent({ runId: "r", state: "error", errorMessage: "boom" })).toEqual({ type: "error", runId: "r", message: "boom" });
     expect(toStreamEvent({ state: "other" })).toBeNull();
     expect(toStreamEvent(null)).toBeNull();
+  });
+
+  it("maps live thinking and tool activity", () => {
+    expect(
+      toAgentStreamEvent({
+        runId: "r",
+        stream: "thinking",
+        data: { itemId: "think-1", phase: "delta", text: "Checking files" },
+      }),
+    ).toEqual({ type: "thinking", runId: "r", itemId: "think-1", text: "Checking files" });
+
+    expect(
+      toAgentStreamEvent({
+        runId: "r",
+        stream: "tool",
+        data: { phase: "start", toolCallId: "call-1", name: "exec", args: { command: "pwd" } },
+      }),
+    ).toEqual({
+      type: "activity",
+      runId: "r",
+      activity: {
+        id: "call-1",
+        name: "exec",
+        title: "exec",
+        phase: "start",
+        status: "running",
+        input: '{\n  "command": "pwd"\n}',
+        output: null,
+        isError: false,
+      },
+    });
   });
 });

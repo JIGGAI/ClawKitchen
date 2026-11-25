@@ -1,8 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { ChatMessage, ChatThread } from "@/lib/chat/messages";
+import type { ChatBlock, ChatMessage, ChatThread, LiveActivity, ToolStatus } from "@/lib/chat/messages";
 import type { ChatAgent } from "./chat-client";
 
 export const railItem = "block w-full rounded-lg px-3 py-2 text-left text-sm transition-colors";
@@ -42,18 +43,91 @@ function clock(ts: number | null): string {
   return ts ? new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
 }
 
+const STATUS_STYLE: Record<ToolStatus, string> = {
+  running: "text-sky-300",
+  completed: "text-emerald-300",
+  failed: "text-red-300",
+  blocked: "text-amber-300",
+  skipped: "text-[color:var(--ck-text-tertiary)]",
+  unknown: "text-[color:var(--ck-text-tertiary)]",
+};
+
+function CodeDetail({ label, text }: { label: string; text: string | null }) {
+  if (!text) return null;
+  return (
+    <div className="mt-2">
+      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--ck-text-tertiary)]">{label}</div>
+      <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-black/35 p-2 text-[11px] leading-relaxed">{text}</pre>
+    </div>
+  );
+}
+
+function ToolCallBlock({ block }: { block: Extract<ChatBlock, { type: "tool_call" }> }) {
+  return (
+    <details className="rounded-xl border border-white/10 bg-black/15 px-3 py-2" open={block.status === "running"}>
+      <summary className="cursor-pointer list-none text-xs">
+        <span className={STATUS_STYLE[block.status]}>{block.status === "running" ? "●" : block.status === "completed" ? "✓" : block.status === "failed" ? "!" : "◆"}</span>
+        <span className="ml-2 font-medium">{block.title}</span>
+        <span className="ml-2 font-mono text-[10px] text-[color:var(--ck-text-tertiary)]">{block.name}</span>
+      </summary>
+      <CodeDetail label="Input" text={block.input} />
+      <CodeDetail label="Output" text={block.output} />
+    </details>
+  );
+}
+
+function ToolResultBlock({ block }: { block: Extract<ChatBlock, { type: "tool_result" }> }) {
+  return (
+    <details className={`rounded-xl border px-3 py-2 ${block.isError ? "border-red-400/25 bg-red-400/5" : "border-white/10 bg-black/15"}`}>
+      <summary className="cursor-pointer list-none text-xs">
+        <span className={block.isError ? "text-red-300" : "text-emerald-300"}>{block.isError ? "!" : "✓"}</span>
+        <span className="ml-2 font-medium">{block.name}</span>
+        <span className="ml-2 text-[color:var(--ck-text-tertiary)]">{block.isError ? "failed" : "completed"}</span>
+      </summary>
+      <CodeDetail label="Output" text={block.output || "(no output)"} />
+    </details>
+  );
+}
+
+function Block({ block, mine }: { block: ChatBlock; mine: boolean }) {
+  if (block.type === "text") return mine ? <p className="whitespace-pre-wrap break-words">{block.text}</p> : <Markdown text={block.text} />;
+  if (block.type === "thinking") {
+    return (
+      <details className="rounded-xl border border-violet-300/15 bg-violet-300/5 px-3 py-2" open>
+        <summary className="cursor-pointer text-xs font-medium text-violet-200">Thinking</summary>
+        <div className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-[color:var(--ck-text-secondary)]">{block.text}</div>
+      </details>
+    );
+  }
+  if (block.type === "tool_call") return <ToolCallBlock block={block} />;
+  if (block.type === "tool_result") return <ToolResultBlock block={block} />;
+  if (block.type === "image") {
+    return block.url ? (
+      <a href={block.url} target="_blank" rel="noreferrer" className="block">
+        <Image src={block.url} alt={block.fileName ?? "Attached image"} width={720} height={480} unoptimized className="max-h-80 w-auto max-w-full rounded-xl object-contain" />
+      </a>
+    ) : (
+      <div className="rounded-xl border border-white/10 px-3 py-2 text-xs">Image attached{block.fileName ? `: ${block.fileName}` : ""}</div>
+    );
+  }
+  return block.url ? (
+    <a href={block.url} target="_blank" rel="noreferrer" className="block rounded-lg border border-white/10 px-3 py-2 text-xs underline">
+      {block.label}
+    </a>
+  ) : (
+    <div className="rounded-lg border border-white/10 px-3 py-2 text-xs">{block.label}</div>
+  );
+}
+
 export function Bubble({ message, agentName }: { message: ChatMessage; agentName: string }) {
+  if (message.role === "tool") {
+    return <div className="mx-auto w-full max-w-3xl space-y-2">{message.blocks.map((block, index) => <Block key={`${message.id}-${index}`} block={block} mine={false} />)}</div>;
+  }
   const mine = message.role === "user";
   return (
     <div className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-      <div
-        className={`max-w-[78%] rounded-2xl px-4 py-2 text-sm ${
-          mine
-            ? "whitespace-pre-wrap break-words rounded-br-sm bg-[color:var(--ck-accent-red)] text-white"
-            : "rounded-bl-sm bg-white/10 text-[color:var(--ck-text-primary)]"
-        }`}
-      >
-        {mine ? message.text : <Markdown text={message.text} />}
+      <div className={`max-w-[88%] space-y-2 rounded-2xl px-4 py-2 text-sm ${mine ? "rounded-br-sm bg-[color:var(--ck-accent-red)] text-white" : "rounded-bl-sm bg-white/10 text-[color:var(--ck-text-primary)]"}`}>
+        {message.blocks.map((block, index) => <Block key={`${message.id}-${index}`} block={block} mine={mine} />)}
         <div className={`mt-1 text-[10px] ${mine ? "text-white/70" : "text-[color:var(--ck-text-tertiary)]"}`}>
           {[mine ? "you" : agentName, clock(message.ts)].filter(Boolean).join(" · ")}
         </div>
@@ -62,11 +136,36 @@ export function Bubble({ message, agentName }: { message: ChatMessage; agentName
   );
 }
 
+export function LiveActivityPanel({ thinking, activities }: { thinking: string | null; activities: LiveActivity[] }) {
+  if (!thinking && activities.length === 0) return null;
+  return (
+    <div className="mx-auto w-full max-w-3xl space-y-2">
+      {thinking ? (
+        <details className="rounded-xl border border-violet-300/15 bg-violet-300/5 px-3 py-2" open>
+          <summary className="cursor-pointer text-xs font-medium text-violet-200">Thinking live</summary>
+          <div className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-[color:var(--ck-text-secondary)]">{thinking}</div>
+        </details>
+      ) : null}
+      {activities.map((activity) => (
+        <details key={activity.id} className="rounded-xl border border-white/10 bg-black/15 px-3 py-2" open={activity.status === "running"}>
+          <summary className="cursor-pointer list-none text-xs">
+            <span className={STATUS_STYLE[activity.status]}>{activity.status === "running" ? "●" : activity.isError ? "!" : "✓"}</span>
+            <span className="ml-2 font-medium">{activity.title}</span>
+            <span className="ml-2 font-mono text-[10px] text-[color:var(--ck-text-tertiary)]">{activity.name}</span>
+          </summary>
+          <CodeDetail label="Input" text={activity.input} />
+          <CodeDetail label="Output" text={activity.output} />
+        </details>
+      ))}
+    </div>
+  );
+}
+
 export function StreamingBubble({ text, agentName }: { text: string | null; agentName: string }) {
   return (
     <div className="flex justify-start">
-      <div className="max-w-[78%] rounded-2xl rounded-bl-sm bg-white/10 px-4 py-2 text-sm text-[color:var(--ck-text-primary)]">
-        {text ? <Markdown text={text} /> : <span className="animate-pulse">{agentName} is thinking…</span>}
+      <div className="max-w-[88%] rounded-2xl rounded-bl-sm bg-white/10 px-4 py-2 text-sm text-[color:var(--ck-text-primary)]">
+        {text ? <Markdown text={text} /> : <span className="animate-pulse">{agentName} is working…</span>}
         <div className="mt-1 text-[10px] text-[color:var(--ck-text-tertiary)]">{agentName} · replying</div>
       </div>
     </div>
